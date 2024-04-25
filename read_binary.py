@@ -60,3 +60,10 @@ output_path = os.path.join(output_dir_path, output_name)
 with open(output_path, 'w') as file:
     for key, value in loaded_data.items():
         file.write(f'{key}: {value}\n')
+
+#* Output only the echo data as txt file
+output_name = os.path.basename(data_path) + '_echo_data.txt'
+output_path = os.path.join(output_dir_path, output_name)
+with open(output_path, 'w') as file:
+    for value in loaded_data['ECHO_DATA']:
+        file.write(f'{value}\n')
