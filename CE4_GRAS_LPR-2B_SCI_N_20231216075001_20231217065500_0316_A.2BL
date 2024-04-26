@@ -16,7 +16,7 @@
 	</Identification_Area>
 	<Reference_List>None</Reference_List>
 	<Observation_Area>
-		<Time_Coordinates>
+		<Time_Coordinates> <!-- 観測期間 -->
 			<start_date_time>2023-12-16T07:55:54.605Z</start_date_time>
 			<stop_date_time>2023-12-16T08:06:40.190Z</stop_date_time>
 		</Time_Coordinates>
@@ -44,24 +44,24 @@
 			<type>Satellite</type>
 		</Target_Identification>
 		<Mission_Area>
-			<product_id>CE4_GRAS_LPR-2B_SCI_N_20231216075001_20231217065500_0316_A.2B</product_id>
+			<product_id>CE4_GRAS_LPR-2B_SCI_N_20231216075001_20231217065500_0316_A.2B</product_id> <!-- 対応するデータファイル名 -->
 			<product_version>A</product_version>
 			<product_level>2B</product_level>
 			<instrument_name>Lunar Penetrating Radar</instrument_name>
 			<instrument_id>LPR</instrument_id>
-			<sequence_id>0316</sequence_id>
+			<sequence_id>0316</sequence_id> <!-- データセットの通し番号？ -->
 			<Work_Mode_Parm>
-				<sampling_interval unit="ns">0.312500</sampling_interval>
+				<sampling_interval unit="ns">0.312500</sampling_interval> <!-- サンプリング間隔[ns] -->
 			</Work_Mode_Parm>
 			<Instrument_Parm>
-				<central_frequency unit="MHz">500</central_frequency>
-				<working_bandwidth unit="MHz">450</working_bandwidth>
-				<antenna_height unit="cm">30</antenna_height>
+				<central_frequency unit="MHz">500</central_frequency> <!-- 中心周波数[MHz] -->
+				<working_bandwidth unit="MHz">450</working_bandwidth> <!-- 動作帯域幅[MHz] -->
+				<antenna_height unit="cm">30</antenna_height> <!-- アンテナ高さ[cm] -->
 			</Instrument_Parm>
-			<Lander_Location>
+			<Lander_Location> <!-- 観測座標 -->
 				<reference_frame>MOON_COORDINATE_SYSTEM</reference_frame>
-				<longitude unit="deg">177.599100</longitude>
-				<latitude unit="deg">-45.444600</latitude>
+				<longitude unit="deg">177.599100</longitude> <!-- 経度[deg] -->
+				<latitude unit="deg">-45.444600</latitude> <!-- 緯度[deg] -->
 			</Lander_Location>
 		</Mission_Area>
 	</Observation_Area>
@@ -79,17 +79,19 @@
 			<Record_Binary>
 				<fields>28</fields>
 				<groups>1</groups>
-				<record_length unit="byte">8307</record_length>
+				<record_length unit="byte">8307</record_length> <!-- レコード長[byte] -->
+				<!-- Frame Identifier (?)：1-4バイト -->
 				<Field_Binary>
 					<name>FRAME_IDENTIFICATION</name>
 					<field_number>1</field_number>
-					<field_location unit="byte">1</field_location>
+					<field_location unit="byte">1</field_location> <!-- フィールドの開始位置[byte] -->
 					<data_type>UnsignedByte</data_type>
-					<field_length unit="byte">4</field_length>
+					<field_length unit="byte">4</field_length> <!-- フィールドの長さ[byte] -->
 					<field_format>None</field_format>
 					<unit>none</unit>
 					<description>Frame Identifier, 0x146F2222: Channel 2 data</description>
 				</Field_Binary>
+				<!-- 観測時刻：5-10バイト -->
 				<Field_Binary>
 					<name>TIME</name>
 					<field_number>2</field_number>
@@ -100,6 +102,7 @@
 					<unit>none</unit>
 					<description>UTC time, the first four bytes represent seconds, the last two bytes represent milliseconds, basing on 2009-12-31-16-00-00-000</description>
 				</Field_Binary>
+				<!-- 速度：11-14バイト -->
 				<Field_Binary>
 					<name>VELOCITY</name>
 					<field_number>3</field_number>
@@ -110,6 +113,7 @@
 					<unit>m/s</unit>
 					<description>Velocity</description>
 				</Field_Binary>
+				<!-- X座標：15-18バイト -->
 				<Field_Binary>
 					<name>XPOSITION</name>
 					<field_number>4</field_number>
@@ -120,6 +124,7 @@
 					<unit>m</unit>
 					<description>The xposition,yposition and zposition of Rover are based on Reference Point Coordinate System, with coordinate center is the reference ponit. The x axis points to north and the y axis points to east and the z axis points to the lunar core.</description>
 				</Field_Binary>
+				<!-- Y座標：19-22バイト -->
 				<Field_Binary>
 					<name>YPOSITION</name>
 					<field_number>5</field_number>
@@ -130,6 +135,7 @@
 					<unit>m</unit>
 					<description>The yposition of Rover.</description>
 				</Field_Binary>
+				<!-- Z座標：23-26バイト -->
 				<Field_Binary>
 					<name>ZPOSITION</name>
 					<field_number>6</field_number>
@@ -140,6 +146,7 @@
 					<unit>m</unit>
 					<description>The zposition of Rover.</description>
 				</Field_Binary>
+				<!-- ローバーのピッチ：27-30バイト -->
 				<Field_Binary>
 					<name>ATT_PITCHING</name>
 					<field_number>7</field_number>
@@ -150,6 +157,7 @@
 					<unit>deg</unit>
 					<description>The pitch angle, roll angle and yaw angle of Rover are based on Reference Point Coordinate System, with coordinate center is the reference ponit. The x axis points to north and the y axis points to east and the z axis points to the lunar core.</description>
 				</Field_Binary>
+				<!-- ローバーのロール：31-34バイト -->
 				<Field_Binary>
 					<name>ATT_ROLLING</name>
 					<field_number>8</field_number>
@@ -160,6 +168,7 @@
 					<unit>deg</unit>
 					<description>The roll angle of Rover.</description>
 				</Field_Binary>
+				<!-- ローバーのヨー：35-38バイト -->
 				<Field_Binary>
 					<name>ATT_YAWING</name>
 					<field_number>9</field_number>
@@ -170,6 +179,7 @@
 					<unit>deg</unit>
 					<description>The yaw angle of Rover.</description>
 				</Field_Binary>
+				<!-- 参照点でのX座標：39-42バイト -->
 				<Field_Binary>
 					<name>REFERENCE_POINT_XPOSITION</name>
 					<field_number>10</field_number>
@@ -180,6 +190,7 @@
 					<unit>m</unit>
 					<description>The xposition, yposition and zposition of reference ponit are based on Landing-site Regional Coordinate System, with coordinate center is CE4 Lander. The x axis points to east and the y axis points to north and the z axis points to zenith.</description>
 				</Field_Binary>
+				<!-- 参照点でのY座標：43-46バイト -->
 				<Field_Binary>
 					<name>REFERENCE_POINT_YPOSITION</name>
 					<field_number>11</field_number>
@@ -190,6 +201,7 @@
 					<unit>m</unit>
 					<description>The yposition of reference ponit.</description>
 				</Field_Binary>
+				<!-- 参照点でのZ座標：47-50バイト -->
 				<Field_Binary>
 					<name>REFERENCE_POINT_ZPOSITION</name>
 					<field_number>12</field_number>
@@ -200,6 +212,7 @@
 					<unit>m</unit>
 					<description>The zposition of reference ponit.</description>
 				</Field_Binary>
+				<!-- 参照点でのピッチ：51-54バイト -->
 				<Field_Binary>
 					<name>REFERENCE_POINT_ATT_PITCHING</name>
 					<field_number>13</field_number>
@@ -210,6 +223,7 @@
 					<unit>deg</unit>
 					<description>The pitch angle, roll angle and yaw angle of Rover in reference ponit are based on Landing-site Regional Coordinate System, with coordinate center is CE4 Lander. The x axis points to east and the y axis points to north and the z axis points to zenith.</description>
 				</Field_Binary>
+				<!-- 参照点でのロール：55-58バイト -->
 				<Field_Binary>
 					<name>REFERENCE_POINT_ATT_ROLLING</name>
 					<field_number>14</field_number>
@@ -220,6 +234,7 @@
 					<unit>deg</unit>
 					<description>The roll angle of Rover in reference ponit.</description>
 				</Field_Binary>
+				<!-- 参照点でのヨー：59-62バイト -->
 				<Field_Binary>
 					<name>REFERENCE_POINT_ATT_YAWING</name>
 					<field_number>15</field_number>
@@ -230,6 +245,7 @@
 					<unit>deg</unit>
 					<description>The yaw angle of Rover in reference ponit.</description>
 				</Field_Binary>
+				<!-- データパラメータ1：63-73バイト -->
 				<Field_Binary>
 					<name>DataParameter1</name>
 					<field_number>16</field_number>
@@ -240,6 +256,7 @@
 					<unit>none</unit>
 					<description>DataParameter1</description>
 				</Field_Binary>
+				<!-- レーダー動作モード，４種類：74バイト -->
 				<Field_Binary>
 					<name>RADAR_WORKING_MODE</name>
 					<field_number>17</field_number>
@@ -250,6 +267,7 @@
 					<unit>none</unit>
 					<description>0x00: standby, 0x0f: only Channel 1 works, 0xf0: only Channel 2 works, 0xff: Channel 1 and Channel 2 work.</description>
 				</Field_Binary>
+				<!-- ch1のゲインモード，２種類：75バイト -->
 				<Field_Binary>
 					<name>RADAR_CHANNEL_1_GAIN_MODE</name>
 					<field_number>18</field_number>
@@ -260,6 +278,7 @@
 					<unit>none</unit>
 					<description>0x00: variational gain, 0xff: fixed gain.</description>
 				</Field_Binary>
+				<!-- ch1のゲイン値：76バイト -->
 				<Field_Binary>
 					<name>RADAR_CHANNEL_1_GAIN_VALUE</name>
 					<field_number>19</field_number>
@@ -270,6 +289,7 @@
 					<unit>none</unit>
 					<description>convert to decimalism.</description>
 				</Field_Binary>
+				<!-- ch2のゲインモード，４種類：77バイト -->
 				<Field_Binary>
 					<name>RADAR_CHANNEL_2_GAIN_MODE</name>
 					<field_number>20</field_number>
@@ -280,6 +300,7 @@
 					<unit>none</unit>
 					<description>0x00: Antenna A variational gain, Antenna B variational gain. 0x0f: Antenna A variational gain, Antenna B fixed gain. 0xf0: Antenna A fixed gain, Antenna B variational gain. 0xff: Antenna A fixed gain, Antenna B fixed gain.</description>
 				</Field_Binary>
+				<!-- ch2のゲイン値１：78バイト -->
 				<Field_Binary>
 					<name>RADAR_CHANNEL_2_GAIN_VALUE_1</name>
 					<field_number>21</field_number>
@@ -290,6 +311,7 @@
 					<unit>none</unit>
 					<description>convert to decimalism.</description>
 				</Field_Binary>
+				<!-- ch2のゲイン値２：79バイト -->
 				<Field_Binary>
 					<name>RADAR_CHANNEL_2_GAIN_VALUE_2</name>
 					<field_number>22</field_number>
@@ -300,6 +322,7 @@
 					<unit>none</unit>
 					<description>convert to decimalism.</description>
 				</Field_Binary>
+				<!-- データパラメータ2：80-107バイト -->
 				<Field_Binary>
 					<name>DataParameter2</name>
 					<field_number>23</field_number>
@@ -310,6 +333,7 @@
 					<unit>none</unit>
 					<description>DataParameter2</description>
 				</Field_Binary>
+				<!-- ch1の有効データ長：108-109バイト -->
 				<Field_Binary>
 					<name>VALID_DATA_LENGTH</name>
 					<field_number>24</field_number>
@@ -320,6 +344,7 @@
 					<unit>none</unit>
 					<description>Length of channel 1 valid data within a data record.</description>
 				</Field_Binary>
+				<!-- ch1のデータレコード数：110-111バイト -->
 				<Field_Binary>
 					<name>CHANNEL_1_RECORD_COUNT</name>
 					<field_number>25</field_number>
@@ -330,6 +355,7 @@
 					<unit>none</unit>
 					<description>The sequence number of channel 1 data records (or time windows).</description>
 				</Field_Binary>
+				<!-- ch2のデータレコード数：112-113バイト -->
 				<Field_Binary>
 					<name>CHANNEL_2_RECORD_COUNT</name>
 					<field_number>26</field_number>
@@ -340,6 +366,7 @@
 					<unit>none</unit>
 					<description>The sequence number of channel 2 data records (or time windows).</description>
 				</Field_Binary>
+				<!-- ch2のチャンネルとアンテナマーク，３種類：114バイト -->
 				<Field_Binary>
 					<name>CHANNEL_AND_ANTENNA_MARK</name>
 					<field_number>27</field_number>
@@ -350,6 +377,7 @@
 					<unit>none</unit>
 					<description>11: Channel 1. 2A: Channel 2 antenna A. 2B: Channel 2 antenna B.</description>
 				</Field_Binary>
+				<!-- グループ：エコーデータ：115-8306バイト -->
 				<Group_Field_Binary>
 					<name>ECHO_DATA</name>
 					<group_number>1</group_number>
@@ -357,7 +385,7 @@
 					<fields>1</fields>
 					<groups>0</groups>
 					<group_location unit="byte">115</group_location>
-					<group_length unit="byte">8192</group_length>
+					<group_length unit="byte">8192</group_length> <!-- １エコーあたり4バイト x 2048エコー = 8192バイト -->
 					<Field_Binary>
 						<name>ECHO_DATA</name>
 						<field_number>1</field_number>
@@ -369,6 +397,7 @@
 						<description>There are 2048 echoes, with a sample interval of 0.3125ns.</description>
 					</Field_Binary>
 				</Group_Field_Binary>
+				<!-- データ品質：8307バイト -->
 				<Field_Binary>
 					<name>QUALITY_STATE</name>
 					<field_number>28</field_number>
