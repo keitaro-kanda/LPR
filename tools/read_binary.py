@@ -1,7 +1,9 @@
 import struct
 import os
+import numpy as np
 
 data_path = 'LPR_2B/CE4_GRAS_LPR-2B_SCI_N_20231216075001_20231217065500_0316_A.2B'
+data_folder_path = 'LPR_2B'
 
 def read_binary_data(file_path):
     # Define the structure of a single record based on the provided metadata
@@ -61,9 +63,30 @@ with open(output_path, 'w') as file:
     for key, value in loaded_data.items():
         file.write(f'{key}: {value}\n')
 
+
+output_dir_path = os.path.dirname(data_path)
+Ascans = []
 #* Output only the echo data as txt file
-output_name = os.path.basename(data_path) + '_echo_data.txt'
-output_path = os.path.join(output_dir_path, output_name)
-with open(output_path, 'w') as file:
-    for value in loaded_data['ECHO_DATA']:
-        file.write(f'{value}\n')
+for filename in os.listdir(data_folder_path):
+    full_path = os.path.join(data_folder_path, filename)
+    # load only '.2B' files
+    if not full_path.endswith('.2B'):
+        continue
+
+    loaded_data = read_binary_data(full_path)
+    np.savetxt(data_folder_path + '/' + filename + '_echo_data.txt', loaded_data['ECHO_DATA'])
+
+    Ascans.append(loaded_data['ECHO_DATA'])
+
+
+Ascans = np.array(Ascans).T
+print(Ascans.shape)
+
+output_name = os.path.basename(data_folder_path) + '_echo_data.txt'
+output_path = os.path.join('Ascans', output_name)
+np.savetxt(output_path, Ascans)
+#output_name = os.path.basename(data_path) + '_echo_data.txt'
+#output_path = os.path.join(output_dir_path, output_name)
+#with open(output_path, 'w') as file:
+#    for value in loaded_data['ECHO_DATA']:
+#        file.write(f'{value}\n')
