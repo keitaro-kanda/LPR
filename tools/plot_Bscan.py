@@ -7,10 +7,7 @@ import mpl_toolkits.axes_grid1 as axgrid1
 Ascans_file_path = 'Ascans/LPR_2B_echo_data.txt'
 
 #* load data
-Ascans = np.loadtxt(Ascans_file_path)
-print(Ascans.shape)
-print(Ascans.shape[0])
-print(Ascans.shape[1])
+Ascans = np.loadtxt(Ascans_file_path, skiprows=0, delimiter=' ')
 
 sample_interval = 0.312500  # [ns]
 

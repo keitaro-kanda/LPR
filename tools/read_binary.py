@@ -1,6 +1,7 @@
 import struct
 import os
 import numpy as np
+from datetime import datetime, timedelta
 
 data_path = 'LPR_2B/CE4_GRAS_LPR-2B_SCI_N_20231216075001_20231217065500_0316_A.2B'
 data_folder_path = 'LPR_2B'
@@ -54,29 +55,106 @@ def read_binary_data(file_path):
         return results
 
 
+#* Define a function to convert bytes to integer
+def bytes_to_int(bytes):
+    return int.from_bytes(bytes, byteorder='big')
+#* Define a functions to read each modes
+def read_radar_mode(mode_value):
+    mode_descriptions = {
+        0x00: "standby",
+        0x0f: "only Channel 1 works",
+        0xf0: "only Channel 2 works",
+        0xff: "Channel 1 and Channel 2 work"
+    }
+    return mode_descriptions.get(mode_value, "Unknown mode")
+def read_radar_channerl_1_gain_mode(mode_value):
+    mode_descriptions = {
+        0x00: "variational gain",
+        0x01: "fixed gain",
+    }
+    return mode_descriptions.get(mode_value, "Unknown mode")
+def read_radar_channerl_2_gain_mode(mode_value):
+    mode_descriptions = {
+        0x00: "Antenna A variational gain, Antenna B variational gain",
+        0x0f: "Antenna A variational gain, Antenna B fixed gain",
+        0xf0: "Antenna A fixed gain, Antenna B variational gain",
+        0xff: "Antenna A fixed gain, Antenna B fixed gain"
+    }
+    return mode_descriptions.get(mode_value, "Unknown mode")
+def channel_and_antenna_mark(mode_value):
+    mode_descriptions = {
+        0x11: "Channel 1",
+        0x2A: "Channel 2, Antenna B",
+        0x2B: "Channel 2, Antenna B"
+    }
+    return mode_descriptions.get(mode_value, "Unknown mode")
+
 
 #* Load the binary data
 output_dir_path = os.path.dirname(data_path)
+Timestamps = []
 Ascans = []
 #* Output only the echo data as txt file
 for filename in os.listdir(data_folder_path):
     full_path = os.path.join(data_folder_path, filename)
+
     # load only '.2B' files
     if full_path.endswith('.2B') == False:
         continue
+
+    # Get the sequence ID from the filename
+    sequence_id = filename.split('_')[-2]
 
     Ascan_output_dir = os.path.join(data_folder_path, 'Ascan')
     if not os.path.exists(Ascan_output_dir):
         os.makedirs(Ascan_output_dir)
     loaded_data = read_binary_data(full_path)
-    np.savetxt(Ascan_output_dir + '/' + filename + '_echo_data.txt', loaded_data['ECHO_DATA'])
-
-    Ascans.append(loaded_data['ECHO_DATA'])
 
 
+    # Save the echo data to a text file one by one
+    with open(Ascan_output_dir + '/' + filename + '_echo_data.txt', 'w') as file:
+        for key, value in loaded_data.items():
+            if key == 'FRAME_IDENTIFICATION':
+                file.write(f'{key}: {"Channel 2 data"}\n')
+            elif key == 'TIME':
+                seconds = bytes_to_int(value[:4])
+                milliseconds = bytes_to_int(value[4:])
+                reference_time = datetime(2009, 12, 31, 16, 0, 0)
+                UTC_time = reference_time + timedelta(seconds=seconds, milliseconds=milliseconds)
+                file.write(f'{key}: {UTC_time}\n')
+            elif key == 'RADAR_WORKING_MODE':
+                mode_value = bytes_to_int(value)
+                mode_description = read_radar_mode(mode_value)
+                file.write(f'{key}: {mode_description}\n')
+            elif key == 'RADAR_CHANNEL_1_GAIN_MODE':
+                mode_value = bytes_to_int(value)
+                mode_description = read_radar_channerl_1_gain_mode(mode_value)
+                file.write(f'{key}: {mode_description}\n')
+            elif key == 'RADAR_CHANNEL_2_GAIN_MODE':
+                mode_value = bytes_to_int(value)
+                mode_description = read_radar_channerl_2_gain_mode(mode_value)
+                file.write(f'{key}: {mode_description}\n')
+            elif key == 'CHANNEL_AND_ANTENNA_MARK':
+                mode_value = bytes_to_int(value)
+                mode_description = channel_and_antenna_mark(mode_value)
+                file.write(f'{key}: {mode_description}\n')
+            else:
+                file.write(f'{key}: {value}\n')
+
+    # Save the echo data to a list to make Bscan data
+    echo_data = np.insert(loaded_data['ECHO_DATA'], 0, sequence_id)
+    Ascans.append(echo_data)
+
+
+#* Save all Ascans as a single Bscan data file
 Ascans = np.array(Ascans).T
-print(Ascans.shape)
+print("Ascans shape:", Ascans.shape)
+
+
+#* sort the Ascans by sequence ID
+Ascans = Ascans[:, Ascans[0].argsort()]
+
 
 output_name = os.path.basename(data_folder_path) + '_echo_data.txt'
 output_path = os.path.join('Ascans', output_name)
-np.savetxt(output_path, Ascans)
+np.savetxt(output_path, Ascans, fmt='%s', delimiter=' ')
