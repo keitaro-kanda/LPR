@@ -17,7 +17,7 @@ fig = plt.figure(figsize=(12, 7), tight_layout=True)
 ax = fig.add_subplot(111)
 plt.imshow(Ascans, aspect='auto', cmap='seismic',
             extent=[0, Ascans.shape[1], Ascans.shape[0]*sample_interval, 0],
-            vmin=-50, vmax=50
+            vmin=-30, vmax=30
             )
 ax.set_xlabel('Trace number', fontsize=18)
 ax.set_ylabel('Time (ns)', fontsize=18)
