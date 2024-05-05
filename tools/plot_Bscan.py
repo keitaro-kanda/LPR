@@ -13,11 +13,11 @@ sample_interval = 0.312500  # [ns]
 
 
 #* plot
-fig = plt.figure(figsize=(12, 7), tight_layout=True)
+fig = plt.figure(figsize=(20, 7), tight_layout=True)
 ax = fig.add_subplot(111)
 plt.imshow(Ascans, aspect='auto', cmap='seismic',
             extent=[0, Ascans.shape[1], Ascans.shape[0]*sample_interval, 0],
-            vmin=-30, vmax=30
+            vmin=-15, vmax=15
             )
 ax.set_xlabel('Trace number', fontsize=18)
 ax.set_ylabel('Time (ns)', fontsize=18)
