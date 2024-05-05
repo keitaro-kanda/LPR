@@ -7,8 +7,8 @@ import mpl_toolkits.axes_grid1 as axgrid1
 Ascans_file_path = 'Ascans/LPR_2B_echo_data.txt'
 
 #* load data
-Ascans = np.loadtxt(Ascans_file_path, skiprows=0, delimiter=' ')
-
+Ascans = np.loadtxt(Ascans_file_path, skiprows=1, delimiter=' ')
+print("Ascans shape:", Ascans.shape)
 sample_interval = 0.312500  # [ns]
 
 
@@ -27,7 +27,7 @@ title = os.path.splitext(os.path.basename(Ascans_file_path))[0]
 plt.title(title, fontsize=20)
 
 
-# plot with colorbar
+#* plot colorbar
 delvider = axgrid1.make_axes_locatable(ax)
 cax = delvider.append_axes('right', size='5%', pad=0.1)
 plt.colorbar(cax=cax).set_label('Amplitude', fontsize=18)
