@@ -38,7 +38,7 @@ plot_data = [Bscan_data, filtered_Bscan, background_removed_Bscan]
 for i in range(3):
     imshow = ax[i].imshow(plot_data[i], aspect='auto', cmap='seismic',
                 extent=[0, plot_data[i].shape[1], plot_data[i].shape[0]*sample_interval_ns, 0],
-                vmin=-100, vmax=100
+                vmin=-50, vmax=50
                 )
     ax[i].tick_params(axis='both', which='major', labelsize=fontsize_small)
     ax[i].set_title(['Raw Bscan', 'Bandpass filtering', 'Background removal'][i], fontsize=fontsize_large)
