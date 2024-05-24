@@ -4,13 +4,22 @@ import numpy as np
 from datetime import datetime, timedelta
 
 data_path = 'LPR_2B/CE4_GRAS_LPR-2B_SCI_N_20231216075001_20231217065500_0316_A.2B'
-data_folder_path = 'LPR_2B'
+#data_folder_path = 'LPR_2B'
+data_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B'
+#* check the data folder path
+if os.path.exists(data_folder_path) == False:
+    print('Data folder does not exist')
+    exit()
+
+#* check the data type whther it is LPR_2B, LPR_2A, or LPR_1
+data_type = os.path.split(data_folder_path)[1]
+print('Data type:', data_type)
 
 
 #* Define a function to read the binary data
 def read_binary_data(file_path):
     # Define the structure of a single record based on the provided metadata
-    if data_folder_path == 'LPR_2B' or data_folder_path == 'LPR_2A':
+    if data_type == 'LPR_2B' or data_type == 'LPR_2A':
         record_format = [
             ("FRAME_IDENTIFICATION", 1, 4, '4B'),  # 4 UnsignedBytes
             ("TIME", 5, 6, '6B'),  # 6 UnsignedBytes
@@ -42,7 +51,7 @@ def read_binary_data(file_path):
             ("ECHO_DATA", 115, 8192, '2048f'),  # 2048 little-endian floats
             ("QUALITY_STATE", 8307, 1, 'B')
         ]
-    elif data_folder_path == 'LPR_1':
+    elif data_type == 'LPR_1':
         record_format = [
             ("FRAME_IDENTIFICATION", 1, 4, '4B'),  # 4 UnsignedBytes
             ("TIME", 5, 6, '6B'),  # 6 UnsignedBytes
@@ -74,6 +83,9 @@ def read_binary_data(file_path):
             ("ECHO_DATA", 115, 32768, '8192f'),  # 8192 little-endian floats
             ("QUALITY_STATE", 32883, 1, 'B')
         ]
+    else:
+        print("Invalid data type")
+        return None
 
     # Open the file and read the specified fields
     with open(file_path, 'rb') as file:
