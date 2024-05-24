@@ -10,16 +10,18 @@ data_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B'
 if os.path.exists(data_folder_path) == False:
     print('Data folder does not exist')
     exit()
+else:
+    print('Data folder is successfully loaded')
 
 #* check the data type whther it is LPR_2B, LPR_2A, or LPR_1
-data_type = os.path.split(data_folder_path)[1]
-print('Data type:', data_type)
+channel = os.path.split(data_folder_path)[1]
+print('Channnel:', channel)
 
 
 #* Define a function to read the binary data
 def read_binary_data(file_path):
     # Define the structure of a single record based on the provided metadata
-    if data_type == 'LPR_2B' or data_type == 'LPR_2A':
+    if channel == 'LPR_2B' or channel == 'LPR_2A':
         record_format = [
             ("FRAME_IDENTIFICATION", 1, 4, '4B'),  # 4 UnsignedBytes
             ("TIME", 5, 6, '6B'),  # 6 UnsignedBytes
@@ -51,7 +53,7 @@ def read_binary_data(file_path):
             ("ECHO_DATA", 115, 8192, '2048f'),  # 2048 little-endian floats
             ("QUALITY_STATE", 8307, 1, 'B')
         ]
-    elif data_type == 'LPR_1':
+    elif channel == 'LPR_1':
         record_format = [
             ("FRAME_IDENTIFICATION", 1, 4, '4B'),  # 4 UnsignedBytes
             ("TIME", 5, 6, '6B'),  # 6 UnsignedBytes
@@ -93,10 +95,18 @@ def read_binary_data(file_path):
         for field_name, start_byte, length, fmt in record_format:
             file.seek(start_byte - 1)  # Adjust for 0-based index
             data = file.read(length)
-            if fmt.endswith('s'):  # Handle string type specially
-                results[field_name] = data.decode().strip()
-            else:
-                results[field_name] = struct.unpack(fmt, data)
+            if len(data) != length:
+                print(f"Warning: Expected {length} bytes for {field_name}, but got {len(data)} bytes.")
+                continue
+            try:
+                if fmt.endswith('s'):  # Handle string type specially
+                    results[field_name] = data.decode().strip()
+                else:
+                    results[field_name] = struct.unpack(fmt, data)
+            except struct.error as e:
+                print(f"Error unpacking field {field_name}: {e}")
+                continue
+
         return results
 
 
@@ -142,6 +152,7 @@ Ascans = []
 #* Output only the echo data as txt file
 for filename in os.listdir(data_folder_path):
     full_path = os.path.join(data_folder_path, filename)
+    file_size = os.path.getsize(full_path)
 
     # load only '.2B' files
     if full_path.endswith('.2B') == False:
@@ -153,7 +164,14 @@ for filename in os.listdir(data_folder_path):
     Ascan_output_dir = os.path.join(data_folder_path, 'Ascan')
     if not os.path.exists(Ascan_output_dir):
         os.makedirs(Ascan_output_dir)
+    #* ファイル名が'._'で始まるファイルは無視する
+    if filename.startswith('._'):
+        continue
+    print(f'Processing {filename} ({file_size} bytes)')
     loaded_data = read_binary_data(full_path)
+
+    if loaded_data is None:
+        continue
 
 
     # Save the echo data to a text file one by one
