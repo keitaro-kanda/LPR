@@ -4,8 +4,6 @@ from tqdm import tqdm
 import mpl_toolkits.axes_grid1 as axgrid1
 
 
-Bscan_data = np.loadtxt('Ascans/LPR_2B_echo_data.txt', skiprows=1, delimiter=' ')
-
 #sample_interval = 0.312500e-9  # [s]
 
 
@@ -47,6 +45,8 @@ class processing_background_removal():
         plt.show()
 
 
+#* example useage
+#Bscan_data = np.loadtxt('Ascans/LPR_2B_echo_data.txt', skiprows=1, delimiter=' ')
 #processer = processing_background_removal(Bscan_data)
 #background_removed_Bscan = processer.subtract_background()
 #processer.plot()

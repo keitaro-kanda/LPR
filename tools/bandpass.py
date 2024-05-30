@@ -5,8 +5,6 @@ import mpl_toolkits.axes_grid1 as axgrid1
 from tqdm import tqdm
 
 
-Bscan_data = np.loadtxt('Ascans/LPR_2B_echo_data.txt', skiprows=1, delimiter=' ')
-
 #sample_interval = 0.312500e-9  # [s]
 
 
@@ -44,7 +42,7 @@ class processing_filtering:
         fig = plt.figure(figsize=(12, 7), tight_layout=True)
         ax = fig.add_subplot(111)
         plt.imshow(self.filtered_Bscan, aspect='auto', cmap='seismic',
-                    extent=[0, self.filtered_Bscan.shape[1], self.filtered_Bscan.shape[0]*self.sample_interval, 0],
+                    extent=[0, self.filtered_Bscan.shape[1], self.filtered_Bscan.shape[0]*self.sample_interval*1e9, 0],
                     vmin=-100, vmax=100
                     )
         ax.set_xlabel('Trace number', fontsize=18)
@@ -63,7 +61,8 @@ class processing_filtering:
 
         plt.show()
 
-
+#* example useage
+#Bscan_data = np.loadtxt('/Volumes/SSD_kanda/LPR/LPR_2B/Raw_Bscan/Bscan.txt', delimiter=' ')
 #processer = processing_filtering(Bscan_data)
 #processer.apply_bandpass_filter()
 #processer.plot()
