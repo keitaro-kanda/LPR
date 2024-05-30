@@ -4,7 +4,8 @@ import os
 import mpl_toolkits.axes_grid1 as axgrid1
 
 
-Ascans_file_path = 'Ascans/LPR_2B_echo_data.txt'
+Ascans_file_path = '/Volumes/SSD_kanda/LPR/LPR_2B/ECHO/ECHO_0001.txt'
+print(os.path.split(Ascans_file_path)[0])
 
 #* load data
 Ascans = np.loadtxt(Ascans_file_path, skiprows=1, delimiter=' ')
@@ -17,7 +18,7 @@ fig = plt.figure(figsize=(20, 7), tight_layout=True)
 ax = fig.add_subplot(111)
 plt.imshow(Ascans, aspect='auto', cmap='seismic',
             extent=[0, Ascans.shape[1], Ascans.shape[0]*sample_interval, 0],
-            vmin=-15, vmax=15
+            vmin=-100, vmax=100
             )
 ax.set_xlabel('Trace number', fontsize=18)
 ax.set_ylabel('Time (ns)', fontsize=18)
@@ -34,7 +35,7 @@ plt.colorbar(cax=cax).set_label('Amplitude', fontsize=18)
 cax.tick_params(labelsize=16)
 
 # save plot
-plot_name = os.path.splitext(os.path.basename(Ascans_file_path))[0] + '.png'
-output_dir = os.path.dirname(Ascans_file_path)
-plt.savefig(output_dir + '/' + plot_name)
+#plot_name = os.path.splitext(os.path.basename(Ascans_file_path))[0] + '.png'
+#output_dir = os.path.dirname(Ascans_file_path)
+#plt.savefig(output_dir + '/' + plot_name)
 plt.show()
