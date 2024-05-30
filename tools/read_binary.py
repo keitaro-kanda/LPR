@@ -3,16 +3,11 @@ import os
 import numpy as np
 from datetime import datetime, timedelta
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 data_path = 'LPR_2B/CE4_GRAS_LPR-2B_SCI_N_20231216075001_20231217065500_0316_A.2B'
-#data_folder_path = 'LPR_2B/original_data'
-data_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B/original_data'
-#* check the data folder path
-if os.path.exists(data_folder_path) == False:
-    print('Data folder does not exist')
-    exit()
-else:
-    print('Data folder is successfully loaded')
+data_folder_path = 'LPR_2B/original_data'
+#data_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B/original_data'
 
 #* check the data type whther it is LPR_2B, LPR_2A, or LPR_1
 channel = 'LPR_2B'
@@ -157,7 +152,8 @@ if not os.path.exists(ECHO_dir):
 
 
 
-Ascans = []
+#Ascans = []
+position = []
 #* Output only the echo data as txt file
 for filename in os.listdir(data_folder_path):
     full_path = os.path.join(data_folder_path, filename)
@@ -227,20 +223,31 @@ for filename in os.listdir(data_folder_path):
                     file.write(f'{key}: {mode_description}\n')
                 else:
                     file.write(f'{key}: {value}\n')
-        
+
+
+        #* 前のファイルと同じpositionのデータは無視する
+        if record_index>0 and position[-1] == [loaded_data['XPOSITION'], loaded_data['YPOSITION'], loaded_data['ZPOSITION']]:
+            continue
+        position.append([loaded_data['XPOSITION'], loaded_data['YPOSITION'], loaded_data['ZPOSITION']])
+
         #* Save the echo data to a list to make Bscan data
+        #* record_indexは最大4桁の整数表記にする
         echo_data = np.insert(loaded_data['ECHO_DATA'], 0, record_index)
         ECHO.append(echo_data)
-    
 
+    #* Save the position data
+    #position = np.array(position)
+    #print('Position shape:', position)
+    #np.savetxt(loaded_data_output_dir + '/position.txt', position)
+
+    #* Save the ECHO data as a txt file
     ECHO = np.array(ECHO).T
     print(ECHO.shape)
-    #* sort the Ascans by records number
     ECHO = ECHO[:, ECHO[0].argsort()]
-
     np.savetxt(ECHO_dir + '/ECHO_' + sequence_id + '.txt', ECHO)
     print('Finished saving ECHO data')
     print('  ')
+
 
 """
 #* Save all Ascans as a single Bscan data file
