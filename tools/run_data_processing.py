@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from tqdm import tqdm
 import os
 import mpl_toolkits.axes_grid1 as axgrid1
 from bandpass import processing_filtering
