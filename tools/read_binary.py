@@ -3,10 +3,33 @@ import os
 import numpy as np
 from datetime import datetime, timedelta
 from tqdm import tqdm
+import argparse
 
-#data_path = 'LPR_2B/CE4_GRAS_LPR-2B_SCI_N_20231216075001_20231217065500_0316_A.2B'
-data_folder_path = 'LPR_2B/original_data'
-#data_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B/original_data'
+
+#* Parse command line arguments
+parser = argparse.ArgumentParser(
+    prog='read_binary.py',
+    description='Read binary data files and save the data as text files',
+    epilog='End of help message',
+    usage='python tools/read_binary.py [path_type]'
+)
+parser.add_argument('path_type', choices = ['local', 'SSD'], help='Choose the path type')
+args = parser.parse_args()
+
+
+
+
+#* Set the data folder path
+if args.path_type == 'local':
+    data_folder_path = 'LPR_2B/original_data'
+elif args.path_type == 'SSD':
+    data_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B/original_data'
+else:
+    print('Invalid path type, please choose either local or SSD')
+    exit()
+
+
+
 #* check the data folder path
 if not os.path.exists(data_folder_path):
     print('Data folder does not exist')
@@ -224,12 +247,13 @@ for filename in tqdm(os.listdir(data_folder_path), desc='Total Progress'):
 
 
         #* Calculate the position of the rover based on the landing site
-        X_position = loaded_data['REFERENCE_POINT_XPOSITION'][0] + loaded_data['XPOSITION'][0]
-        echo_data = np.insert(echo_data, 1, X_position)
-        Y_position = loaded_data['REFERENCE_POINT_YPOSITION'][0] + loaded_data['YPOSITION'][0]
-        echo_data = np.insert(echo_data, 2, Y_position)
-        Z_position = loaded_data['REFERENCE_POINT_ZPOSITION'][0] + loaded_data['ZPOSITION'][0]
-        echo_data = np.insert(echo_data, 3, Z_position)
+        echo_data = np.insert(echo_data, 1, loaded_data['VELOCITY'][0])
+        #X_position = loaded_data['REFERENCE_POINT_XPOSITION'][0] + loaded_data['XPOSITION'][0]
+        echo_data = np.insert(echo_data, 2, loaded_data['XPOSITION'][0])
+        #Y_position = loaded_data['REFERENCE_POINT_YPOSITION'][0] + loaded_data['YPOSITION'][0]
+        echo_data = np.insert(echo_data, 3, loaded_data['YPOSITION'][0])
+        #Z_position = loaded_data['REFERENCE_POINT_ZPOSITION'][0] + loaded_data['ZPOSITION'][0]
+        echo_data = np.insert(echo_data, 4, loaded_data['ZPOSITION'][0])
         #* Ignore positions that are the same as the previous record
         #if record_index > 0 and position[-1] == [loaded_data['XPOSITION'], loaded_data['YPOSITION'], loaded_data['ZPOSITION']]:
         #    continue

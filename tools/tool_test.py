@@ -12,6 +12,6 @@ lat = np.arcsin(read[0]/1737.4)
 print(lat*180/np.pi)
 
 # 16進数'30b2 c438'をfloatに変換
-data = 0x447A0000
+data = 0xaf2286c3
 read = struct.unpack('>f', struct.pack('>I', data))[0]
 print(read)
