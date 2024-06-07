@@ -64,7 +64,7 @@ def read_and_plot():
     total_x = np.array([])  # Initialize as numpy array
     total_y = np.array([])  # Initialize as numpy array
     record_num = []
-    total_record_num = [0]
+    total_record_num = []
     sequence_id = []
 
 
@@ -79,7 +79,7 @@ def read_and_plot():
 
         sequence_id.append(positions_file.split('_')[-1].split('.')[0])
         record_num.append(positions.shape[0])
-        total_record_num.append(total_record_num[-1] + positions.shape[0] if total_record_num else 0)
+        total_record_num.append(total_record_num[-1] + positions.shape[0] if total_record_num else positions.shape[0])
 
 
         #* Load X, Y, Z, distance
@@ -124,15 +124,23 @@ def read_and_plot():
     axes = [ax_left_0, ax_left_1, ax_left_2, ax_left_3]
 
     for i in range(len(axes)):
-            axes[i].plot(positions4plot[:, 1]*100, label='Velocity', linestyle='-')
-            axes[i].plot(positions4plot[:, 2], label='X (North-South)', linestyle='--')
-            axes[i].plot(positions4plot[:, 3], label='Y(East-West)', linestyle='-.')
-            axes[i].plot(positions4plot[:, 5], label='Distance', linestyle=':')
+            #* plot X, Y, Z, distance
+            axes[i].plot(positions4plot[:, 2], linestyle='-')
+            axes[i].plot(positions4plot[:, 3], linestyle='--')
+            axes[i].plot(positions4plot[:, 5], linestyle='-.')
+            #* plot velocity
+            axes2 = axes[i].twinx()
+            axes2.plot(positions4plot[:, 1], color='black', alpha=0.2)
+            axes2.set_ylim(0, 0.1)
+
             axes[i].grid()
             axes[i].set_xticks(total_record_num[:len(sequence_id)], sequence_id, rotation=90)
             axes[i].set_xlim(total_record_num[split_points[i]], total_record_num[split_points[i+1] - 1])
+            axes[i].set_ylabel('[m]')
+            axes2.set_ylabel('[cm/s]')
             if i == 0:
-                axes[i].legend(['Velocity (x100)', 'X (North-South)', 'Y (East-West)', 'Distance'], loc = 'upper right')
+                axes[i].legend(['X (North-South) [m]', 'Y (East-West) [m]', 'Distance [m]'], loc = 'upper left')
+                axes2.legend(['Velocity [cm/s]'], loc = 'upper right')
 
 
     #* Right side panels
@@ -158,8 +166,20 @@ def read_and_plot():
     #* plot start point
     ax_right_1.plot(total_y[0], total_x[0], marker='*', markersize=12, color='red')
     ax_right_1.grid()
-    ax_right_1.set_xlabel('Y [m] (East-West)', fontsize=fontsize_medium)
-    ax_right_1.set_ylabel('X [m] (North-South)', fontsize=fontsize_medium)
+    ax_right_1.set_xlabel('East-West', fontsize=fontsize_medium)
+    ax_right_1.set_ylabel('North-South', fontsize=fontsize_medium)
+
+    #* Convert X and Y ticks into Moon's coordinate as (0, 0) is (177.599100, -45.444600)
+    """
+    Moon_radius = 1737.4 * 10**3 # m
+    deg_per_km = 360 / (2 * np.pi * Moon_radius)
+    xticks = ax_right_1.get_xticks()
+    yticks = ax_right_1.get_yticks()
+    xticks_moon = xticks / 1000 * deg_per_km  + 177.599100
+    yticks_moon = yticks / 1000 * deg_per_km - 45.444600
+    ax_right_1.set_xticklabels(xticks_moon)
+    ax_right_1.set_yticklabels(yticks_moon)
+    """
 
 
     plt.savefig(os.path.join(position_folder_path, 'plot_position.png'))

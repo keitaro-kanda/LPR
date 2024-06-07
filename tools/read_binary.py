@@ -246,18 +246,15 @@ for filename in tqdm(os.listdir(data_folder_path), desc='Total Progress'):
         echo_data = np.insert(loaded_data['ECHO_DATA'], 0, loaded_data['CHANNEL_2_RECORD_COUNT'])
 
 
-        #* Calculate the position of the rover based on the landing site
+        #* Insert the position data to the echo data
         echo_data = np.insert(echo_data, 1, loaded_data['VELOCITY'][0])
-        #X_position = loaded_data['REFERENCE_POINT_XPOSITION'][0] + loaded_data['XPOSITION'][0]
         echo_data = np.insert(echo_data, 2, loaded_data['XPOSITION'][0])
-        #Y_position = loaded_data['REFERENCE_POINT_YPOSITION'][0] + loaded_data['YPOSITION'][0]
         echo_data = np.insert(echo_data, 3, loaded_data['YPOSITION'][0])
-        #Z_position = loaded_data['REFERENCE_POINT_ZPOSITION'][0] + loaded_data['ZPOSITION'][0]
         echo_data = np.insert(echo_data, 4, loaded_data['ZPOSITION'][0])
-        #* Ignore positions that are the same as the previous record
-        #if record_index > 0 and position[-1] == [loaded_data['XPOSITION'], loaded_data['YPOSITION'], loaded_data['ZPOSITION']]:
-        #    continue
-        #position.append([loaded_data['XPOSITION'], loaded_data['YPOSITION'], loaded_data['ZPOSITION']])
+        echo_data = np.insert(echo_data, 5, loaded_data['REFERENCE_POINT_XPOSITION'][0])
+        echo_data = np.insert(echo_data, 6, loaded_data['REFERENCE_POINT_YPOSITION'][0])
+        echo_data = np.insert(echo_data, 7, loaded_data['REFERENCE_POINT_ZPOSITION'][0])
+
 
         #* Save the echo data to a list to make Bscan data
         ECHO.append(echo_data)
