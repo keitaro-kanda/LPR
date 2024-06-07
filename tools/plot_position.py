@@ -18,6 +18,7 @@ if not os.path.exists(output_dir):
 def load_positions():
     for ECHO_data in tqdm(natsorted(os.listdir(data_folder_path))):
         record_count = []
+        VELOCITY = []
         XPOSITION = []
         YPOSITION = []
         ZPOSITION = []
@@ -35,20 +36,21 @@ def load_positions():
         for i in range(data.shape[1]):
 
             record_count.append(i + 1)
-            XPOSITION.append(data[2, i]) # data[1, i] is VELOCITY
+            VELOCITY.append(data[1, i])
+            XPOSITION.append(data[2, i])
             YPOSITION.append(data[3, i])
             ZPOSITION.append(data[4, i])
 
             distance.append(distance[-1] + np.sqrt((XPOSITION[-1] - XPOSITION[-2])**2 + (YPOSITION[-1] - YPOSITION[-2])**2) if distance else 0)
 
         #* Save record_count, XPOSITION, YPOSITION, ZPOSITION as 4xN array
-        positions = np.array([record_count, XPOSITION, YPOSITION, ZPOSITION, distance])
+        positions = np.array([record_count, VELOCITY, XPOSITION, YPOSITION, ZPOSITION, distance])
 
         #* sort by record_count
         positions = positions[:, np.argsort(positions[0])]
 
         #* Save positions with header
-        header = 'record_number X Y Z distance'
+        header = 'record_number Velocity X Y Z distance'
         sequence_id = ECHO_data.split('_')[-1].split('.')[0]
         np.savetxt(os.path.join(output_dir, 'position_' + str(sequence_id) + '.txt'), positions.T, delimiter=' ', header=header, comments='')
 
@@ -70,6 +72,8 @@ def read_and_plot():
     for positions_file in natsorted(os.listdir(position_folder_path)):
         if not positions_file.endswith('.txt'):
             continue
+        if positions_file.startswith('._'):
+            continue
         full_path = os.path.join(position_folder_path, positions_file)
         positions = np.loadtxt(full_path, delimiter=' ', skiprows=1) # postions file contains header
 
@@ -84,7 +88,7 @@ def read_and_plot():
         #* calculate total distance
         if total_distance4plot.size > 0:
             last_total_distance = total_distance4plot[-1]
-            total_distance4plot = np.concatenate((total_distance4plot, last_total_distance + positions[:, 4]))
+            total_distance4plot = np.concatenate((total_distance4plot, last_total_distance + positions[:, 5]))
         else:
             total_distance4plot = positions[:, 4]
 
@@ -92,8 +96,8 @@ def read_and_plot():
         if total_x.size > 0:
             last_total_x = total_x[-1]
             last_total_y = total_y[-1]
-            total_x = np.concatenate((total_x, last_total_x + positions[:, 1]))
-            total_y = np.concatenate((total_y, last_total_y + positions[:, 2]))
+            total_x = np.concatenate((total_x, last_total_x + positions[:, 2]))
+            total_y = np.concatenate((total_y, last_total_y + positions[:, 3]))
         else:
             total_x = positions[:, 1]
             total_y = positions[:, 2]
@@ -104,7 +108,7 @@ def read_and_plot():
     fontsize_large = 20
     fontsize_medium = 18
 
-    fig = plt.figure(figsize=(20, 20), tight_layout=True)
+    fig = plt.figure(figsize=(25, 20), tight_layout=True)
     #* 左列は4つのパネル，右列は2つのパネル，右列のパネルは縦並びで左列のパネルの高さの2倍
     gs = GridSpec(4, 2, width_ratios=[1, 2], height_ratios=[1, 1, 1, 1])
 
@@ -120,14 +124,15 @@ def read_and_plot():
     axes = [ax_left_0, ax_left_1, ax_left_2, ax_left_3]
 
     for i in range(len(axes)):
-            axes[i].plot(positions4plot[:, 1], label='X (North-South)')
-            axes[i].plot(positions4plot[:, 2], label='Y(East-West)', linestyle='--')
-            axes[i].plot(positions4plot[:, 4], label='Distance', linestyle='-.')
+            axes[i].plot(positions4plot[:, 1]*100, label='Velocity', linestyle='-')
+            axes[i].plot(positions4plot[:, 2], label='X (North-South)', linestyle='--')
+            axes[i].plot(positions4plot[:, 3], label='Y(East-West)', linestyle='-.')
+            axes[i].plot(positions4plot[:, 5], label='Distance', linestyle=':')
             axes[i].grid()
             axes[i].set_xticks(total_record_num[:len(sequence_id)], sequence_id, rotation=90)
             axes[i].set_xlim(total_record_num[split_points[i]], total_record_num[split_points[i+1] - 1])
             if i == 0:
-                axes[i].legend(['X (North-South)', 'Y (East-West)', 'Distance'], loc = 'upper right')
+                axes[i].legend(['Velocity (x100)', 'X (North-South)', 'Y (East-West)', 'Distance'], loc = 'upper right')
 
 
     #* Right side panels
@@ -149,15 +154,6 @@ def read_and_plot():
     cbar = plt.colorbar(ax_right_1.scatter(total_y, total_x, marker='.', c=total_distance4plot, cmap='viridis', s=5),
                         ax=ax_right_1, location='bottom', orientation='horizontal', pad=0.1)
     cbar.set_label('Distance (m)', fontsize=fontsize_medium)
-    #* colorbar, メモリはsequence_id
-    #cbar = plt.colorbar(ax_right_1.scatter(total_y, total_x, marker='.', c=total_distance4plot, cmap='viridis', s=10),
-    #                    ax=ax_right_1, ticks=sequence_id, location='bottom', orientation='horizontal', pad=0.1)
-    #cbar.set_ticks(total_distance4plot)
-    #   .set_label('Sequence ID', fontsize=fontsize_medium)
-    #* plot sequence_id on the track
-    #for i, txt in enumerate(sequence_id):
-    #    if i % 2 == 0:
-    #        ax_right_1.annotate(txt, (total_y[total_record_num[i]], total_x[total_record_num[i]]))
 
     #* plot start point
     ax_right_1.plot(total_y[0], total_x[0], marker='*', markersize=12, color='red')
@@ -167,6 +163,7 @@ def read_and_plot():
 
 
     plt.savefig(os.path.join(position_folder_path, 'plot_position.png'))
+    plt.savefig(os.path.join(position_folder_path, 'plot_position.pdf'))
     plt.show()
     return plt
 
