@@ -4,11 +4,27 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from matplotlib.gridspec import GridSpec
 from natsort import natsorted
+import argparse
 
 
-#data_folder_path = 'LPR_2B/original_data'
-data_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B/ECHO'
-position_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Position'
+#* Parse command line arguments
+parser = argparse.ArgumentParser(
+    prog='plot_position.py',
+    description='Plot position of observation site from ECHO data',
+    epilog='End of help message',
+    usage='python tools/plot_position.py [path_type]',
+)
+parser.add_argument('path_type', choices = ['local', 'SSD'], help='Choose the path type')
+args = parser.parse_args()
+
+
+#* Define data folder path
+if args.path_type == 'local':
+    data_folder_path = 'LPR_2B/ECHO'
+    position_folder_path = 'LPR_2B/Position'
+elif args.path_type == 'SSD':
+    data_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B/ECHO'
+    position_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Position'
 output_dir = os.path.join(os.path.dirname(data_folder_path), 'Position')
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
@@ -22,6 +38,9 @@ def load_positions():
         XPOSITION = []
         YPOSITION = []
         ZPOSITION = []
+        reference_X = []
+        reference_Y = []
+        reference_Z = []
         distance = []
         #* Load only .txt files
         if not ECHO_data.endswith('.txt'):
@@ -40,22 +59,25 @@ def load_positions():
             XPOSITION.append(data[2, i])
             YPOSITION.append(data[3, i])
             ZPOSITION.append(data[4, i])
+            reference_X.append(data[5, i])
+            reference_Y.append(data[6, i])
+            reference_Z.append(data[7, i])
 
             distance.append(distance[-1] + np.sqrt((XPOSITION[-1] - XPOSITION[-2])**2 + (YPOSITION[-1] - YPOSITION[-2])**2) if distance else 0)
 
         #* Save record_count, XPOSITION, YPOSITION, ZPOSITION as 4xN array
-        positions = np.array([record_count, VELOCITY, XPOSITION, YPOSITION, ZPOSITION, distance])
+        positions = np.array([record_count, VELOCITY, XPOSITION, YPOSITION, ZPOSITION, distance, reference_X, reference_Y, reference_Z])
 
         #* sort by record_count
         positions = positions[:, np.argsort(positions[0])]
 
         #* Save positions with header
-        header = 'record_number Velocity X Y Z distance'
+        header = 'record_number Velocity X Y Z distance Refernce_X Reference_Y Reference_z'
         sequence_id = ECHO_data.split('_')[-1].split('.')[0]
         np.savetxt(os.path.join(output_dir, 'position_' + str(sequence_id) + '.txt'), positions.T, delimiter=' ', header=header, comments='')
 
 
-#load_positions()
+load_positions()
 
 
 def read_and_plot():
@@ -187,4 +209,4 @@ def read_and_plot():
     plt.show()
     return plt
 
-read_and_plot()
+#read_and_plot()
