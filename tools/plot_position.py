@@ -79,8 +79,8 @@ def load_positions():
 
 
 
-def read_and_plot():
-    positions4plot = np.array([])
+def plot():
+    positions4plot = np.array([])  # Initialize as numpy array
     total_distance4plot = np.array([])  # Initialize as numpy array
     total_x = np.array([])  # Initialize as numpy array
     total_y = np.array([])  # Initialize as numpy array
@@ -103,15 +103,19 @@ def read_and_plot():
         total_record_num.append(total_record_num[-1] + positions.shape[0] if total_record_num else positions.shape[0])
 
 
-        #* Load X, Y, Z, distance
-        positions4plot = np.vstack((positions4plot, positions)) if positions4plot.size else positions
+        #* Load position data
+        if positions4plot.size > 0:
+            positions4plot = np.concatenate((positions4plot, positions))
+        else:
+            positions4plot = positions
+
 
         #* calculate total distance
         if total_distance4plot.size > 0:
             last_total_distance = total_distance4plot[-1]
             total_distance4plot = np.concatenate((total_distance4plot, last_total_distance + positions[:, 5]))
         else:
-            total_distance4plot = positions[:, 4]
+            total_distance4plot = positions[:, 5]
 
         #* calculate total position
         if total_x.size > 0:
@@ -120,15 +124,68 @@ def read_and_plot():
             total_x = np.concatenate((total_x, last_total_x + positions[:, 2]))
             total_y = np.concatenate((total_y, last_total_y + positions[:, 3]))
         else:
-            total_x = positions[:, 1]
-            total_y = positions[:, 2]
-    #print(record_num)
-    #print(total_record_num)
+            total_x = positions[:, 2]
+            total_y = positions[:, 3]
+
+    #* Extract data
+    Velocity = positions4plot[:, 1]
+    X = positions4plot[:, 2]
+    Y = positions4plot[:, 3]
+    Z = positions4plot[:, 4]
+    Reference_X = positions4plot[:, 6]
+    Reference_Y = positions4plot[:, 7]
+    Reference_Z = positions4plot[:, 8]
+
 
     #* plot
     fontsize_large = 20
     fontsize_medium = 18
 
+
+    fig, axes = plt.subplots(4, 1, figsize=(20, 20), tight_layout=True, sharex=True)
+
+    #* plot velocity
+    axes[0].plot(Velocity, color='black')
+    axes[0].set_ylabel('Velocity [cm/s]', fontsize=fontsize_medium)
+    axes[0].grid()
+
+    #* plot X, Y, Z
+    axes[1].plot(X, linestyle='-', label='X (North-South) [m]')
+    axes[1].plot(Y, linestyle='--', label='Y (East-West) [m]')
+    axes[1].plot(Z, linestyle='-.', label='Z [m]')
+    axes[1].set_ylabel('Rover posi [m]', fontsize=fontsize_medium)
+    axes[1].legend(loc='upper right')
+    axes[1].grid()
+
+    #* plot reference X, Y, Z
+    axes[2].plot(np.abs(Reference_X), linestyle='-', label='Reference_X [m]')
+    axes[2].plot(np.abs(Reference_Y), linestyle='--', label='Reference_Y [m]')
+    axes[2].plot(np.abs(Reference_Z), linestyle='-.', label='Reference_Z [m]')
+    axes[2].set_ylabel('Reference point posi [m]', fontsize=fontsize_medium)
+    axes[2].set_yscale('log')
+    axes[2].legend(loc='upper right')
+    axes[2].grid()
+
+    #* plot distance
+    axes[3].plot(total_distance4plot, color='black')
+    axes[3].set_ylabel('Total distance [m]', fontsize=fontsize_medium)
+    axes[3].grid()
+
+    axes[3].set_xticks(total_record_num, sequence_id, rotation=90)
+
+    #* set xticks
+    fig.supxlabel('Record number', fontsize=fontsize_large)
+
+    plt.show()
+
+
+
+
+
+
+
+
+    """
     fig = plt.figure(figsize=(25, 20), tight_layout=True)
     #* 左列は4つのパネル，右列は2つのパネル，右列のパネルは縦並びで左列のパネルの高さの2倍
     gs = GridSpec(4, 2, width_ratios=[1, 2], height_ratios=[1, 1, 1, 1])
@@ -189,6 +246,7 @@ def read_and_plot():
     ax_right_1.grid()
     ax_right_1.set_xlabel('East-West', fontsize=fontsize_medium)
     ax_right_1.set_ylabel('North-South', fontsize=fontsize_medium)
+    """
 
     #* Convert X and Y ticks into Moon's coordinate as (0, 0) is (177.599100, -45.444600)
     """
@@ -200,12 +258,12 @@ def read_and_plot():
     yticks_moon = yticks / 1000 * deg_per_km - 45.444600
     ax_right_1.set_xticklabels(xticks_moon)
     ax_right_1.set_yticklabels(yticks_moon)
-    """
 
 
     plt.savefig(os.path.join(position_folder_path, 'plot_position.png'))
     plt.savefig(os.path.join(position_folder_path, 'plot_position.pdf'))
     plt.show()
+    """
     return plt
 
 
@@ -213,10 +271,10 @@ def read_and_plot():
 if args.function_type == 'load':
     load_positions()
 elif args.function_type == 'plot':
-    read_and_plot()
+    plot()
 elif args.function_type == 'both':
     load_positions()
-    read_and_plot()
+    plot()
 else:
     print('Invalid function type')
     exit()
