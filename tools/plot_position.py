@@ -145,7 +145,7 @@ def plot():
     fig, axes = plt.subplots(4, 1, figsize=(25, 20), tight_layout=True, sharex=True)
 
     #* plot velocity
-    axes[0].scatter(np.arange(len(Velocity)), Velocity, color='black')
+    axes[0].scatter(np.arange(len(Velocity)), Velocity *100, s=5)
     axes[0].set_ylabel('Velocity [cm/s]', fontsize=fontsize_medium)
     axes[0].axhline(y=5.5, color='red', linestyle='--')
     axes[0].grid()
@@ -168,7 +168,7 @@ def plot():
     axes[2].grid()
 
     #* plot distance
-    axes[3].plot(total_distance4plot, color='black')
+    axes[3].plot(total_distance4plot)
     axes[3].set_ylabel('Total distance [m]', fontsize=fontsize_medium)
     axes[3].grid()
 
