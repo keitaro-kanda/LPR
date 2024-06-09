@@ -12,9 +12,10 @@ parser = argparse.ArgumentParser(
     prog='plot_position.py',
     description='Plot position of observation site from ECHO data',
     epilog='End of help message',
-    usage='python tools/plot_position.py [path_type]',
+    usage='python tools/plot_position.py [path_type] [function type]',
 )
 parser.add_argument('path_type', choices = ['local', 'SSD'], help='Choose the path type')
+parser.add_argument('function_type', choices = ['load', 'plot', 'both'], help='Choose the function type')
 args = parser.parse_args()
 
 
@@ -76,8 +77,6 @@ def load_positions():
         sequence_id = ECHO_data.split('_')[-1].split('.')[0]
         np.savetxt(os.path.join(output_dir, 'position_' + str(sequence_id) + '.txt'), positions.T, delimiter=' ', header=header, comments='')
 
-
-load_positions()
 
 
 def read_and_plot():
@@ -209,4 +208,15 @@ def read_and_plot():
     plt.show()
     return plt
 
-#read_and_plot()
+
+
+if args.function_type == 'load':
+    load_positions()
+elif args.function_type == 'plot':
+    read_and_plot()
+elif args.function_type == 'both':
+    load_positions()
+    read_and_plot()
+else:
+    print('Invalid function type')
+    exit()
