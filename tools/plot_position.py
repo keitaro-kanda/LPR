@@ -147,6 +147,7 @@ def plot():
     #* plot velocity
     axes[0].scatter(np.arange(len(Velocity)), Velocity, color='black')
     axes[0].set_ylabel('Velocity [cm/s]', fontsize=fontsize_medium)
+    axes[0].axhline(y=5.5, color='red', linestyle='--')
     axes[0].grid()
 
     #* plot X, Y, Z
