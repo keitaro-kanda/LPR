@@ -176,7 +176,27 @@ def plot():
     #* set xticks
     fig.supxlabel('Record number', fontsize=fontsize_large)
 
+    plt.savefig(os.path.join(position_folder_path, 'plot_position.png'))
     plt.show()
+
+
+    #* Plot track of CE-4
+    fig = plt.figure(figsize=(25, 20), tight_layout=True)
+    plt.scatter(total_y, total_x, c=total_distance4plot, cmap='viridis', s=10)
+    #* colorbar
+    cbar = plt.colorbar(plt.scatter(total_y, total_x, marker='.', c=total_distance4plot, cmap='viridis', s=5),
+                        location='bottom', orientation='horizontal', pad=0.1)
+    cbar.set_label('Distance (m)', fontsize=fontsize_medium)
+    #* plot start point
+    plt.plot(total_y[0], total_x[0], marker='*', markersize=12, color='red')
+
+    plt.grid()
+    plt.xlabel('East-West', fontsize=fontsize_medium)
+    plt.ylabel('North-South', fontsize=fontsize_medium)
+
+    plt.savefig(os.path.join(position_folder_path, 'plot_track.png'))
+    plt.show()
+
 
 
 
