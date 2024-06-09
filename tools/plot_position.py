@@ -142,25 +142,25 @@ def plot():
     fontsize_medium = 18
 
 
-    fig, axes = plt.subplots(4, 1, figsize=(20, 20), tight_layout=True, sharex=True)
+    fig, axes = plt.subplots(4, 1, figsize=(25, 20), tight_layout=True, sharex=True)
 
     #* plot velocity
-    axes[0].plot(Velocity, color='black')
+    axes[0].scatter(np.arange(len(Velocity)), Velocity, color='black')
     axes[0].set_ylabel('Velocity [cm/s]', fontsize=fontsize_medium)
     axes[0].grid()
 
     #* plot X, Y, Z
-    axes[1].plot(X, linestyle='-', label='X (North-South) [m]')
-    axes[1].plot(Y, linestyle='--', label='Y (East-West) [m]')
+    axes[1].plot(X, linestyle='-', label='X (North-South)')
+    axes[1].plot(Y, linestyle='--', label='Y (East-West)')
     axes[1].plot(Z, linestyle='-.', label='Z [m]')
     axes[1].set_ylabel('Rover posi [m]', fontsize=fontsize_medium)
     axes[1].legend(loc='upper right')
     axes[1].grid()
 
     #* plot reference X, Y, Z
-    axes[2].plot(np.abs(Reference_X), linestyle='-', label='Reference_X [m]')
-    axes[2].plot(np.abs(Reference_Y), linestyle='--', label='Reference_Y [m]')
-    axes[2].plot(np.abs(Reference_Z), linestyle='-.', label='Reference_Z [m]')
+    axes[2].plot(np.abs(Reference_X), linestyle='-', label='Reference_X')
+    axes[2].plot(np.abs(Reference_Y), linestyle='--', label='Reference_Y')
+    axes[2].plot(np.abs(Reference_Z), linestyle='-.', label='Reference_Z')
     axes[2].set_ylabel('Reference point posi [m]', fontsize=fontsize_medium)
     axes[2].set_yscale('log')
     axes[2].legend(loc='upper right')
@@ -171,7 +171,7 @@ def plot():
     axes[3].set_ylabel('Total distance [m]', fontsize=fontsize_medium)
     axes[3].grid()
 
-    axes[3].set_xticks(total_record_num, sequence_id, rotation=90)
+    axes[3].set_xticks(total_record_num[::2], sequence_id[::2], rotation=90)
 
     #* set xticks
     fig.supxlabel('Record number', fontsize=fontsize_large)
