@@ -84,7 +84,7 @@ def plot():
     total_distance4plot = np.array([])  # Initialize as numpy array
     total_x = np.array([])  # Initialize as numpy array
     total_y = np.array([])  # Initialize as numpy array
-    record_num = []
+    record_num = [0]
     total_record_num = []
     sequence_id = []
 
@@ -127,6 +127,7 @@ def plot():
             total_x = positions[:, 2]
             total_y = positions[:, 3]
 
+    total_record_num.insert(0, 0)
     #* Extract data
     Velocity = positions4plot[:, 1]
     X = positions4plot[:, 2]
@@ -142,150 +143,75 @@ def plot():
     fontsize_medium = 18
 
 
-    fig, axes = plt.subplots(4, 1, figsize=(25, 20), tight_layout=True, sharex=True)
+    fig, axes = plt.subplots(4, 1, figsize=(30, 15), tight_layout=True, sharex=True)
 
     #* plot velocity
     axes[0].scatter(np.arange(len(Velocity)), Velocity *100, s=5)
-    axes[0].set_ylabel('Velocity [cm/s]', fontsize=fontsize_medium)
+    axes[0].set_ylabel('Velocity [cm/s]', fontsize=fontsize_large)
     axes[0].axhline(y=5.5, color='red', linestyle='--')
-    axes[0].grid()
+    axes[0].set_ylim(0, 7)
 
     #* plot X, Y, Z
     axes[1].plot(X, linestyle='-', label='X (North-South)')
     axes[1].plot(Y, linestyle='--', label='Y (East-West)')
     axes[1].plot(Z, linestyle='-.', label='Z [m]')
-    axes[1].set_ylabel('Rover posi [m]', fontsize=fontsize_medium)
-    axes[1].legend(loc='upper right')
-    axes[1].grid()
+    axes[1].set_ylabel('Rover posi [m]', fontsize=fontsize_large)
+    axes[1].legend(loc='lower right', fontsize=fontsize_medium)
 
     #* plot reference X, Y, Z
     axes[2].plot(np.abs(Reference_X), linestyle='-', label='Reference_X')
     axes[2].plot(np.abs(Reference_Y), linestyle='--', label='Reference_Y')
     axes[2].plot(np.abs(Reference_Z), linestyle='-.', label='Reference_Z')
-    axes[2].set_ylabel('Reference point posi [m]', fontsize=fontsize_medium)
+    axes[2].set_ylabel('Reference point posi [m]', fontsize=fontsize_large)
     axes[2].set_yscale('log')
-    axes[2].legend(loc='upper right')
-    axes[2].grid()
+    axes[2].legend(loc='upper right', fontsize=fontsize_medium)
 
     #* plot distance
     axes[3].plot(total_distance4plot)
-    axes[3].set_ylabel('Total distance [m]', fontsize=fontsize_medium)
-    axes[3].grid()
+    axes[3].set_ylabel('Total distance [m]', fontsize=fontsize_large)
 
-    axes[3].set_xticks(total_record_num[::2], sequence_id[::2], rotation=90)
+    axes[3].set_xticks(total_record_num[:len(sequence_id):2], sequence_id[::2], rotation=90)
+
+    #* Common settings
+    for i in range(4):
+        axes[i].grid()
+        axes[i].tick_params(labelsize=fontsize_medium)
 
     #* set xticks
-    fig.supxlabel('Record number', fontsize=fontsize_large)
+    fig.supxlabel('Sequence ID', fontsize=fontsize_large)
 
     plt.savefig(os.path.join(position_folder_path, 'plot_position.png'))
     plt.show()
 
 
     #* Plot track of CE-4
-    fig = plt.figure(figsize=(25, 20), tight_layout=True)
-    plt.scatter(total_y, total_x, c=total_distance4plot, cmap='viridis', s=10)
+    fig = plt.figure(figsize=(20, 20), tight_layout=True)
+    #plt.scatter(total_y, total_x, c=total_distance4plot, cmap='viridis', s=10)
     #* colorbar
     cbar = plt.colorbar(plt.scatter(total_y, total_x, marker='.', c=total_distance4plot, cmap='viridis', s=5),
-                        location='bottom', orientation='horizontal', pad=0.1)
+                        location='bottom', orientation='horizontal', pad=0.1, aspect=50)
     cbar.set_label('Distance (m)', fontsize=fontsize_medium)
+    cbar.ax.tick_params(labelsize=fontsize_medium)
     #* plot start point
     plt.plot(total_y[0], total_x[0], marker='*', markersize=12, color='red')
 
+    #* plot sequence id
+    for i in range(len(sequence_id)):
+        if i % 10 == 0:
+            plt.text(total_y[total_record_num[i]], total_x[total_record_num[i]], sequence_id[i], fontsize=fontsize_medium)
+        else:
+            continue
+
     plt.grid()
-    plt.xlabel('East-West', fontsize=fontsize_medium)
-    plt.ylabel('North-South', fontsize=fontsize_medium)
+    plt.xlabel('East-West', fontsize=fontsize_large)
+    plt.ylabel('North-South', fontsize=fontsize_large)
+    plt.tick_params(labelsize=fontsize_medium)
+
 
     plt.savefig(os.path.join(position_folder_path, 'plot_track.png'))
     plt.show()
 
 
-
-
-
-
-
-
-
-    """
-    fig = plt.figure(figsize=(25, 20), tight_layout=True)
-    #* 左列は4つのパネル，右列は2つのパネル，右列のパネルは縦並びで左列のパネルの高さの2倍
-    gs = GridSpec(4, 2, width_ratios=[1, 2], height_ratios=[1, 1, 1, 1])
-
-
-
-    split_points = [0, int(len(sequence_id)/4), int(len(sequence_id)/2), int(3*len(sequence_id)/4), len(sequence_id)]
-
-    #* Left side panels
-    ax_left_0 = fig.add_subplot(gs[0, 0])
-    ax_left_1 = fig.add_subplot(gs[1, 0])
-    ax_left_2 = fig.add_subplot(gs[2, 0])
-    ax_left_3 = fig.add_subplot(gs[3, 0])
-    axes = [ax_left_0, ax_left_1, ax_left_2, ax_left_3]
-
-    for i in range(len(axes)):
-            #* plot X, Y, Z, distance
-            axes[i].plot(positions4plot[:, 2], linestyle='-')
-            axes[i].plot(positions4plot[:, 3], linestyle='--')
-            axes[i].plot(positions4plot[:, 5], linestyle='-.')
-            #* plot velocity
-            axes2 = axes[i].twinx()
-            axes2.plot(positions4plot[:, 1], color='black', alpha=0.2)
-            axes2.set_ylim(0, 0.1)
-
-            axes[i].grid()
-            axes[i].set_xticks(total_record_num[:len(sequence_id)], sequence_id, rotation=90)
-            axes[i].set_xlim(total_record_num[split_points[i]], total_record_num[split_points[i+1] - 1])
-            axes[i].set_ylabel('[m]')
-            axes2.set_ylabel('[cm/s]')
-            if i == 0:
-                axes[i].legend(['X (North-South) [m]', 'Y (East-West) [m]', 'Distance [m]'], loc = 'upper left')
-                axes2.legend(['Velocity [cm/s]'], loc = 'upper right')
-
-
-    #* Right side panels
-    ax_right_0 = fig.add_subplot(gs[0:2, 1])
-    ax_right_1 = fig.add_subplot(gs[2:4, 1])
-
-    #* plot total distance
-    ax_right_0.plot(total_distance4plot, '-')
-    ax_right_0.set_xlabel('Sequence id', fontsize=fontsize_medium)
-    ax_right_0.set_ylabel('Distance (m)', fontsize=fontsize_medium)
-    ax_right_0.grid()
-    #* sequence_idを2つ飛ばしでメモリにする
-    ax_right_0.set_xticks(total_record_num[:len(sequence_id):2], sequence_id[::2], rotation=90)
-    ax_right_0.set_xlim(0, positions4plot.shape[0])
-
-    #* plot track of CE-4
-    ax_right_1.scatter(total_y, total_x, c=total_distance4plot, cmap='viridis', s=10)
-    #* colorbar
-    cbar = plt.colorbar(ax_right_1.scatter(total_y, total_x, marker='.', c=total_distance4plot, cmap='viridis', s=5),
-                        ax=ax_right_1, location='bottom', orientation='horizontal', pad=0.1)
-    cbar.set_label('Distance (m)', fontsize=fontsize_medium)
-
-    #* plot start point
-    ax_right_1.plot(total_y[0], total_x[0], marker='*', markersize=12, color='red')
-    ax_right_1.grid()
-    ax_right_1.set_xlabel('East-West', fontsize=fontsize_medium)
-    ax_right_1.set_ylabel('North-South', fontsize=fontsize_medium)
-    """
-
-    #* Convert X and Y ticks into Moon's coordinate as (0, 0) is (177.599100, -45.444600)
-    """
-    Moon_radius = 1737.4 * 10**3 # m
-    deg_per_km = 360 / (2 * np.pi * Moon_radius)
-    xticks = ax_right_1.get_xticks()
-    yticks = ax_right_1.get_yticks()
-    xticks_moon = xticks / 1000 * deg_per_km  + 177.599100
-    yticks_moon = yticks / 1000 * deg_per_km - 45.444600
-    ax_right_1.set_xticklabels(xticks_moon)
-    ax_right_1.set_yticklabels(yticks_moon)
-
-
-    plt.savefig(os.path.join(position_folder_path, 'plot_position.png'))
-    plt.savefig(os.path.join(position_folder_path, 'plot_position.pdf'))
-    plt.show()
-    """
-    return plt
 
 
 
