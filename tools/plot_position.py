@@ -64,7 +64,7 @@ def load_positions():
             reference_Y.append(data[6, i])
             reference_Z.append(data[7, i])
 
-            distance.append(distance[-1] + np.sqrt((XPOSITION[-1] - XPOSITION[-2])**2 + (YPOSITION[-1] - YPOSITION[-2])**2) if distance else 0)
+            distance.append(distance[-1] + np.sqrt((XPOSITION[i] - XPOSITION[i-1])**2 + (YPOSITION[i] - YPOSITION[i-1])**2) if distance else 0)
 
         #* Save record_count, XPOSITION, YPOSITION, ZPOSITION as 4xN array
         positions = np.array([record_count, VELOCITY, XPOSITION, YPOSITION, ZPOSITION, distance, reference_X, reference_Y, reference_Z])
