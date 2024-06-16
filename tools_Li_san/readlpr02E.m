@@ -35,12 +35,15 @@ function [ntr,DAT] = readlpr02E(pname,fname)
 
 
 
+%% ファイルオープンとエラーチェック
 fid = fopen([pname,fname],'r');
 if fid == -1
     disp([fname,' does not exist!'])
     ntr = 0; DAT = {};
     return;
 end
+
+%% チャンネルとデータレベルのチェック
 if ~isempty(strfind(fname,'LPR-1'))
     ch = 1;
 elseif ~isempty(strfind(fname,'LPR-2'))
@@ -64,6 +67,8 @@ else
     return;
 end
 
+%% データ読み込み
+%% 特定のバイトパターンに基づいてトレースの開始位置を特性する．
 dchar = fread(fid,'uint8');
 if ch == 1
     a1 = find(dchar == hex2dec('14'));
@@ -79,6 +84,7 @@ else
     trace_bpos = a3(find(dchar(a3 + 3) == hex2dec('22')));
 end
 
+%% もしトレースの開始位置が特例された場合，その位置までのデータをテキストファイルに書き出す．
 if trace_bpos > 1
     foid = fopen([pname,fname,'.txt'],'w');
     fprintf(foid,'%s',dchar(1:trace_bpos-1));
@@ -86,6 +92,7 @@ if trace_bpos > 1
 end
 clear dchar;
 
+%% トレースデータの読み込み
 fseek(fid, 0, 'bof');
 n = length(trace_bpos);
 fprintf(1, '%s\n', ['Reading data from ''' fname ' ''...']);
