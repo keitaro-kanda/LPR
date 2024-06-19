@@ -254,6 +254,9 @@ for filename in tqdm(os.listdir(data_folder_path), desc='Total Progress'):
         echo_data = np.insert(echo_data, 5, loaded_data['REFERENCE_POINT_XPOSITION'][0])
         echo_data = np.insert(echo_data, 6, loaded_data['REFERENCE_POINT_YPOSITION'][0])
         echo_data = np.insert(echo_data, 7, loaded_data['REFERENCE_POINT_ZPOSITION'][0])
+        echo_data = np.insert(echo_data, 8, loaded_data['ATT_PITCHING'][0])
+        echo_data = np.insert(echo_data, 9, loaded_data['ATT_ROLLING'][0])
+        echo_data = np.insert(echo_data, 10, loaded_data['ATT_YAWING'][0])
 
 
         #* Save the echo data to a list to make Bscan data
