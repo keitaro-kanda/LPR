@@ -124,4 +124,5 @@ for ECHO_data in tqdm(natsorted(os.listdir(ECHO_dir))):
 
     #* save plot
     plt.savefig(output_dir + '/Bscan_' + str(sequcence_id + '.png'), dpi=300)
+    plt.show()
     plt.close()
