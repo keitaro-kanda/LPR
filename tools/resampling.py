@@ -28,43 +28,40 @@ if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
 
-def remove_redundant_rows(data, threshold=0.9):
-    # Calculate the mean of each row
-    row_means = np.mean(data, axis=1)
-    # Calculate the variance of each row
-    row_variances = np.var(data, axis=1)
-    # Normalize the variances
-    normalized_variances = row_variances / np.max(row_variances)
-    # Identify rows with normalized variance below the threshold
-    redundant_rows = normalized_variances < threshold
-    # Remove redundant rows
-    cleaned_data = data[~redundant_rows, :]
-    return cleaned_data
+
+def remove_redundant_rows(data, record_num):
+    #* Calculate the average of previous five records
+    average = np.mean(data[:, record_num - 5:record_num], axis=1)
+
+    difference = np.abs(data[:, record_num] - average)
+
+    #* If the difference is larger than criteria, remove the record
+    difference_criteria = 0.1
+    if np.sum(difference) > difference_criteria:
+        np.insert(data[:, record_num], 0, record_num)
+        Resampled_ECHO.append(data[:, record_num])
 
 
-for ECHO_data in tqdm(natsorted(os.listdir(data_folder_path))):
-    #* Load only .txt files
+#* Resampling
+for ECHO_data in natsorted(os.listdir(data_folder_path)):
+    #* Load ECHO data
     if not ECHO_data.endswith('.txt'):
         continue
     if ECHO_data.startswith('._'):
         continue
 
     ECHO_data_path = os.path.join(data_folder_path, ECHO_data)
-    data = np.loadtxt(ECHO_data_path, delimiter=' ')
+    data = np.loadtxt(ECHO_data_path, delimiter=' ', skiprows=11)
 
-    ECHO = data[5:, :]
 
-    #* Remove redundant rows
-    cleaned_ECHO = remove_redundant_rows(ECHO)
+    #* Resampling
+    for i in tqdm(range(data.shape[1]), desc=ECHO_data):
+        Resampled_ECHO = []
+        remove_redundant_rows(data, i)
+    print(np.array(Resampled_ECHO).shape)
 
-    #* Save cleaned data
-    cleaned_data_path = os.path.join(output_dir, f'cleaned_{ECHO_data}')
-    np.savetxt(cleaned_data_path, cleaned_ECHO, delimiter=' ')
-
-    plt.figure(figsize=(10, 10))
-    plt.imshow(cleaned_ECHO, aspect='auto', cmap='seismic')
+    plt.figure()
+    plt.imshow(Resampled_ECHO, aspect='auto')
     plt.colorbar()
-    plt.title(f'Cleaned Data: {ECHO_data}')
-    plt.savefig(os.path.join(output_dir, f'cleaned_{ECHO_data}.png'))
-    plt.close()
-print('Data resampling completed')
+
+    plt.show()

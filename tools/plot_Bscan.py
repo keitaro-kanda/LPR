@@ -55,6 +55,9 @@ for ECHO_data in tqdm(natsorted(os.listdir(ECHO_dir))):
     XPOSITION = []
     YPOSITION = []
     ZPOSITION = []
+    PITCHING = []
+    ROLLING = []
+    YAWING = []
     ECHO = []
 
     ECHO_data_path = os.path.join(ECHO_dir, ECHO_data)
@@ -65,7 +68,10 @@ for ECHO_data in tqdm(natsorted(os.listdir(ECHO_dir))):
     XPOSITION = data[2, :]
     YPOSITION = data[3, :]
     ZPOSITION = data[4, :]
-    ECHO = data[5:, :]
+    PITCHING = data[5, :]
+    ROLLING = data[6, :]
+    YAWING = data[7, :]
+    ECHO = data[8:, :]
 
     #ECHO_for_plot = np.concatenate(ECHO, axis=1)
     #print("B-scan shape after concatenation:", ECHO_for_plot.shape)
@@ -80,7 +86,7 @@ for ECHO_data in tqdm(natsorted(os.listdir(ECHO_dir))):
 
 
     fig = plt.figure(figsize=(20, 10), tight_layout=True)
-    gs = GridSpec(3, 1, height_ratios=[4, 1, 1])
+    gs = GridSpec(4, 1, height_ratios=[4, 1, 1, 1])
 
     gs_echo = plt.subplot(gs[0])
     gs_echo.imshow(ECHO, aspect='auto', cmap='seismic',
@@ -116,6 +122,17 @@ for ECHO_data in tqdm(natsorted(os.listdir(ECHO_dir))):
     gs_posi.set_ylabel('Position \n [m]', fontsize=font_lartge)
     gs_posi.legend(loc='lower right', fontsize=font_medium)
     gs_posi.tick_params(axis='both', which='major', labelsize=font_medium)
+
+    #* plot Pitching, Rolling, Yawing
+    gs_angle = plt.subplot(gs[3], sharex=gs_echo)
+    gs_angle.plot(PITCHING, '-', label='Pitching')
+    gs_angle.plot(ROLLING, '--', label='Rolling')
+    gs_angle.plot(YAWING, '-.', label='Yawing')
+    gs_angle.set_ylabel('Angle [deg]', fontsize=font_lartge)
+    gs_angle.legend(loc='lower right', fontsize=font_medium)
+    gs_angle.tick_params(axis='both', which='major', labelsize=font_medium)
+    gs_angle.tick_params(axis='x', which='major', labelsize=font_small)
+    gs_angle.set_yscale('log')
 
 
     fig.supxlabel('Record number', fontsize=font_lartge)
