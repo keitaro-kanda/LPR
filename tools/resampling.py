@@ -31,15 +31,18 @@ if not os.path.exists(output_dir):
 
 def remove_redundant_rows(data, record_num):
     #* Calculate the average of previous five records
-    average = np.mean(data[:, record_num - 5:record_num], axis=1)
+    difference_criteria = 6000
 
-    difference = np.abs(data[:, record_num] - average)
-
-    #* If the difference is larger than criteria, remove the record
-    difference_criteria = 0.1
-    if np.sum(difference) > difference_criteria:
-        np.insert(data[:, record_num], 0, record_num)
-        Resampled_ECHO.append(data[:, record_num])
+    if record_num ==0:
+        Resampled_ECHO.append(np.insert(data[:, record_num], 0, record_num))
+    else:
+        if record_num > 10:
+            average = np.mean(data[:, record_num - 10:record_num], axis=1)
+            difference = np.abs(data[:, record_num] - average)
+        else:
+            difference = np.abs(data[:, record_num] - data[:, record_num - 1])
+        if np.sum(difference) > difference_criteria:
+            Resampled_ECHO.append(np.insert(data[:, record_num], 0, record_num))
 
 
 #* Resampling
@@ -53,15 +56,40 @@ for ECHO_data in natsorted(os.listdir(data_folder_path)):
     ECHO_data_path = os.path.join(data_folder_path, ECHO_data)
     data = np.loadtxt(ECHO_data_path, delimiter=' ', skiprows=11)
 
-
+    print(' ')
+    print('ECHO data:', ECHO_data)
+    print('record count number:', data.shape[1])
     #* Resampling
+    Resampled_ECHO = []
     for i in tqdm(range(data.shape[1]), desc=ECHO_data):
-        Resampled_ECHO = []
         remove_redundant_rows(data, i)
-    print(np.array(Resampled_ECHO).shape)
+    Resampled_ECHO = np.array(Resampled_ECHO).T
+    print(Resampled_ECHO.shape)
 
-    plt.figure()
-    plt.imshow(Resampled_ECHO, aspect='auto')
+
+    #* Plot which record is resampled on the data plot
+    resampled_record = Resampled_ECHO[0, :]
+    print('Number of resampled record:', len(resampled_record))
+    plt.figure(tight_layout=True)
+    plt.imshow(data, aspect='auto', cmap='seismic',
+                extent=[0, data.shape[1], data.shape[0]*0.3125, 0],
+                vmin=-50, vmax=50)
+    plt.xlabel('Record count')
+    plt.ylabel('Time [ns]')
+    plt.colorbar()
+    #* Shade resampled record
+    for i in range(len(resampled_record)):
+        plt.axvspan(resampled_record[i], resampled_record[i]+1, color='gray', alpha=0.1)
+    plt.show()
+
+
+    #* Plot resampled ECHO data
+    plt.figure(tight_layout=True)
+    plt.imshow(Resampled_ECHO, aspect='auto', cmap='seismic',
+                extent=[0, Resampled_ECHO.shape[1], Resampled_ECHO.shape[0]*0.3125, 0],
+                vmin=-50, vmax=50)
+    plt.xlabel('Record count')
+    plt.ylabel('Time [ns]')
     plt.colorbar()
 
     plt.show()
