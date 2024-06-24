@@ -1,3 +1,7 @@
+"""
+This code make hall B-scan plot from resampled ECHO data.
+If you want to make B-scan plot of each sequence, you can use resampling.py.
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 import os
@@ -13,16 +17,17 @@ parser = argparse.ArgumentParser(
     prog='plot_Bscan.py',
     description='Plot B-scan from ECHO data',
     epilog='End of help message',
-    usage='python tools/plot_Bscan.py [path_type]',
+    usage='python tools/plot_Bscan.py [path_type] [function type]',
 )
 parser.add_argument('path_type', choices = ['local', 'SSD'], help='Choose the path type')
+parser.add_argument('function_type', choices = ['load', 'plot'], help='Choose the function type')
 args = parser.parse_args()
 
 
 
 #* Define data folder path
 if args.path_type == 'local':
-    ECHO_dir = 'LPR_2B/ECHO'
+    ECHO_dir = 'LPR_2B/Resampled_ECHO/txt'
 elif args.path_type == 'SSD':
     ECHO_dir = '/Volumes/SSD_kanda/LPR/LPR_2B/Resampled_ECHO/txt'
 else:
@@ -37,132 +42,62 @@ print("Ascans shape:", Ascans.shape)
 sample_interval = 0.312500  # [ns]
 
 
-#Velocity = []
-#ECHO = []
-output_dir = os.path.join(os.path.dirname(ECHO_dir), 'Raw_Bscan')
+#* Define output folder path
+output_dir = os.path.join(os.path.dirname(ECHO_dir))
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
-ECHO_for_plot = np.array([])
-for ECHO_data in tqdm(natsorted(os.listdir(ECHO_dir))):
-    #* Load only .txt files
-    if not ECHO_data.endswith('.txt'):
-        continue
-    if ECHO_data.startswith('._'):
-        continue
 
-    sequcence_id = ECHO_data.split('_')[-1].split('.')[0]
-    Velocity = []
-    XPOSITION = []
-    YPOSITION = []
-    ZPOSITION = []
-    PITCHING = []
-    ROLLING = []
-    YAWING = []
-    ECHO = []
+def load_resampled_data():
+    ECHO_for_plot = np.array([])
+    for ECHO_data in tqdm(natsorted(os.listdir(ECHO_dir))):
+        #* Load only .txt files
+        if not ECHO_data.endswith('.txt'):
+            continue
+        if ECHO_data.startswith('._'):
+            continue
 
-    ECHO_data_path = os.path.join(ECHO_dir, ECHO_data)
-    data = np.loadtxt(ECHO_data_path, delimiter=' ', skiprows=11)
+        sequcence_id = ECHO_data.split('_')[-1].split('.')[0]
 
-    """
-    Velocity = data[1, :]
-    XPOSITION = data[2, :]
-    YPOSITION = data[3, :]
-    ZPOSITION = data[4, :]
-    PITCHING = data[5, :]
-    ROLLING = data[6, :]
-    YAWING = data[7, :]
-    ECHO = data[8:, :]
-    """
+        ECHO_data_path = os.path.join(ECHO_dir, ECHO_data)
+        data = np.loadtxt(ECHO_data_path, delimiter=' ', skiprows=1)
 
-    ECHO_for_plot = np.concatenate(data, axis=1)
-    print("B-scan shape after concatenation:", ECHO_for_plot.shape)
+        if ECHO_for_plot.size == 0:
+            ECHO_for_plot = data
+        else:
+            ECHO_for_plot = np.concatenate([ECHO_for_plot, data], axis=1)
+        #print("B-scan shape after concatenation:", ECHO_for_plot.shape)
 
-    #np.savetxt(output_dir + '/Bscan.txt', ECHO_for_plot)
+    np.savetxt(output_dir + '/Bscan.txt', ECHO_for_plot)
+    print("B-scan saved at", output_dir + '/Bscan.txt')
+    print("B-scan shape:", ECHO_for_plot.shape)
 
-
-    #* plot
-    font_lartge = 20
-    font_medium = 18
-    font_small = 16
-
-
-    def use_GridSpec():
-        fig = plt.figure(figsize=(20, 10), tight_layout=True)
-        gs = GridSpec(4, 1, height_ratios=[4, 1, 1, 1])
-
-        gs_echo = plt.subplot(gs[0])
-        gs_echo.imshow(ECHO, aspect='auto', cmap='seismic',
-                    extent=[0, ECHO.shape[1], ECHO.shape[0]*sample_interval, 0],
-                    vmin=-50, vmax=50
-                    )
-        #axes[0].set_xlabel('Trace number', fontsize=18)
-        gs_echo.set_ylabel('Time [ns]', fontsize=font_lartge)
-        gs_echo.tick_params(axis='both', which='major', labelsize=font_medium)
-
-
-        #* plot colorbar
-        """
-        delvider = axgrid1.make_axes_locatable(axes[0])
-        cax = delvider.append_axes('right', size='5%', pad=0.1)
-        plt.colorbar(cax=cax).set_label('Amplitude', fontsize=18)
-        cax.tick_params(labelsize=16)
-        """
-
-        #* plot velocity
-        gs_V = plt.subplot(gs[1], sharex=gs_echo)
-        gs_V.plot(Velocity*100)
-        gs_V.set_ylabel('Velocity \n [cm/s]', fontsize=font_lartge)
-        gs_V.set_ylim(0, 7)
-        gs_V.axhline(y=5.5, color='red', linestyle='--')
-        gs_V.tick_params(axis='both', which='major', labelsize=font_medium)
-
-        #* plot position
-        gs_posi = plt.subplot(gs[2], sharex=gs_echo)
-        gs_posi.plot(XPOSITION, '-', label='X position')
-        gs_posi.plot(YPOSITION, '--', label='Y position')
-        gs_posi.plot(ZPOSITION, '-.', label='Z position')
-        gs_posi.set_ylabel('Position \n [m]', fontsize=font_lartge)
-        gs_posi.legend(loc='lower right', fontsize=font_medium)
-        gs_posi.tick_params(axis='both', which='major', labelsize=font_medium)
-
-        #* plot Pitching, Rolling, Yawing
-        gs_angle = plt.subplot(gs[3], sharex=gs_echo)
-        gs_angle.plot(PITCHING, '-', label='Pitching')
-        gs_angle.plot(ROLLING, '--', label='Rolling')
-        gs_angle.plot(YAWING, '-.', label='Yawing')
-        gs_angle.set_ylabel('Angle [deg]', fontsize=font_lartge)
-        gs_angle.legend(loc='lower right', fontsize=font_medium)
-        gs_angle.tick_params(axis='both', which='major', labelsize=font_medium)
-        gs_angle.tick_params(axis='x', which='major', labelsize=font_small)
-        gs_angle.set_yscale('log')
-
-
-        fig.supxlabel('Record number', fontsize=font_lartge)
-        fig.suptitle('Sequence ID: ' + str(sequcence_id), fontsize=font_lartge)
-
-
-        #* save plot
-        plt.savefig(output_dir + '/Bscan_' + str(sequcence_id + '.png'), dpi=300)
-        plt.show()
-        plt.close()
 
 #* plot
 font_lartge = 20
 font_medium = 18
 font_small = 16
 
-def single_plot():
+def single_plot(plot_data):
     plt.figure(figsize=(12, 6), tight_layout=True)
-    plt.imshow(ECHO_for_plot, aspect='auto', cmap='seismic',
-                extent=[0, ECHO.shape[1], ECHO.shape[0]*sample_interval, 0],
-                vmin=-50, vmax=50
+    plt.imshow(plot_data, aspect='auto', cmap='seismic',
+                extent=[0, plot_data.shape[1]*3.75*1e-2, plot_data.shape[0]*sample_interval, 0],
+                vmin=-15, vmax=15
                 )
-    plt.xlabel('Record number', fontsize=font_lartge)
+    plt.xlabel('Distance', fontsize=font_lartge)
     plt.ylabel('Time [ns]', fontsize=font_lartge)
     plt.colorbar().set_label('Amplitude', fontsize=font_lartge)
 
+    plt.savefig(output_dir + '/Bscan.png')
     plt.show()
 
     return plt
-single_plot()
+
+if args.function_type == 'load':
+    load_resampled_data()
+    single_plot()
+elif args.function_type == 'plot':
+    resampled_data = np.loadtxt(os.path.dirname(ECHO_dir) + '/Bscan.txt')
+    single_plot(resampled_data)
+else:
+    raise ValueError('Invalid function type')
