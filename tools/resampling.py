@@ -30,19 +30,31 @@ if not os.path.exists(output_dir):
 
 
 def remove_redundant_rows(data, record_num):
-    #* Calculate the average of previous five records
     difference_criteria = 6000
 
+    #* Calculate the average of previous five records
     if record_num ==0:
         Resampled_ECHO.append(np.insert(data[:, record_num], 0, record_num))
     else:
         if record_num > 10:
             average = np.mean(data[:, record_num - 10:record_num], axis=1)
             difference = np.abs(data[:, record_num] - average)
+            difference_list.append(np.sum(difference))
         else:
             difference = np.abs(data[:, record_num] - data[:, record_num - 1])
         if np.sum(difference) > difference_criteria:
             Resampled_ECHO.append(np.insert(data[:, record_num], 0, record_num))
+
+
+def remove_redundant_rows_2(resampled_data, record_num_ind): # data contains redord count in the first row
+    difference_criteria = 4000
+
+    #* Calculate the average of previous five records
+    if record_num_ind > 0:
+        difference = np.abs(data[:, record_num_ind] - data[:, record_num_ind - 1])
+        if np.sum(difference) < difference_criteria:
+            # 条件を満たした列を削除する
+            resampled_data = np.delete(resampled_data, record_num_ind, axis=1)
 
 
 #* Resampling
@@ -59,10 +71,16 @@ for ECHO_data in natsorted(os.listdir(data_folder_path)):
     print(' ')
     print('ECHO data:', ECHO_data)
     print('record count number:', data.shape[1])
+
+
     #* Resampling
     Resampled_ECHO = []
-    for i in tqdm(range(data.shape[1]), desc=ECHO_data):
+    difference_list = []
+    for i in tqdm(range(data.shape[1]), desc=ECHO_data + ' resampling_1'):
         remove_redundant_rows(data, i)
+    print('Resampled_ECHO:', len(Resampled_ECHO))
+    for i in tqdm(range(len(Resampled_ECHO)), desc=ECHO_data + ' resampling_2'):
+        remove_redundant_rows_2(Resampled_ECHO, i)
     Resampled_ECHO = np.array(Resampled_ECHO).T
     print(Resampled_ECHO.shape)
 
@@ -80,6 +98,13 @@ for ECHO_data in natsorted(os.listdir(data_folder_path)):
     #* Shade resampled record
     for i in range(len(resampled_record)):
         plt.axvspan(resampled_record[i], resampled_record[i]+1, color='gray', alpha=0.1)
+    plt.show()
+
+    plt.figure(tight_layout=True)
+    plt.plot(difference_list)
+    plt.hlines(6000, 0, len(difference_list), 'r', linestyles='dashed')
+    plt.xlabel('Record count')
+    plt.ylabel('Difference')
     plt.show()
 
 
