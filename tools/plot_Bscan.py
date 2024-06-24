@@ -24,7 +24,7 @@ args = parser.parse_args()
 if args.path_type == 'local':
     ECHO_dir = 'LPR_2B/ECHO'
 elif args.path_type == 'SSD':
-    ECHO_dir = '/Volumes/SSD_kanda/LPR/LPR_2B/ECHO'
+    ECHO_dir = '/Volumes/SSD_kanda/LPR/LPR_2B/Resampled_ECHO/txt'
 else:
     raise ValueError('Invalid path type')
 
@@ -43,6 +43,7 @@ output_dir = os.path.join(os.path.dirname(ECHO_dir), 'Raw_Bscan')
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
+ECHO_for_plot = np.array([])
 for ECHO_data in tqdm(natsorted(os.listdir(ECHO_dir))):
     #* Load only .txt files
     if not ECHO_data.endswith('.txt'):
@@ -61,9 +62,9 @@ for ECHO_data in tqdm(natsorted(os.listdir(ECHO_dir))):
     ECHO = []
 
     ECHO_data_path = os.path.join(ECHO_dir, ECHO_data)
-    data = np.loadtxt(ECHO_data_path, delimiter=' ')
+    data = np.loadtxt(ECHO_data_path, delimiter=' ', skiprows=11)
 
-
+    """
     Velocity = data[1, :]
     XPOSITION = data[2, :]
     YPOSITION = data[3, :]
@@ -72,9 +73,10 @@ for ECHO_data in tqdm(natsorted(os.listdir(ECHO_dir))):
     ROLLING = data[6, :]
     YAWING = data[7, :]
     ECHO = data[8:, :]
+    """
 
-    #ECHO_for_plot = np.concatenate(ECHO, axis=1)
-    #print("B-scan shape after concatenation:", ECHO_for_plot.shape)
+    ECHO_for_plot = np.concatenate(data, axis=1)
+    print("B-scan shape after concatenation:", ECHO_for_plot.shape)
 
     #np.savetxt(output_dir + '/Bscan.txt', ECHO_for_plot)
 
@@ -85,61 +87,82 @@ for ECHO_data in tqdm(natsorted(os.listdir(ECHO_dir))):
     font_small = 16
 
 
-    fig = plt.figure(figsize=(20, 10), tight_layout=True)
-    gs = GridSpec(4, 1, height_ratios=[4, 1, 1, 1])
+    def use_GridSpec():
+        fig = plt.figure(figsize=(20, 10), tight_layout=True)
+        gs = GridSpec(4, 1, height_ratios=[4, 1, 1, 1])
 
-    gs_echo = plt.subplot(gs[0])
-    gs_echo.imshow(ECHO, aspect='auto', cmap='seismic',
+        gs_echo = plt.subplot(gs[0])
+        gs_echo.imshow(ECHO, aspect='auto', cmap='seismic',
+                    extent=[0, ECHO.shape[1], ECHO.shape[0]*sample_interval, 0],
+                    vmin=-50, vmax=50
+                    )
+        #axes[0].set_xlabel('Trace number', fontsize=18)
+        gs_echo.set_ylabel('Time [ns]', fontsize=font_lartge)
+        gs_echo.tick_params(axis='both', which='major', labelsize=font_medium)
+
+
+        #* plot colorbar
+        """
+        delvider = axgrid1.make_axes_locatable(axes[0])
+        cax = delvider.append_axes('right', size='5%', pad=0.1)
+        plt.colorbar(cax=cax).set_label('Amplitude', fontsize=18)
+        cax.tick_params(labelsize=16)
+        """
+
+        #* plot velocity
+        gs_V = plt.subplot(gs[1], sharex=gs_echo)
+        gs_V.plot(Velocity*100)
+        gs_V.set_ylabel('Velocity \n [cm/s]', fontsize=font_lartge)
+        gs_V.set_ylim(0, 7)
+        gs_V.axhline(y=5.5, color='red', linestyle='--')
+        gs_V.tick_params(axis='both', which='major', labelsize=font_medium)
+
+        #* plot position
+        gs_posi = plt.subplot(gs[2], sharex=gs_echo)
+        gs_posi.plot(XPOSITION, '-', label='X position')
+        gs_posi.plot(YPOSITION, '--', label='Y position')
+        gs_posi.plot(ZPOSITION, '-.', label='Z position')
+        gs_posi.set_ylabel('Position \n [m]', fontsize=font_lartge)
+        gs_posi.legend(loc='lower right', fontsize=font_medium)
+        gs_posi.tick_params(axis='both', which='major', labelsize=font_medium)
+
+        #* plot Pitching, Rolling, Yawing
+        gs_angle = plt.subplot(gs[3], sharex=gs_echo)
+        gs_angle.plot(PITCHING, '-', label='Pitching')
+        gs_angle.plot(ROLLING, '--', label='Rolling')
+        gs_angle.plot(YAWING, '-.', label='Yawing')
+        gs_angle.set_ylabel('Angle [deg]', fontsize=font_lartge)
+        gs_angle.legend(loc='lower right', fontsize=font_medium)
+        gs_angle.tick_params(axis='both', which='major', labelsize=font_medium)
+        gs_angle.tick_params(axis='x', which='major', labelsize=font_small)
+        gs_angle.set_yscale('log')
+
+
+        fig.supxlabel('Record number', fontsize=font_lartge)
+        fig.suptitle('Sequence ID: ' + str(sequcence_id), fontsize=font_lartge)
+
+
+        #* save plot
+        plt.savefig(output_dir + '/Bscan_' + str(sequcence_id + '.png'), dpi=300)
+        plt.show()
+        plt.close()
+
+#* plot
+font_lartge = 20
+font_medium = 18
+font_small = 16
+
+def single_plot():
+    plt.figure(figsize=(12, 6), tight_layout=True)
+    plt.imshow(ECHO_for_plot, aspect='auto', cmap='seismic',
                 extent=[0, ECHO.shape[1], ECHO.shape[0]*sample_interval, 0],
                 vmin=-50, vmax=50
                 )
-    #axes[0].set_xlabel('Trace number', fontsize=18)
-    gs_echo.set_ylabel('Time [ns]', fontsize=font_lartge)
-    gs_echo.tick_params(axis='both', which='major', labelsize=font_medium)
+    plt.xlabel('Record number', fontsize=font_lartge)
+    plt.ylabel('Time [ns]', fontsize=font_lartge)
+    plt.colorbar().set_label('Amplitude', fontsize=font_lartge)
 
-
-    #* plot colorbar
-    """
-    delvider = axgrid1.make_axes_locatable(axes[0])
-    cax = delvider.append_axes('right', size='5%', pad=0.1)
-    plt.colorbar(cax=cax).set_label('Amplitude', fontsize=18)
-    cax.tick_params(labelsize=16)
-    """
-
-    #* plot velocity
-    gs_V = plt.subplot(gs[1], sharex=gs_echo)
-    gs_V.plot(Velocity*100)
-    gs_V.set_ylabel('Velocity \n [cm/s]', fontsize=font_lartge)
-    gs_V.set_ylim(0, 7)
-    gs_V.axhline(y=5.5, color='red', linestyle='--')
-    gs_V.tick_params(axis='both', which='major', labelsize=font_medium)
-
-    #* plot position
-    gs_posi = plt.subplot(gs[2], sharex=gs_echo)
-    gs_posi.plot(XPOSITION, '-', label='X position')
-    gs_posi.plot(YPOSITION, '--', label='Y position')
-    gs_posi.plot(ZPOSITION, '-.', label='Z position')
-    gs_posi.set_ylabel('Position \n [m]', fontsize=font_lartge)
-    gs_posi.legend(loc='lower right', fontsize=font_medium)
-    gs_posi.tick_params(axis='both', which='major', labelsize=font_medium)
-
-    #* plot Pitching, Rolling, Yawing
-    gs_angle = plt.subplot(gs[3], sharex=gs_echo)
-    gs_angle.plot(PITCHING, '-', label='Pitching')
-    gs_angle.plot(ROLLING, '--', label='Rolling')
-    gs_angle.plot(YAWING, '-.', label='Yawing')
-    gs_angle.set_ylabel('Angle [deg]', fontsize=font_lartge)
-    gs_angle.legend(loc='lower right', fontsize=font_medium)
-    gs_angle.tick_params(axis='both', which='major', labelsize=font_medium)
-    gs_angle.tick_params(axis='x', which='major', labelsize=font_small)
-    gs_angle.set_yscale('log')
-
-
-    fig.supxlabel('Record number', fontsize=font_lartge)
-    fig.suptitle('Sequence ID: ' + str(sequcence_id), fontsize=font_lartge)
-
-
-    #* save plot
-    plt.savefig(output_dir + '/Bscan_' + str(sequcence_id + '.png'), dpi=300)
     plt.show()
-    plt.close()
+
+    return plt
+single_plot()

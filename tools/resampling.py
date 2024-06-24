@@ -23,10 +23,18 @@ if args.path_type == 'local':
     data_folder_path = 'LPR_2B/ECHO'
 elif args.path_type == 'SSD':
     data_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B/ECHO'
+
+
+#* Define output folder path
 output_dir = os.path.join(os.path.dirname(data_folder_path), 'Resampled_ECHO')
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
-
+txt_output_dir = os.path.join(output_dir, 'txt')
+if not os.path.exists(txt_output_dir):
+    os.makedirs(txt_output_dir)
+plot_output_dir = os.path.join(output_dir, 'plot')
+if not os.path.exists(plot_output_dir):
+    os.makedirs(plot_output_dir)
 
 
 def remove_redundant_rows(data, record_num):
@@ -67,6 +75,7 @@ for ECHO_data in natsorted(os.listdir(data_folder_path)):
 
     ECHO_data_path = os.path.join(data_folder_path, ECHO_data)
     data = np.loadtxt(ECHO_data_path, delimiter=' ', skiprows=11)
+    sequence_id = ECHO_data.split('_')[-1].split('.')[0]
 
     print(' ')
     print('ECHO data:', ECHO_data)
@@ -84,37 +93,80 @@ for ECHO_data in natsorted(os.listdir(data_folder_path)):
     Resampled_ECHO = np.array(Resampled_ECHO).T
     print(Resampled_ECHO.shape)
 
+    #* Save resampled ECHO data
+    np.savetxt(txt_output_dir + '/' + sequence_id + '_resampled.txt', Resampled_ECHO, delimiter=' ')
+
 
     #* Plot which record is resampled on the data plot
     resampled_record = Resampled_ECHO[0, :]
+    font_large = 20
+    font_medium = 18
     print('Number of resampled record:', len(resampled_record))
-    plt.figure(tight_layout=True)
+
+
+    #* Plot original B-scan
+    plt.figure(figsize=(15, 10), tight_layout=True)
     plt.imshow(data, aspect='auto', cmap='seismic',
                 extent=[0, data.shape[1], data.shape[0]*0.3125, 0],
                 vmin=-50, vmax=50)
-    plt.xlabel('Record count')
-    plt.ylabel('Time [ns]')
-    plt.colorbar()
+    plt.xlabel('Record count', fontsize=font_large)
+    plt.ylabel('Time [ns]', fontsize=font_large)
+    plt.title('Sequence ID: ' + sequence_id, fontsize=font_large)
+    plt.tick_params(labelsize=font_medium)
+
+    cbar = plt.colorbar()
+    cbar.set_label('Amplitude', fontsize=font_large)
+    cbar.ax.tick_params(labelsize=font_medium)
+
+    plt.savefig(plot_output_dir + '/' + sequence_id + '_original.png')
+    plt.close()
+
+
+    #* Plot original B-scan and shade resampled record
+    plt.figure(figsize=(15, 10), tight_layout=True)
+    plt.imshow(data, aspect='auto', cmap='seismic',
+                extent=[0, data.shape[1], data.shape[0]*0.3125, 0],
+                vmin=-50, vmax=50)
+    plt.xlabel('Record count', fontsize=font_large)
+    plt.ylabel('Time [ns]', fontsize=font_large)
+    plt.title('Sequence ID: ' + sequence_id, fontsize=font_large)
+    plt.tick_params(labelsize=font_medium)
+
+    cbar = plt.colorbar()
+    cbar.set_label('Amplitude', fontsize=font_large)
+    cbar.ax.tick_params(labelsize=font_medium)
     #* Shade resampled record
     for i in range(len(resampled_record)):
         plt.axvspan(resampled_record[i], resampled_record[i]+1, color='gray', alpha=0.1)
-    plt.show()
 
+    plt.savefig(plot_output_dir + '/' + sequence_id + '_shaded.png')
+    plt.close()
+
+
+    """
+    #* Plot difference between the original data and the resampled data
     plt.figure(tight_layout=True)
     plt.plot(difference_list)
     plt.hlines(6000, 0, len(difference_list), 'r', linestyles='dashed')
     plt.xlabel('Record count')
     plt.ylabel('Difference')
     plt.show()
+    """
 
 
     #* Plot resampled ECHO data
-    plt.figure(tight_layout=True)
+    plt.figure(figsize=(15, 10), tight_layout=True)
     plt.imshow(Resampled_ECHO, aspect='auto', cmap='seismic',
                 extent=[0, Resampled_ECHO.shape[1], Resampled_ECHO.shape[0]*0.3125, 0],
                 vmin=-50, vmax=50)
-    plt.xlabel('Record count')
-    plt.ylabel('Time [ns]')
-    plt.colorbar()
+    plt.xlabel('Record count', fontsize=font_large)
+    plt.ylabel('Time [ns]', fontsize=font_large)
+    plt.title('Sequence ID: ' + sequence_id, fontsize=font_large)
+    plt.tick_params(labelsize=font_medium)
 
-    plt.show()
+    cbar = plt.colorbar()
+    cbar.set_label('Amplitude', fontsize=font_large)
+    cbar.ax.tick_params(labelsize=font_medium)
+
+    plt.savefig(plot_output_dir + '/' + sequence_id + '_resampled.png')
+    plt.close()
