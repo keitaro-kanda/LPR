@@ -19,7 +19,7 @@ args = parser.parse_args()
 
 
 #* Define data folder path
-if args.path_type == 'local':
+if args.path_type == 'local' or args.path_type == 'test':
     data_folder_path = 'LPR_2B/ECHO'
 elif args.path_type == 'SSD':
     data_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B/ECHO'
@@ -37,32 +37,49 @@ if not os.path.exists(plot_output_dir):
     os.makedirs(plot_output_dir)
 
 
-def remove_redundant_rows(data, record_num):
-    difference_criteria = 6000
-
+def calc_difference(data, record_num):
     #* Calculate the average of previous five records
+    if record_num == 0:
+        #Resampled_ECHO.append(np.insert(data[:, record_num], 0, record_num))
+        difference_list.append(0)
+    else:
+        difference = np.abs(data[:, record_num] - data[:, record_num - 1])
+        #if np.sum(difference) > difference_criteria:
+        #Resampled_ECHO.append(np.insert(data[:, record_num], 0, record_num))
+        difference_list.append(np.sum(difference))
+    """
     if record_num ==0:
         Resampled_ECHO.append(np.insert(data[:, record_num], 0, record_num))
     else:
-        if record_num > 10:
-            average = np.mean(data[:, record_num - 10:record_num], axis=1)
+        if record_num >= 5:
+            average = np.mean(data[:, record_num - 5:record_num], axis=1)
             difference = np.abs(data[:, record_num] - average)
             difference_list.append(np.sum(difference))
         else:
             difference = np.abs(data[:, record_num] - data[:, record_num - 1])
         if np.sum(difference) > difference_criteria:
             Resampled_ECHO.append(np.insert(data[:, record_num], 0, record_num))
+    """
 
-
-def remove_redundant_rows_2(resampled_data, record_num_ind): # data contains redord count in the first row
-    difference_criteria = 4000
-
-    #* Calculate the average of previous five records
-    if record_num_ind > 0:
-        difference = np.abs(data[:, record_num_ind] - data[:, record_num_ind - 1])
-        if np.sum(difference) < difference_criteria:
-            # 条件を満たした列を削除する
-            resampled_data = np.delete(resampled_data, record_num_ind, axis=1)
+criteria = 6500
+#* Calculate running average of difference_list
+def calc_running_average(list, record_num):
+    if record_num == 0:
+        running_average_list.append(0)
+        resampled_ECHO.append(np.insert(data[:, record_num], 0, record_num))
+        resampled_record.append(record_num)
+    if i >= 10:
+        running_average = np.mean(list[i-10:i])
+        running_average_list.append(running_average)
+        if running_average > criteria:
+            resampled_ECHO.append(np.insert(data[:, record_num], 0, record_num))
+            resampled_record.append(record_num)
+    else:
+        running_average = np.mean(list[:i])
+        running_average_list.append(running_average)
+        if running_average > criteria:
+            resampled_ECHO.append(np.insert(data[:, record_num], 0, record_num))
+            resampled_record.append(record_num)
 
 
 #* Resampling
@@ -83,22 +100,27 @@ for ECHO_data in natsorted(os.listdir(data_folder_path)):
 
 
     #* Resampling
-    Resampled_ECHO = []
+    resampled_ECHO = []
     difference_list = []
-    for i in tqdm(range(data.shape[1]), desc=ECHO_data + ' resampling_1'):
-        remove_redundant_rows(data, i)
-    print('Resampled_ECHO:', len(Resampled_ECHO))
-    for i in tqdm(range(len(Resampled_ECHO)), desc=ECHO_data + ' resampling_2'):
-        remove_redundant_rows_2(Resampled_ECHO, i)
-    Resampled_ECHO = np.array(Resampled_ECHO).T
-    print(Resampled_ECHO.shape)
+    running_average_list = []
+    resampled_record = []
+
+    #* Calculate difference and running average of difference
+    for i in tqdm(range(data.shape[1]), desc=ECHO_data + ' Calculate difference'):
+        calc_difference(data, i)
+    for i in tqdm(range(len(difference_list)), desc=ECHO_data + ' Calculate running average'):
+        calc_running_average(difference_list, i)
+    print('Resampled_ECHO:', len(resampled_ECHO))
+    resampled_ECHO = np.array(resampled_ECHO).T
+
+    #print(Resampled_ECHO.shape)
 
     #* Save resampled ECHO data
-    np.savetxt(txt_output_dir + '/' + sequence_id + '_resampled.txt', Resampled_ECHO, delimiter=' ')
+    #np.savetxt(txt_output_dir + '/' + sequence_id + '_resampled.txt', Resampled_ECHO, delimiter=' ')
 
 
     #* Plot which record is resampled on the data plot
-    resampled_record = Resampled_ECHO[0, :]
+    resampled_record = resampled_ECHO[0, :]
     font_large = 20
     font_medium = 18
     print('Number of resampled record:', len(resampled_record))
@@ -119,10 +141,41 @@ for ECHO_data in natsorted(os.listdir(data_folder_path)):
     cbar.ax.tick_params(labelsize=font_medium)
 
     plt.savefig(plot_output_dir + '/' + sequence_id + '_original.png')
+    #plt.show()
     plt.close()
 
 
     #* Plot original B-scan and shade resampled record
+    fig, ax = plt.subplots(2,1, figsize=(15, 10), tight_layout=True, sharex=True)
+    ax[0].imshow(data, aspect='auto', cmap='seismic',
+                extent=[0, data.shape[1], data.shape[0]*0.3125, 0],
+                vmin=-50, vmax=50)
+    ax[0].set_ylabel('Time [ns]', fontsize=font_large)
+    ax[0].tick_params(labelsize=font_medium)
+
+    #* Shade resampled record
+    for i in range(len(resampled_record)):
+        ax[0].axvspan(resampled_record[i], resampled_record[i]+1, color='gray', alpha=0.1)
+
+    #cbar = plt.colorbar(ax[0].images[0], ax=ax[0], )
+    #cbar.set_label('Amplitude', fontsize=font_large)
+    #cbar.ax.tick_params(labelsize=font_medium)
+
+    ax[1].plot(difference_list, label='Difference')
+    ax[1].plot(running_average_list, label='Running average')
+    ax[1].set_ylabel('Difference', fontsize=font_large)
+    ax[1].tick_params(labelsize=font_medium)
+    ax[1].hlines(criteria, 0, len(difference_list), 'k', linestyles='dashed', label='Difference criteria')
+    ax[1].legend(fontsize=font_medium)
+
+    fig.suptitle('Sequence ID: ' + sequence_id, fontsize=font_large)
+    fig.supxlabel('Record count', fontsize=font_large)
+
+    plt.savefig(plot_output_dir + '/' + sequence_id + '_shaded.png')
+    #plt.show()
+    plt.close()
+
+    """
     plt.figure(figsize=(15, 10), tight_layout=True)
     plt.imshow(data, aspect='auto', cmap='seismic',
                 extent=[0, data.shape[1], data.shape[0]*0.3125, 0],
@@ -139,11 +192,11 @@ for ECHO_data in natsorted(os.listdir(data_folder_path)):
     for i in range(len(resampled_record)):
         plt.axvspan(resampled_record[i], resampled_record[i]+1, color='gray', alpha=0.1)
 
-    plt.savefig(plot_output_dir + '/' + sequence_id + '_shaded.png')
-    plt.close()
+    #plt.savefig(plot_output_dir + '/' + sequence_id + '_shaded.png')
+    plt.show()
+    #plt.close()
 
 
-    """
     #* Plot difference between the original data and the resampled data
     plt.figure(tight_layout=True)
     plt.plot(difference_list)
@@ -154,10 +207,11 @@ for ECHO_data in natsorted(os.listdir(data_folder_path)):
     """
 
 
+
     #* Plot resampled ECHO data
     plt.figure(figsize=(15, 10), tight_layout=True)
-    plt.imshow(Resampled_ECHO, aspect='auto', cmap='seismic',
-                extent=[0, Resampled_ECHO.shape[1], Resampled_ECHO.shape[0]*0.3125, 0],
+    plt.imshow(resampled_ECHO, aspect='auto', cmap='seismic',
+                extent=[0, resampled_ECHO.shape[1], resampled_ECHO.shape[0]*0.3125, 0],
                 vmin=-50, vmax=50)
     plt.xlabel('Record count', fontsize=font_large)
     plt.ylabel('Time [ns]', fontsize=font_large)
@@ -169,4 +223,5 @@ for ECHO_data in natsorted(os.listdir(data_folder_path)):
     cbar.ax.tick_params(labelsize=font_medium)
 
     plt.savefig(plot_output_dir + '/' + sequence_id + '_resampled.png')
+    #plt.show()
     plt.close()

@@ -66,11 +66,11 @@ def load_resampled_data():
             ECHO_for_plot = data
         else:
             ECHO_for_plot = np.concatenate([ECHO_for_plot, data], axis=1)
-        #print("B-scan shape after concatenation:", ECHO_for_plot.shape)
 
     np.savetxt(output_dir + '/Bscan.txt', ECHO_for_plot)
     print("B-scan saved at", output_dir + '/Bscan.txt')
     print("B-scan shape:", ECHO_for_plot.shape)
+    return ECHO_for_plot
 
 
 #* plot
@@ -94,8 +94,8 @@ def single_plot(plot_data):
     return plt
 
 if args.function_type == 'load':
-    load_resampled_data()
-    single_plot()
+    resampled_data = load_resampled_data()
+    single_plot(resampled_data)
 elif args.function_type == 'plot':
     resampled_data = np.loadtxt(os.path.dirname(ECHO_dir) + '/Bscan.txt')
     single_plot(resampled_data)
