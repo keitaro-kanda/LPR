@@ -23,6 +23,7 @@ if args.path_type == 'local' or args.path_type == 'test':
     data_path = 'LPR_2B/Resampled_ECHO/Bscan.txt'
 elif args.path_type == 'SSD':
     data_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Resampled_ECHO/Bscan.txt'
+print('Data path:', data_path)
 
 
 #* load raw Bscan data
@@ -35,31 +36,31 @@ if not os.path.exists(output_dir):
 print('Output dir:', output_dir)
 
 
-#* process bandpass filter
-bandpass_filtering = processing_filtering(Raw_Bscan)
-sample_interval = bandpass_filtering.sample_interval
-filtered_Bscan = bandpass_filtering.apply_bandpass_filter()
-print('Finished bandpass filtering')
-print(filtered_Bscan.shape)
-
-
 #* process time zero correction
-time_zero_correction = proccessing_time_zero_correction(filtered_Bscan)
+time_zero_correction = proccessing_time_zero_correction(Raw_Bscan)
 peak_time = time_zero_correction.find_peak_time()
 aligned_Bscan = time_zero_correction.align_peak_time()
 print('Finished time-zero correction')
 print(aligned_Bscan.shape)
 
 
+#* process bandpass filter
+bandpass_filtering = processing_filtering(aligned_Bscan)
+sample_interval = bandpass_filtering.sample_interval
+filtered_Bscan = bandpass_filtering.apply_bandpass_filter()
+print('Finished bandpass filtering')
+print(filtered_Bscan.shape)
+
+
 
 #* process background removal
-background_removal = processing_background_removal(aligned_Bscan)
+background_removal = processing_background_removal(filtered_Bscan)
 background_removed_Bscan = background_removal.subtract_background()
 print('Finished background removal')
 print(background_removed_Bscan.shape)
 
 
-plot_data = [Raw_Bscan, filtered_Bscan, aligned_Bscan, background_removed_Bscan]
+plot_data = [Raw_Bscan, aligned_Bscan, filtered_Bscan, background_removed_Bscan]
 
 
 sample_interval_ns = sample_interval * 1e9
@@ -72,10 +73,10 @@ fontsize_small = 16
 for i in range(len(plot_data)):
     imshow = ax[i].imshow(plot_data[i], aspect='auto', cmap='seismic',
                 extent=[0, plot_data[i].shape[1], plot_data[i].shape[0]*sample_interval_ns, 0],
-                vmin=-50, vmax=50
+                vmin=-15, vmax=15
                 )
     ax[i].tick_params(axis='both', which='major', labelsize=fontsize_small)
-    ax[i].set_title(['Raw Bscan', 'Bandpass filtering', 'Time-zero correction', 'Background removal'][i], fontsize=fontsize_large)
+    ax[i].set_title(['Raw Bscan', 'Time-zero correction', 'Bandpass filtering', 'Background removal'][i], fontsize=fontsize_large)
 
     if i == len(plot_data) - 1:
         ax[i].set_xlabel('Trace number', fontsize=fontsize_medium)

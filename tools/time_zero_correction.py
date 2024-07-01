@@ -24,9 +24,13 @@ class proccessing_time_zero_correction:
         return self.peak
 
     def align_peak_time(self):
-        max_peak = max(self.peak)
+        #* Align peak time at median peak time
+        time_zero_point = np.median(self.peak)
+        time_zero_record = self.peak.index(time_zero_point)
+        print('Time zero point: ', time_zero_point, 'record number: ', time_zero_record)
+        print('New time zero [s]', time_zero_point * self.sample_interval)
         for i in tqdm(range(self.Bscan_data.shape[1]), desc='Aligning peak time'):
-            shift = int((max_peak - self.peak[i])) # shift index number
+            shift = int((time_zero_point - self.peak[i])) # shift index number
             #* シフトする分はゼロで埋める
             if shift > 0:
                 self.aligned_Bscan[:, i] = np.concatenate([np.zeros(shift), self.Bscan_data[:len(self.Bscan_data)-shift, i]])

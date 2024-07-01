@@ -1,17 +1,35 @@
 import numpy as np
-import struct
+from scipy import signal
+import matplotlib.pyplot as plt
 
+# Filter specifications
+lowcut = 250e6
+highcut = 750e6
+sample_interval = 0.3125e-9  # Sample interval
+fs = 1/sample_interval  # Sampling frequency
 
+# Design the Butterworth band-pass filter
+order = 4
+nyquist = 0.5 * fs
+low = lowcut / nyquist
+high = highcut / nyquist
 
-# read binarty, binary is '30b2 c438'
-data = b'\x30\xb2\xc4\x38'
-read = struct.unpack('!f', data)
-print(read)
-# メートルを緯度に変換，月の半径は1737.4kmとする
-lat = np.arcsin(read[0]/1737.4)
-print(lat*180/np.pi)
+b, a = signal.butter(order, [low, high], btype='band')
 
-# 16進数'30b2 c438'をfloatに変換
-data = 0xaf2286c3
-read = struct.unpack('>f', struct.pack('>I', data))[0]
-print(read)
+# Frequency response
+w, h = signal.freqz(b, a, worN=8000)
+frequencies = (w / np.pi) * nyquist
+
+# Plot the frequency response
+plt.figure(figsize=(10, 6))
+plt.plot(frequencies / 1e6, abs(h), 'b')
+plt.title('Band-pass Filter Frequency Response')
+plt.xlabel('Frequency (MHz)')
+plt.ylabel('Gain')
+plt.axvline(lowcut / 1e6, color='k', linestyle='--')
+plt.axvline(highcut / 1e6, color='k', linestyle='--')
+plt.axvline(150, color='r', linestyle='--')
+plt.axvline(850, color='r', linestyle='--')
+plt.ylim(0, 1.2)
+plt.grid()
+plt.show()

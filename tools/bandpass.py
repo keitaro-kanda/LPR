@@ -6,31 +6,65 @@ from tqdm import tqdm
 from scipy import signal
 
 
-#sample_interval = 0.312500e-9  # [s]
-
 
 class processing_filtering:
     def __init__(self, Bscan_data, sample_interval=0.312500e-9):
-        self.Bscan_data = Bscan_data # input is Bscan data array, not file path
+        self.Bscan_data = Bscan_data # input is Bscan data array (2D), not file path
         self.filtered_Bscan = np.zeros(self.Bscan_data.shape)
         self.sample_interval = sample_interval
 
 
-    def bandpass_filter(self, Ascandata):
+    def bandpass_filter(self, Ascandata): # Ascandata is 1D array
+        #* 0. Prepare window function to bandpass filter of 250-750 MHz
+        window = signal.windows.hamming(len(Ascandata))
+        #window = signal.windows.hamming(len(Ascandata))
 
         #* 1. FFT
-        fft_data = np.fft.fft(Ascandata)
+        fft_data = np.fft.fft(Ascandata * window)
         freq = np.linspace(0, 1/self.sample_interval, len(fft_data))
+        #fft_data = np.fft.fft(Ascandata)
+        #freq = np.linspace(0, 1/self.sample_interval, len(fft_data))
 
+
+        #* Filter specifications
+        lowcut = 250e6 # [Hz]
+        highcut = 750e6 # [Hz]
+        fs = 1/self.sample_interval  # Sampling frequency
+
+        #* Design the Butterworth band-pass filter
+        order = 4
+        nyquist = 0.5 * fs
+        low = lowcut / nyquist
+        high = highcut / nyquist
+
+        b, a = signal.butter(order, [low, high], btype='band')
+
+        #* Apply bandpass filter
+        filtered_data = signal.filtfilt(b, a, Ascandata)
+        return filtered_data
+        """
         #* 2. Bandpass filter
-        low_freq = 250.0e6 # [Hz]
-        high_freq = 750.0e6 # [Hz]
-        fft_data[(freq < low_freq)] = 0
-        fft_data[(freq > high_freq)] = 0
+        low_stop = 150e6 # [Hz]
+        low_bandpass = 250.0e6 # [Hz]
+        high_bandpass = 750.0e6 # [Hz]
+        high_stop = 850e6 # [Hz]
+
+        #* Design FIR (finite impulse response) filter
+        N = 2048
+        FIR = signal.firwin(N, [low_stop, low_bandpass, high_bandpass, high_stop], pass_zero=False, fs=1/self.sample_interval)
+
+        #* Apply FIR filter
+        fft_data = np.fft.fft(Ascandata)
+        fft_data = np.fft.fftshift(fft_data)
+        filered_data = np.convolve(fft_data, FIR, mode='same')
+        filterd_data = np.fft.ifftshift(filered_data)
+
+        return filterd_data
 
         #* 3. Inverse FFT
-        filtered_data = np.fft.ifft(fft_data).real
-        return filtered_data
+        #filtered_data = np.fft.ifft(fft_data).real
+        #return filtered_data
+        """
 
 
     def apply_bandpass_filter(self):
