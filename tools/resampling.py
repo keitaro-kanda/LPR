@@ -38,6 +38,7 @@ if not os.path.exists(plot_output_dir):
 
 
 def calc_difference(data, record_num):
+    """
     #* Calculate the average of previous five records
     if record_num == 0:
         #Resampled_ECHO.append(np.insert(data[:, record_num], 0, record_num))
@@ -49,19 +50,27 @@ def calc_difference(data, record_num):
         difference_list.append(np.sum(difference))
     """
     if record_num ==0:
-        Resampled_ECHO.append(np.insert(data[:, record_num], 0, record_num))
+        resampled_ECHO.append(np.insert(data[:, record_num], 0, record_num))
     else:
         if record_num >= 5:
             average = np.mean(data[:, record_num - 5:record_num], axis=1)
             difference = np.abs(data[:, record_num] - average)
             difference_list.append(np.sum(difference))
         else:
-            difference = np.abs(data[:, record_num] - data[:, record_num - 1])
-        if np.sum(difference) > difference_criteria:
-            Resampled_ECHO.append(np.insert(data[:, record_num], 0, record_num))
-    """
+            average = np.mean(data[:, :record_num], axis=1)
+            difference = np.abs(data[:, record_num] - average)
+            difference_list.append(np.sum(difference))
+        if np.sum(difference) > criteria:
+            resampled_ECHO.append(np.insert(data[:, record_num], 0, record_num))
 
-criteria = 6500
+
+def calc_difference_2(data):
+    for i in range(data.shape[1]):
+        if i > 0:
+            difference = np.abs(data[1:, i] - data[1:, i-1]) # 0行目はrecord numberなので除外
+            if np.sum(difference) < 4000:
+                np.delete(data, i, axis=1)
+
 #* Calculate running average of difference_list
 def calc_running_average(list, record_num):
     if record_num == 0:
@@ -82,6 +91,7 @@ def calc_running_average(list, record_num):
             resampled_record.append(record_num)
 
 
+criteria = 6500
 #* Resampling
 for ECHO_data in natsorted(os.listdir(data_folder_path)):
     #* Load ECHO data
@@ -108,8 +118,11 @@ for ECHO_data in natsorted(os.listdir(data_folder_path)):
     #* Calculate difference and running average of difference
     for i in tqdm(range(data.shape[1]), desc=ECHO_data + ' Calculate difference'):
         calc_difference(data, i)
-    for i in tqdm(range(len(difference_list)), desc=ECHO_data + ' Calculate running average'):
-        calc_running_average(difference_list, i)
+    resampled_ECHO = np.array(resampled_ECHO)
+    #for i in tqdm(range(len(difference_list)), desc=ECHO_data + ' Calculate running average'):
+    #    calc_running_average(difference_list, i)
+    #for i in tqdm(range(len(resampled_ECHO)), desc=ECHO_data + ' Calculate difference 2'):
+    #    calc_difference_2(resampled_ECHO)
     print('Resampled_ECHO:', len(resampled_ECHO))
     resampled_ECHO = np.array(resampled_ECHO).T
 
@@ -141,7 +154,7 @@ for ECHO_data in natsorted(os.listdir(data_folder_path)):
     cbar.ax.tick_params(labelsize=font_medium)
 
     plt.savefig(plot_output_dir + '/' + sequence_id + '_original.png')
-    #plt.show()
+    plt.show()
     plt.close()
 
 
@@ -172,7 +185,7 @@ for ECHO_data in natsorted(os.listdir(data_folder_path)):
     fig.supxlabel('Record count', fontsize=font_large)
 
     plt.savefig(plot_output_dir + '/' + sequence_id + '_shaded.png')
-    #plt.show()
+    plt.show()
     plt.close()
 
     """
@@ -223,5 +236,5 @@ for ECHO_data in natsorted(os.listdir(data_folder_path)):
     cbar.ax.tick_params(labelsize=font_medium)
 
     plt.savefig(plot_output_dir + '/' + sequence_id + '_resampled.png')
-    #plt.show()
+    plt.show()
     plt.close()
