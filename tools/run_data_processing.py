@@ -5,6 +5,24 @@ import mpl_toolkits.axes_grid1 as axgrid1
 from bandpass import processing_filtering
 from remove_background import processing_background_removal
 from time_zero_correction import proccessing_time_zero_correction
+import argparse
+
+#* Parse command line arguments
+parser = argparse.ArgumentParser(
+    prog='resampling.py',
+    description='Resampling ECHO data',
+    epilog='End of help message',
+    usage='python tools/resampling.py [path_type]',
+)
+parser.add_argument('path_type', choices = ['local', 'SSD'], help='Choose the path type')
+args = parser.parse_args()
+
+
+#* Define data folder path
+if args.path_type == 'local' or args.path_type == 'test':
+    data_folder_path = 'LPR_2B/ECHO'
+elif args.path_type == 'SSD':
+    data_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B/ECHO'
 
 
 #* load raw Bscan data

@@ -129,7 +129,7 @@ for ECHO_data in natsorted(os.listdir(data_folder_path)):
     #print(Resampled_ECHO.shape)
 
     #* Save resampled ECHO data
-    #np.savetxt(txt_output_dir + '/' + sequence_id + '_resampled.txt', Resampled_ECHO, delimiter=' ')
+    np.savetxt(txt_output_dir + '/' + sequence_id + '_resampled.txt', resampled_ECHO, delimiter=' ')
 
 
     #* Plot which record is resampled on the data plot
