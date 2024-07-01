@@ -154,7 +154,7 @@ for ECHO_data in natsorted(os.listdir(data_folder_path)):
     cbar.ax.tick_params(labelsize=font_medium)
 
     plt.savefig(plot_output_dir + '/' + sequence_id + '_original.png')
-    plt.show()
+    #plt.show()
     plt.close()
 
 
@@ -185,7 +185,7 @@ for ECHO_data in natsorted(os.listdir(data_folder_path)):
     fig.supxlabel('Record count', fontsize=font_large)
 
     plt.savefig(plot_output_dir + '/' + sequence_id + '_shaded.png')
-    plt.show()
+    #plt.show()
     plt.close()
 
     """
@@ -236,5 +236,5 @@ for ECHO_data in natsorted(os.listdir(data_folder_path)):
     cbar.ax.tick_params(labelsize=font_medium)
 
     plt.savefig(plot_output_dir + '/' + sequence_id + '_resampled.png')
-    plt.show()
+    #plt.show()
     plt.close()
