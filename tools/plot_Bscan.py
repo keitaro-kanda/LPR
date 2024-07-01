@@ -81,11 +81,10 @@ font_small = 16
 def single_plot(plot_data):
     plt.figure(figsize=(12, 6), tight_layout=True)
     plt.imshow(plot_data, aspect='auto', cmap='seismic',
-                #extent=[0, plot_data.shape[1]*3.75*1e-2, plot_data.shape[0]*sample_interval, 0],
-                extent=[0, plot_data.shape[1], plot_data.shape[0]*sample_interval, 0],
+                extent=[0, plot_data.shape[1]*3.75*1e-2, plot_data.shape[0]*sample_interval, 0],
                 vmin=-15, vmax=15
                 )
-    plt.xlabel('Record Count', fontsize=font_lartge)
+    plt.xlabel('Distance', fontsize=font_lartge)
     plt.ylabel('Time [ns]', fontsize=font_lartge)
     plt.colorbar().set_label('Amplitude', fontsize=font_lartge)
 

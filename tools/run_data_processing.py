@@ -9,8 +9,8 @@ import argparse
 
 #* Parse command line arguments
 parser = argparse.ArgumentParser(
-    prog='resampling.py',
-    description='Resampling ECHO data',
+    prog='run_data_processing.py',
+    description='Run bandpass filtering, time-zero correction, and background removal on resampled Bscan data',
     epilog='End of help message',
     usage='python tools/resampling.py [path_type]',
 )
@@ -20,13 +20,13 @@ args = parser.parse_args()
 
 #* Define data folder path
 if args.path_type == 'local' or args.path_type == 'test':
-    data_folder_path = 'LPR_2B/ECHO'
+    data_path = 'LPR_2B/Resampled_ECHO/Bscan.txt'
 elif args.path_type == 'SSD':
-    data_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B/ECHO'
+    data_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Resampled_ECHO/Bscan.txt'
 
 
 #* load raw Bscan data
-data_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Raw_Bscan/Bscan.txt'
+#data_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Raw_Bscan/Bscan.txt'
 Raw_Bscan = np.loadtxt(data_path, delimiter=' ')
 print("Bscan shape:", Raw_Bscan.shape)
 output_dir = os.path.join(os.path.dirname(os.path.dirname(data_path)), 'Processed_Bscan')
