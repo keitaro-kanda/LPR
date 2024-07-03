@@ -36,16 +36,9 @@ if not os.path.exists(output_dir):
 print('Output dir:', output_dir)
 
 
-#* process time zero correction
-time_zero_correction = proccessing_time_zero_correction(Raw_Bscan)
-peak_time = time_zero_correction.find_peak_time()
-aligned_Bscan = time_zero_correction.align_peak_time()
-print('Finished time-zero correction')
-print(aligned_Bscan.shape)
-
 
 #* process bandpass filter
-bandpass_filtering = processing_filtering(aligned_Bscan)
+bandpass_filtering = processing_filtering(Raw_Bscan)
 sample_interval = bandpass_filtering.sample_interval
 filtered_Bscan = bandpass_filtering.apply_bandpass_filter()
 print('Finished bandpass filtering')
@@ -53,14 +46,25 @@ print(filtered_Bscan.shape)
 
 
 
+#* process time zero correction
+time_zero_correction = proccessing_time_zero_correction(filtered_Bscan, sample_interval)
+peak_time = time_zero_correction.find_peak_time()
+aligned_Bscan = time_zero_correction.align_peak_time()
+print('Finished time-zero correction')
+print(aligned_Bscan.shape)
+
+
+
 #* process background removal
-background_removal = processing_background_removal(filtered_Bscan)
+background_removal = processing_background_removal(aligned_Bscan)
 background_removed_Bscan = background_removal.subtract_background()
 print('Finished background removal')
 print(background_removed_Bscan.shape)
 
 
-plot_data = [Raw_Bscan, aligned_Bscan, filtered_Bscan, background_removed_Bscan]
+
+plot_data = [Raw_Bscan, filtered_Bscan, aligned_Bscan, background_removed_Bscan]
+title = ['Raw B-scan', 'Bandpass filtered B-scan', 'Time-zero corrected B-scan', 'Background removed B-scan']
 
 
 sample_interval_ns = sample_interval * 1e9
@@ -76,7 +80,7 @@ for i in range(len(plot_data)):
                 vmin=-15, vmax=15
                 )
     ax[i].tick_params(axis='both', which='major', labelsize=fontsize_small)
-    ax[i].set_title(['Raw Bscan', 'Time-zero correction', 'Bandpass filtering', 'Background removal'][i], fontsize=fontsize_large)
+    ax[i].set_title(title[i], fontsize=fontsize_large)
 
     if i == len(plot_data) - 1:
         ax[i].set_xlabel('Trace number', fontsize=fontsize_medium)
