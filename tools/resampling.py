@@ -100,7 +100,7 @@ for ECHO_data in natsorted(os.listdir(data_folder_path)):
         continue
 
     ECHO_data_path = os.path.join(data_folder_path, ECHO_data)
-    raw_data = np.loadtxt(ECHO_data_path, delimiter=' ', skiprows=11)
+    raw_data = np.loadtxt(ECHO_data_path, delimiter=' ', skiprows=0)
     sequence_id = ECHO_data.split('_')[-1].split('.')[0]
 
     print('---------------------------------')

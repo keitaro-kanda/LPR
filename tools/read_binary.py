@@ -4,7 +4,7 @@ import numpy as np
 from datetime import datetime, timedelta
 from tqdm import tqdm
 import argparse
-
+from natsort import natsorted
 
 #* Parse command line arguments
 parser = argparse.ArgumentParser(
@@ -182,7 +182,7 @@ os.makedirs(ECHO_dir, exist_ok=True)
 
 position = []
 #* Output only the echo data as txt file
-for filename in tqdm(os.listdir(data_folder_path), desc='Total Progress'):
+for filename in tqdm(natsorted(os.listdir(data_folder_path)), desc='Total Progress'):
     full_path = os.path.join(data_folder_path, filename)
     file_size = os.path.getsize(full_path)
 
@@ -242,6 +242,8 @@ for filename in tqdm(os.listdir(data_folder_path), desc='Total Progress'):
                     file.write(f'{key}: {value}\n')
 
 
+
+        """
         #* Extract the ECHO data
         echo_data = np.insert(loaded_data['ECHO_DATA'], 0, loaded_data['CHANNEL_2_RECORD_COUNT'])
 
@@ -257,10 +259,11 @@ for filename in tqdm(os.listdir(data_folder_path), desc='Total Progress'):
         echo_data = np.insert(echo_data, 8, loaded_data['ATT_PITCHING'][0])
         echo_data = np.insert(echo_data, 9, loaded_data['ATT_ROLLING'][0])
         echo_data = np.insert(echo_data, 10, loaded_data['ATT_YAWING'][0])
+        """
 
 
         #* Save the echo data to a list to make Bscan data
-        ECHO.append(echo_data)
+        ECHO.append(loaded_data['ECHO_DATA'])
 
 
     #* Save the ECHO data as a txt file

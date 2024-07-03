@@ -14,14 +14,14 @@ class processing_filtering:
         self.sample_interval = sample_interval
 
 
-    def bandpass_filter(self, Ascandata): # Ascandata is 1D array
+    def bandpass_filter(self, Ascandata, lowcut, highcut, order): # Ascandata is 1D array
         #* Filter specifications
-        lowcut = 250e6 # [Hz]
-        highcut = 750e6 # [Hz]
+        #lowcut = 250e6 # [Hz]
+        #highcut = 750e6 # [Hz]
         fs = 1/self.sample_interval  # Sampling frequency
 
         #* Design the Butterworth band-pass filter
-        order = 4
+        #order = 4
         nyquist = 0.5 * fs
         low = lowcut / nyquist
         high = highcut / nyquist

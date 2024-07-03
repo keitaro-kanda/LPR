@@ -17,6 +17,13 @@ class proccessing_time_zero_correction:
         self.peak = []
         self.aligned_Bscan = np.zeros(self.Bscan_data.shape)
 
+    def zero_corrections(self):
+        #data_2 = np.zeros((self.Bscan_data.shape))
+        for i in tqdm(range(self.Bscan_data.shape[1])):
+            idx = np.where((np.abs(self.Bscan_data[:, i])>0.5))[0][0]
+            self.aligned_Bscan[:idx, i] = self.Bscan_data[idx:, i]
+        return self.aligned_Bscan
+
     def find_peak_time(self):
         for i in tqdm(range(self.Bscan_data.shape[1]), desc='Finding peak time'):
             peak_index = np.argmax(self.Bscan_data[:, i]) # index number, not time
