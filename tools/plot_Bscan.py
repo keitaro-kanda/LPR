@@ -60,7 +60,8 @@ def load_resampled_data():
         sequcence_id = ECHO_data.split('_')[-1].split('.')[0]
 
         ECHO_data_path = os.path.join(ECHO_dir, ECHO_data)
-        data = np.loadtxt(ECHO_data_path, delimiter=' ', skiprows=1)
+        data = np.loadtxt(ECHO_data_path, delimiter=' ', skiprows=0)
+
 
         if ECHO_for_plot.size == 0:
             ECHO_for_plot = data
@@ -69,7 +70,6 @@ def load_resampled_data():
 
     np.savetxt(output_dir + '/Bscan.txt', ECHO_for_plot)
     print("B-scan saved at", output_dir + '/Bscan.txt')
-    print("B-scan shape:", ECHO_for_plot.shape)
     return ECHO_for_plot
 
 
@@ -95,9 +95,11 @@ def single_plot(plot_data):
 
 if args.function_type == 'load':
     resampled_data = load_resampled_data()
+    print("B-scan shape:", resampled_data.shape)
     single_plot(resampled_data)
 elif args.function_type == 'plot':
     resampled_data = np.loadtxt(os.path.dirname(ECHO_dir) + '/Bscan.txt')
+    print("B-scan shape:", resampled_data.shape)
     single_plot(resampled_data)
 else:
     raise ValueError('Invalid function type')

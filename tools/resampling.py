@@ -76,13 +76,17 @@ def resampling(data): # input is 2D array
             medf[i : i + window] = 1
 
     idx = np.where(medf == 1)[0]
-    data_filtered = data[:, idx]
-    print('Raw data shape was: ', data.shape)
-    print('Filtered data shape is: ', data_filtered.shape)
+    if np.sum(idx) == 0:
+        data_filtered = data[:, idx]
+        print('No interesting data found')
+    else:
+        data_filtered = data[:, idx]
+        print('Raw data shape was: ', data.shape)
+        print('Filtered data shape is: ', data_filtered.shape)
 
 
-    #* Save filtered data as .txt file
-    np.savetxt(txt_output_dir + '/' + str(sequence_id) + '_resampled.txt', data_filtered, delimiter=' ')
+        #* Save filtered data as .txt file
+        np.savetxt(txt_output_dir + '/' + str(sequence_id) + '_resampled.txt', data_filtered, delimiter=' ')
 
     return sobelx, med_denoised, med, medf, data_filtered
 
