@@ -5,6 +5,8 @@ from tqdm import tqdm
 from matplotlib.gridspec import GridSpec
 from natsort import natsorted
 import argparse
+import cv2
+from scipy import ndimage
 
 
 #* Parse command line arguments
@@ -37,62 +39,55 @@ if not os.path.exists(plot_output_dir):
     os.makedirs(plot_output_dir)
 
 
-def calc_difference(data, record_num):
-    """
-    #* Calculate the average of previous five records
-    if record_num == 0:
-        #Resampled_ECHO.append(np.insert(data[:, record_num], 0, record_num))
-        difference_list.append(0)
-    else:
-        difference = np.abs(data[:, record_num] - data[:, record_num - 1])
-        #if np.sum(difference) > difference_criteria:
-        #Resampled_ECHO.append(np.insert(data[:, record_num], 0, record_num))
-        difference_list.append(np.sum(difference))
-    """
-    if record_num ==0:
-        resampled_ECHO.append(np.insert(data[:, record_num], 0, record_num))
-    else:
-        if record_num >= 5:
-            average = np.mean(data[:, record_num - 5:record_num], axis=1)
-            difference = np.abs(data[:, record_num] - average)
-            difference_list.append(np.sum(difference))
-        else:
-            average = np.mean(data[:, :record_num], axis=1)
-            difference = np.abs(data[:, record_num] - average)
-            difference_list.append(np.sum(difference))
-        if np.sum(difference) > criteria:
-            resampled_ECHO.append(np.insert(data[:, record_num], 0, record_num))
+#* init data_2B for data and medf for interest extrapolation
+#* 2048 is read by the header .2BL and it is fixed for all LPR_2B files [time dims]
+data_2B = np.zeros((0, 2048))
+medf = np.zeros(0)
+
+def resampling(data): # input is 2D array
+    #* Do not consider first 300 datapoints
+    img = data[300:, :]
+
+    #* Compute the derivative of the data in x direction with Sobel with a kernel size of 5
+	#* This should eliminate the horizonatal lines
+    sobelx = cv2.Sobel(img, cv2.CV_64F, 1, 0, ksize=5)
+
+    #* Denoise the sobelx with a median filter of size 5
+	#* We need to reduce random noise for the next step
+    med_denoised = ndimage.median_filter(sobelx, 5)
+
+    #* Sum the absolute values of the denoised traces on time dims
+	#* We should have cancelled signals on death traces --> highest value on the real traces
+    med = np.sum(np.abs(med_denoised), axis = 0)
+
+	#* Define a moving window to avoid taking into account small portions with high values.
+	#* We want to take the signals only when it has a value highest than thres for window consecutive traces
+    window = 25
+    thres = 20000
 
 
-def calc_difference_2(data):
-    for i in range(data.shape[1]):
-        if i > 0:
-            difference = np.abs(data[1:, i] - data[1:, i-1]) # 0行目はrecord numberなので除外
-            if np.sum(difference) < 4000:
-                np.delete(data, i, axis=1)
+	#* Init output vector as 0s
+    medf = np.zeros(med.shape)
+	#* for each trace
+    for i in range(med.shape[0] - window):
+		#* if all values are > thres
+        if np.all(med[i : i + window] > thres):
+            #* replace 0 with 1 in the output vector
+            medf[i : i + window] = 1
 
-#* Calculate running average of difference_list
-def calc_running_average(list, record_num):
-    if record_num == 0:
-        running_average_list.append(0)
-        resampled_ECHO.append(np.insert(data[:, record_num], 0, record_num))
-        resampled_record.append(record_num)
-    if i >= 10:
-        running_average = np.mean(list[i-10:i])
-        running_average_list.append(running_average)
-        if running_average > criteria:
-            resampled_ECHO.append(np.insert(data[:, record_num], 0, record_num))
-            resampled_record.append(record_num)
-    else:
-        running_average = np.mean(list[:i])
-        running_average_list.append(running_average)
-        if running_average > criteria:
-            resampled_ECHO.append(np.insert(data[:, record_num], 0, record_num))
-            resampled_record.append(record_num)
+    idx = np.where(medf == 1)[0]
+    data_filtered = data[:, idx]
+    print('Raw data shape was: ', data.shape)
+    print('Filtered data shape is: ', data_filtered.shape)
 
 
-criteria = 6500
-#* Resampling
+    #* Save filtered data as .txt file
+    np.savetxt(txt_output_dir + '/' + str(sequence_id) + '_resampled.txt', data_filtered, delimiter=' ')
+
+    return sobelx, med_denoised, med, medf, data_filtered
+
+
+#* Condunct resampling
 for ECHO_data in natsorted(os.listdir(data_folder_path)):
     #* Load ECHO data
     if not ECHO_data.endswith('.txt'):
@@ -101,140 +96,72 @@ for ECHO_data in natsorted(os.listdir(data_folder_path)):
         continue
 
     ECHO_data_path = os.path.join(data_folder_path, ECHO_data)
-    data = np.loadtxt(ECHO_data_path, delimiter=' ', skiprows=11)
+    raw_data = np.loadtxt(ECHO_data_path, delimiter=' ', skiprows=11)
     sequence_id = ECHO_data.split('_')[-1].split('.')[0]
 
-    print(' ')
+    print('---------------------------------')
     print('ECHO data:', ECHO_data)
-    print('record count number:', data.shape[1])
+    print('record count number:', raw_data.shape[1])
+    print('Now processing...')
+    print('   ')
+
+    sobelx, med_denoised, med, medf, data_filtered = resampling(raw_data)
+    data_filtered4plot = np.zeros(raw_data.shape)
+    data_filtered4plot[:, :data_filtered.shape[1]] = data_filtered
 
 
-    #* Resampling
-    resampled_ECHO = []
-    difference_list = []
-    running_average_list = []
-    resampled_record = []
+    #* Plot
+    fig, ax = plt.subplots(6, 1, figsize=(12, 20), tight_layout=True, sharex=True)
+    fontsize_large = 20
+    fontsize_medium = 18
+    fontsize_small = 16
 
-    #* Calculate difference and running average of difference
-    for i in tqdm(range(data.shape[1]), desc=ECHO_data + ' Calculate difference'):
-        calc_difference(data, i)
-    resampled_ECHO = np.array(resampled_ECHO)
-    #for i in tqdm(range(len(difference_list)), desc=ECHO_data + ' Calculate running average'):
-    #    calc_running_average(difference_list, i)
-    #for i in tqdm(range(len(resampled_ECHO)), desc=ECHO_data + ' Calculate difference 2'):
-    #    calc_difference_2(resampled_ECHO)
-    print('Resampled_ECHO:', len(resampled_ECHO))
-    resampled_ECHO = np.array(resampled_ECHO).T
+    #* Plot raw data
+    ax[0].imshow(raw_data, aspect='auto', cmap='seismic',
+                extent=[0, raw_data.shape[1], raw_data.shape[0]*0.3125, 0],
+                vmin=-15, vmax=15)
+    ax[0].set_title('Raw data: ' + str(sequence_id), fontsize=fontsize_large)
+    ax[0].set_ylabel('Time [ns]', fontsize=fontsize_medium)
+    ax[0].tick_params(axis='both', which='major', labelsize=fontsize_small)
 
-    #print(Resampled_ECHO.shape)
+    #* Plot Sobel filtered data
+    ax[1].imshow(sobelx, aspect='auto', cmap='seismic',
+                extent=[0, sobelx.shape[1], sobelx.shape[0]*0.3125, 0],
+                vmin=-15, vmax=15)
+    ax[1].set_title('Sobel filtered', fontsize=fontsize_large)
+    ax[1].set_ylabel('Time [ns]', fontsize=fontsize_medium)
+    ax[1].tick_params(axis='both', which='major', labelsize=fontsize_small)
 
-    #* Save resampled ECHO data
-    np.savetxt(txt_output_dir + '/' + sequence_id + '_resampled.txt', resampled_ECHO, delimiter=' ')
+    #* Plot median denoised data
+    ax[2].imshow(med_denoised, aspect='auto', cmap='seismic',
+                extent=[0, med_denoised.shape[1], med_denoised.shape[0]*0.3125, 0],
+                vmin=-15, vmax=15)
+    ax[2].set_title('Random noise reduction', fontsize=fontsize_large)
+    ax[2].set_ylabel('Time [ns]', fontsize=fontsize_medium)
+    ax[2].tick_params(axis='both', which='major', labelsize=fontsize_small)
 
+    #* Plot median data
+    ax[3].plot(med, label='med')
+    ax[3].hlines(20000, 0, med.shape[0], 'r', label='thres')
+    ax[3].set_title('Filtered singals amplitude', fontsize=fontsize_medium)
+    ax[3].legend()
+    ax[3].set_ylabel('Amplitude', fontsize=fontsize_medium)
+    ax[3].tick_params(axis='both', which='major', labelsize=fontsize_small)
 
-    #* Plot which record is resampled on the data plot
-    resampled_record = resampled_ECHO[0, :]
-    font_large = 20
-    font_medium = 18
-    print('Number of resampled record:', len(resampled_record))
+    #* Plot median filtered data
+    ax[4].plot(medf)
+    ax[4].set_title('Gate with interesting data', fontsize=fontsize_medium)
+    ax[4].tick_params(axis='both', which='major', labelsize=fontsize_small)
 
+    #* Plot filtered data
+    ax[5].imshow(data_filtered4plot, aspect='auto', cmap='seismic',
+                extent=[0, raw_data.shape[1], raw_data.shape[0]*0.3125, 0],
+                vmin=-15, vmax=15)
+    ax[5].set_title('Filtered ECHO data', fontsize=fontsize_large)
+    ax[5].set_ylabel('Time [ns]', fontsize=fontsize_medium)
+    ax[5].tick_params(axis='both', which='major', labelsize=fontsize_small)
 
-    #* Plot original B-scan
-    plt.figure(figsize=(15, 10), tight_layout=True)
-    plt.imshow(data, aspect='auto', cmap='seismic',
-                extent=[0, data.shape[1], data.shape[0]*0.3125, 0],
-                vmin=-50, vmax=50)
-    plt.xlabel('Record count', fontsize=font_large)
-    plt.ylabel('Time [ns]', fontsize=font_large)
-    plt.title('Sequence ID: ' + sequence_id, fontsize=font_large)
-    plt.tick_params(labelsize=font_medium)
+    fig.supxlabel('Trace number', fontsize=fontsize_medium)
 
-    cbar = plt.colorbar()
-    cbar.set_label('Amplitude', fontsize=font_large)
-    cbar.ax.tick_params(labelsize=font_medium)
-
-    plt.savefig(plot_output_dir + '/' + sequence_id + '_original.png')
-    #plt.show()
-    plt.close()
-
-
-    #* Plot original B-scan and shade resampled record
-    fig, ax = plt.subplots(2,1, figsize=(15, 10), tight_layout=True, sharex=True)
-    ax[0].imshow(data, aspect='auto', cmap='seismic',
-                extent=[0, data.shape[1], data.shape[0]*0.3125, 0],
-                vmin=-50, vmax=50)
-    ax[0].set_ylabel('Time [ns]', fontsize=font_large)
-    ax[0].tick_params(labelsize=font_medium)
-
-    #* Shade resampled record
-    for i in range(len(resampled_record)):
-        ax[0].axvspan(resampled_record[i], resampled_record[i]+1, color='gray', alpha=0.1)
-
-    #cbar = plt.colorbar(ax[0].images[0], ax=ax[0], )
-    #cbar.set_label('Amplitude', fontsize=font_large)
-    #cbar.ax.tick_params(labelsize=font_medium)
-
-    ax[1].plot(difference_list, label='Difference')
-    ax[1].plot(running_average_list, label='Running average')
-    ax[1].set_ylabel('Difference', fontsize=font_large)
-    ax[1].tick_params(labelsize=font_medium)
-    ax[1].hlines(criteria, 0, len(difference_list), 'k', linestyles='dashed', label='Difference criteria')
-    ax[1].legend(fontsize=font_medium)
-
-    fig.suptitle('Sequence ID: ' + sequence_id, fontsize=font_large)
-    fig.supxlabel('Record count', fontsize=font_large)
-
-    plt.savefig(plot_output_dir + '/' + sequence_id + '_shaded.png')
-    #plt.show()
-    plt.close()
-
-    """
-    plt.figure(figsize=(15, 10), tight_layout=True)
-    plt.imshow(data, aspect='auto', cmap='seismic',
-                extent=[0, data.shape[1], data.shape[0]*0.3125, 0],
-                vmin=-50, vmax=50)
-    plt.xlabel('Record count', fontsize=font_large)
-    plt.ylabel('Time [ns]', fontsize=font_large)
-    plt.title('Sequence ID: ' + sequence_id, fontsize=font_large)
-    plt.tick_params(labelsize=font_medium)
-
-    cbar = plt.colorbar()
-    cbar.set_label('Amplitude', fontsize=font_large)
-    cbar.ax.tick_params(labelsize=font_medium)
-    #* Shade resampled record
-    for i in range(len(resampled_record)):
-        plt.axvspan(resampled_record[i], resampled_record[i]+1, color='gray', alpha=0.1)
-
-    #plt.savefig(plot_output_dir + '/' + sequence_id + '_shaded.png')
-    plt.show()
-    #plt.close()
-
-
-    #* Plot difference between the original data and the resampled data
-    plt.figure(tight_layout=True)
-    plt.plot(difference_list)
-    plt.hlines(6000, 0, len(difference_list), 'r', linestyles='dashed')
-    plt.xlabel('Record count')
-    plt.ylabel('Difference')
-    plt.show()
-    """
-
-
-
-    #* Plot resampled ECHO data
-    plt.figure(figsize=(15, 10), tight_layout=True)
-    plt.imshow(resampled_ECHO, aspect='auto', cmap='seismic',
-                extent=[0, resampled_ECHO.shape[1], resampled_ECHO.shape[0]*0.3125, 0],
-                vmin=-50, vmax=50)
-    plt.xlabel('Record count', fontsize=font_large)
-    plt.ylabel('Time [ns]', fontsize=font_large)
-    plt.title('Sequence ID: ' + sequence_id, fontsize=font_large)
-    plt.tick_params(labelsize=font_medium)
-
-    cbar = plt.colorbar()
-    cbar.set_label('Amplitude', fontsize=font_large)
-    cbar.ax.tick_params(labelsize=font_medium)
-
-    plt.savefig(plot_output_dir + '/' + sequence_id + '_resampled.png')
-    #plt.show()
+    plt.savefig(plot_output_dir + '/' + str(sequence_id) + '_resampling_flow.png')
     plt.close()
