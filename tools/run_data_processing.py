@@ -78,32 +78,45 @@ title = ['Raw B-scan', 'Bandpass filtered B-scan', 'Time-zero corrected B-scan',
 
 
 sample_interval_ns = sample_interval * 1e9
+trace_interval = 3.6e-2 # [m], [Li et al. (2020), Sci. Adv.]
 
-#* Plot single panel figure x 5
+
+#* Plot
+font_large = 20
+font_medium = 18
+font_small = 16
+
+
+#* Plot single panel figure x
+print('   ')
+print('Plotting single panel figure x 5')
 for i in range(len(plot_data)):
     fig = plt.figure(figsize=(18, 6), tight_layout=True)
     ax = fig.add_subplot(111)
+    #fig, ax = plt.subplots(1, 1, figsize=(18, 6), tight_layout=True)
     if i == 4:
-        imshow = ax.imshow(plot_data[i], aspect='auto', cmap='seismic',
-                extent=[0, plot_data[i].shape[1], plot_data[i].shape[0]*sample_interval_ns, 0],
+        im = ax.imshow(plot_data[i], aspect='auto', cmap='seismic',
+                extent=[0, plot_data[i].shape[1]*trace_interval, plot_data[i].shape[0]*sample_interval_ns, 0],
                 vmin=-0.1, vmax=0.1
                 )
     else:
-        imshow = ax.imshow(plot_data[i], aspect='auto', cmap='seismic',
-                    extent=[0, plot_data[i].shape[1], plot_data[i].shape[0]*sample_interval_ns, 0],
+        im = ax.imshow(plot_data[i], aspect='auto', cmap='seismic',
+                    extent=[0, plot_data[i].shape[1]*trace_interval, plot_data[i].shape[0]*sample_interval_ns, 0],
                     vmin=-15, vmax=15
                     )
-    ax.tick_params(axis='both', which='major', labelsize=16)
-    ax.set_title(title[i], fontsize=20)
+    ax.tick_params(axis='both', which='major', labelsize=font_small)
+    ax.set_title(title[i], fontsize=font_large)
 
-    cbar = plt.colorbar(imshow, ax=ax)
-    cbar.set_label('Amplitude', fontsize=18)
-    cbar.ax.tick_params(labelsize=16)
+    ax.set_xlabel('Trace number', fontsize=font_medium)
+    ax.set_ylabel('Time (ns)', fontsize=font_medium)
 
-    ax.set_xlabel('Trace number', fontsize=18)
-    ax.set_ylabel('Time (ns)', fontsize=18)
+    delvider = axgrid1.make_axes_locatable(ax)
+    cax = delvider.append_axes('right', size='3%', pad=0.1)
+    plt.colorbar(im, cax=cax, orientation = 'vertical').set_label('Amplitude', fontsize=font_large)
+    cax.tick_params(labelsize=font_small)
 
     plt.savefig(output_dir + '/' + title[i] + '.png')
+    print('Finished plotting', title[i])
     plt.close()
 
 
@@ -111,45 +124,34 @@ for i in range(len(plot_data)):
 print('   ')
 print('Plotting 5 panel figure')
 fig, ax = plt.subplots(len(plot_data), 1, figsize=(18, 20), tight_layout=True, sharex=True)
-fontsize_large = 20
-fontsize_medium = 18
-fontsize_small = 16
+
 
 for i in range(len(plot_data)):
     if i == 4:
-        imshow = ax[i].imshow(plot_data[i], aspect='auto', cmap='seismic',
-                extent=[0, plot_data[i].shape[1], plot_data[i].shape[0]*sample_interval_ns, 0],
+        im = ax[i].imshow(plot_data[i], aspect='auto', cmap='seismic',
+                extent=[0, plot_data[i].shape[1]*trace_interval, plot_data[i].shape[0]*sample_interval_ns, 0],
                 vmin=-0.1, vmax=0.1
                 )
     else:
-        imshow = ax[i].imshow(plot_data[i], aspect='auto', cmap='seismic',
-                    extent=[0, plot_data[i].shape[1], plot_data[i].shape[0]*sample_interval_ns, 0],
+        im = ax[i].imshow(plot_data[i], aspect='auto', cmap='seismic',
+                    extent=[0, plot_data[i].shape[1]*trace_interval, plot_data[i].shape[0]*sample_interval_ns, 0],
                     vmin=-15, vmax=15
                     )
-    ax[i].tick_params(axis='both', which='major', labelsize=fontsize_small)
-    ax[i].set_title(title[i], fontsize=fontsize_large)
+    ax[i].tick_params(axis='both', which='major', labelsize=font_small)
+    ax[i].set_title(title[i], fontsize=font_large)
 
-    cbar = plt.colorbar(imshow, ax=ax[i])
-    cbar.set_label('Amplitude', fontsize=fontsize_medium)
-    cbar.ax.tick_params(labelsize=fontsize_small)
+    delvider = axgrid1.make_axes_locatable(ax[i])
+    cax = delvider.append_axes('right', size='3%', pad=0.1)
+    plt.colorbar(im, cax=cax, orientation = 'vertical').set_label('Amplitude', fontsize=font_large)
+    cax.tick_params(labelsize=font_small)
 
-    if i == len(plot_data) - 1:
-        ax[i].set_xlabel('Trace number', fontsize=fontsize_medium)
-    #ax[i].set_ylim(50, 0)
+fig.supxlabel('Distance [m]', fontsize=font_medium)
+fig.supylabel('Time (ns)', fontsize=font_medium)
 
-
-#fig.supxlabel('Trace number', fontsize=fontsize_medium)
-fig.supylabel('Time (ns)', fontsize=fontsize_medium)
-
-
-#* plot colorbar
-#delvider = axgrid1.make_axes_locatable(ax[len(plot_data)-1])
-#cax = delvider.append_axes('bottom', size='5%', pad=1)
-#plt.colorbar(imshow, cax=cax, orientation = 'horizontal').set_label('Amplitude', fontsize=fontsize_medium)
-#cax.tick_params(labelsize=fontsize_small)
 
 
 #* save plot
 plt.savefig(output_dir + '/Processed_Bscan.png')
+print('Finished plotting 5 panel figure')
 
 plt.show()

@@ -40,6 +40,7 @@ Ascans = np.loadtxt(Ascans_file_path, skiprows=1, delimiter=' ')
 print("Ascans shape:", Ascans.shape)
 """
 sample_interval = 0.312500  # [ns]
+trace_interval = 3.6e-2 # [m], [Li et al. (2020), Sci. Adv.]
 
 
 #* Define output folder path
@@ -81,7 +82,7 @@ font_small = 16
 def single_plot(plot_data):
     plt.figure(figsize=(18, 6), tight_layout=True)
     plt.imshow(plot_data, aspect='auto', cmap='seismic',
-                extent=[0, plot_data.shape[1]*3.75*1e-2, plot_data.shape[0]*sample_interval, 0],
+                extent=[0, plot_data.shape[1]*trace_interval, plot_data.shape[0]*sample_interval, 0],
                 vmin=-15, vmax=15
                 )
     plt.xlabel('Distance [m]', fontsize=font_large)
@@ -89,9 +90,6 @@ def single_plot(plot_data):
     plt.tick_params(axis='both', which='major', labelsize=font_medium)
 
     #* Colorbar
-    #cbar = plt.colorbar()
-    #cbar.set_label('Amplitude', fontsize=font_lartge)
-    #cbar.ax.tick_params(labelsize=font_medium)
     delvider = axgrid1.make_axes_locatable(plt.gca())
     cax = delvider.append_axes('right', size='3%', pad=0.1)
     plt.colorbar(cax=cax, orientation = 'vertical').set_label('Amplitude', fontsize=font_large)
@@ -115,7 +113,7 @@ elif args.function_type == 'plot':
     print("B-scan shape:", resampled_data.shape)
     print('')
     print('Now plotting...')
-    
+
     single_plot(resampled_data)
 else:
     raise ValueError('Invalid function type')
