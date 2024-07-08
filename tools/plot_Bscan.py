@@ -74,7 +74,7 @@ def load_resampled_data():
 
 
 #* plot
-font_lartge = 20
+font_large = 20
 font_medium = 18
 font_small = 16
 
@@ -84,14 +84,18 @@ def single_plot(plot_data):
                 extent=[0, plot_data.shape[1]*3.75*1e-2, plot_data.shape[0]*sample_interval, 0],
                 vmin=-15, vmax=15
                 )
-    plt.xlabel('Distance [m]', fontsize=font_lartge)
-    plt.ylabel('Time [ns]', fontsize=font_lartge)
+    plt.xlabel('Distance [m]', fontsize=font_large)
+    plt.ylabel('Time [ns]', fontsize=font_large)
     plt.tick_params(axis='both', which='major', labelsize=font_medium)
 
     #* Colorbar
-    cbar = plt.colorbar()
-    cbar.set_label('Amplitude', fontsize=font_lartge)
-    cbar.ax.tick_params(labelsize=font_medium)
+    #cbar = plt.colorbar()
+    #cbar.set_label('Amplitude', fontsize=font_lartge)
+    #cbar.ax.tick_params(labelsize=font_medium)
+    delvider = axgrid1.make_axes_locatable(plt.gca())
+    cax = delvider.append_axes('right', size='3%', pad=0.1)
+    plt.colorbar(cax=cax, orientation = 'vertical').set_label('Amplitude', fontsize=font_large)
+    cax.tick_params(labelsize=font_small)
 
     plt.savefig(output_dir + '/Bscan.png')
     plt.show()
@@ -103,8 +107,15 @@ if args.function_type == 'load':
     print("B-scan shape:", resampled_data.shape)
     single_plot(resampled_data)
 elif args.function_type == 'plot':
+    print('Function type is plot')
+    print(' ')
+
     resampled_data = np.loadtxt(os.path.dirname(ECHO_dir) + '/Bscan.txt')
+    print('Finished loading B-scan data')
     print("B-scan shape:", resampled_data.shape)
+    print('')
+    print('Now plotting...')
+    
     single_plot(resampled_data)
 else:
     raise ValueError('Invalid function type')
