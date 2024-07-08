@@ -35,6 +35,7 @@ output_dir = os.path.join(os.path.dirname(os.path.dirname(data_path)), 'Processe
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 print('Output dir:', output_dir)
+print('   ')
 
 
 
@@ -46,7 +47,7 @@ filtered_Bscan = np.zeros(Raw_Bscan.shape)
 for i in tqdm(range(Raw_Bscan.shape[1]), desc='Applying bandpass filter'):
             filtered_Bscan[:, i] = bandpass_filtering.bandpass_filter(Raw_Bscan[:, i], 250e6, 750e6, 5)
 print('Finished bandpass filtering')
-(filtered_Bscan.shape)
+print(filtered_Bscan.shape)
 
 
 
@@ -62,9 +63,13 @@ print(aligned_Bscan.shape)
 
 #* process background removal
 background_removal = processing_background_removal(aligned_Bscan)
-background_removed_Bscan = background_removal.subtract_background()
+background_data, background_removed_Bscan = background_removal.subtract_background()
 print('Finished background removal')
 print(background_removed_Bscan.shape)
+
+
+plt.plot(background_data)
+plt.show()
 
 
 #* Process gain function

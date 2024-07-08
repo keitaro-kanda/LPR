@@ -20,13 +20,14 @@ class proccessing_time_zero_correction:
     def zero_corrections(self):
         #data_2 = np.zeros((self.Bscan_data.shape))
         for i in tqdm(range(self.Bscan_data.shape[1])):
-            idx = np.where((np.abs(self.Bscan_data[:, i])>0.5))[0][0]
-            self.aligned_Bscan[:idx, i] = self.Bscan_data[idx:, i]
+            idx = np.where((np.abs(self.Bscan_data[:, i])))[0][0]
+            print(idx)
+            self.aligned_Bscan[:-idx, i] = self.Bscan_data[idx:, i]
         return self.aligned_Bscan
 
     def find_peak_time(self):
         for i in tqdm(range(self.Bscan_data.shape[1]), desc='Finding peak time'):
-            peak_index = np.argmax(self.Bscan_data[:, i]) # index number, not time
+            peak_index = np.where(self.Bscan_data[:, i]>0.5)[0][0] # index number, not time
             self.peak.append(peak_index)
         return self.peak
 
@@ -40,9 +41,9 @@ class proccessing_time_zero_correction:
             shift = int((time_zero_point - self.peak[i])) # shift index number
             #* シフトする分はゼロで埋める
             if shift > 0:
-                self.aligned_Bscan[:, i] = np.concatenate([np.zeros(shift), self.Bscan_data[:len(self.Bscan_data)-shift, i]])
+                self.aligned_Bscan[:, i] = np.concatenate([np.zeros(shift), self.Bscan_data[:-shift, i]])
             elif shift < 0:
-                self.aligned_Bscan[:, i] = np.concatenate([self.Bscan_data[abs(shift):, i], np.zeros(abs(shift))])
+                self.aligned_Bscan[:, i] = np.concatenate([self.Bscan_data[np.abs(shift):, i], np.zeros(np.abs(shift))])
             else:
                 self.aligned_Bscan[:, i] = self.Bscan_data[:, i]
         return np.array(self.aligned_Bscan)

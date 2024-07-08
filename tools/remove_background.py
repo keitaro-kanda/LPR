@@ -18,7 +18,7 @@ class processing_background_removal():
         self.background_removed_Bscan = np.zeros_like(self.Bscan_data)
         for i in tqdm(range(self.Bscan_data.shape[1]), desc='Subtracting background'):
             self.background_removed_Bscan[:, i] =  self.Bscan_data[:, i] - self.background_data
-        return self.background_removed_Bscan
+        return self.background_data,  self.background_removed_Bscan
 
 
     def plot(self):
