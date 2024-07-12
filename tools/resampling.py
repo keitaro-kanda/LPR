@@ -92,7 +92,9 @@ def resampling(data): # input is 2D array
 
 
 #* Condunct resampling
-for ECHO_data in natsorted(os.listdir(data_folder_path)):
+total_trace_num = 0
+resampled_trace_num = 0
+for ECHO_data in tqdm(natsorted(os.listdir(data_folder_path))):
     #* Load ECHO data
     if not ECHO_data.endswith('.txt'):
         continue
@@ -106,12 +108,22 @@ for ECHO_data in natsorted(os.listdir(data_folder_path)):
     print('---------------------------------')
     print('ECHO data:', ECHO_data)
     print('record count number:', raw_data.shape[1])
+    #* Count the number of traces before resampling
+    total_trace_num += raw_data.shape[1]
     print('Now processing...')
     print('   ')
 
     sobelx, med_denoised, med, medf, data_filtered = resampling(raw_data)
     data_filtered4plot = np.zeros(raw_data.shape)
     data_filtered4plot[:, :data_filtered.shape[1]] = data_filtered
+
+
+    #* Count the number of traces after resampling
+    resampled_trace_num += data_filtered.shape[1]
+    if ECHO_data == natsorted(os.listdir(data_folder_path))[-1]:
+        with open(output_dir + '/total_trace_num.txt', 'w') as f:
+            f.write('Number of total traces before resampling:', str(total_trace_num))
+            f.write('Number of total traces after resampling:', str(resampled_trace_num))
 
 
     #* Plot

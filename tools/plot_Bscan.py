@@ -96,6 +96,7 @@ def single_plot(plot_data):
     cax.tick_params(labelsize=font_small)
 
     plt.savefig(output_dir + '/Bscan.png')
+    plt.savefig(output_dir + '/Bscan.pdf', format='pdf', dpi=300)
     plt.show()
 
     return plt
