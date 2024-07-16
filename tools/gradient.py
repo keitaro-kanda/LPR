@@ -5,6 +5,8 @@ import mpl_toolkits.axes_grid1 as axgrid1
 from matplotlib.colors import LogNorm
 from tqdm import tqdm
 import os
+import matplotlib.colors as colors
+import matplotlib.cm as cm
 
 
 data_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Processed_Bscan/txt/gained_Bscan.txt'
@@ -69,13 +71,14 @@ grady[grady == 0] = 1e-15
 
 
 grad_combined = np.sqrt(gradx**2 + grady**2)
+grad_deviation = gradx - grady
 
 
-data_list = [gradx, grady, grad_combined]
-title_list = ['Gradient X', 'Gradient Y', 'Gradient Combined']
+data_list = [gradx, grady, grad_combined, grad_combined]
+title_list = ['Gradient X', 'Gradient Y', 'Gradient Combined', 'Gradient Combined']
 
 #* Plot
-fig, ax = plt.subplots(3, 1, figsize=(18, 18), tight_layout=True, sharex=True)
+fig, ax = plt.subplots(4, 1, figsize=(18, 18), tight_layout=True, sharex=True)
 font_large = 20
 font_medium = 18
 font_small = 16
@@ -89,12 +92,23 @@ for i, data in enumerate(data_list):
     """
     log_norm = LogNorm(vmin=np.amin(data), vmax=np.amax(data))
     data = 10 * np.log10(data/np.amax(data))
-    im = ax[i].imshow(data,
+    if i == 3:
+        color_bounds = np.arange(-50, 1, 5)
+        cmap_colors = colors.ListedColormap([cm.jet(int(255*i/color_bounds.shape[0])) for i in range(color_bounds.shape[0]-1)])
+        norm = colors.BoundaryNorm(color_bounds, cmap_colors.N)
+        im = ax[i].imshow(data,
                 #norm=log_norm,
-                aspect='auto', cmap='viridis',
+                aspect='auto', cmap=cmap_colors,
                 extent=[0, data.shape[1]*trace_interval, data.shape[0]*sample_interval*1e9, skip_sec*1e9],
-                vmin=-35, vmax=0
+                norm=norm
                 )
+    else:
+        im = ax[i].imshow(data,
+                    #norm=log_norm,
+                    aspect='auto', cmap='jet',
+                    extent=[0, data.shape[1]*trace_interval, data.shape[0]*sample_interval*1e9, skip_sec*1e9],
+                    vmin=-50, vmax=0
+                    )
     ax[i].set_title(title_list[i], fontsize=font_large)
     ax[i].tick_params(axis='both', which='major', labelsize=font_small)
 
@@ -105,7 +119,7 @@ for i, data in enumerate(data_list):
     plt.colorbar(im, cax=cax).set_label('Amplitude [dB]', fontsize=font_medium)
     cax.tick_params(labelsize=font_small)
 
-fig.supxlabel('Trace number', fontsize=font_medium)
+fig.supxlabel('Distance [m]', fontsize=font_medium)
 fig.supylabel('Time [ns]', fontsize=font_medium)
 
 if np_grad:
