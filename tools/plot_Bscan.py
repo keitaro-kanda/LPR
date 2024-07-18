@@ -10,6 +10,7 @@ from tqdm import tqdm
 from matplotlib.gridspec import GridSpec
 import argparse
 from natsort import natsorted
+from scipy import signal
 
 
 #* Parse command line arguments
@@ -17,10 +18,11 @@ parser = argparse.ArgumentParser(
     prog='plot_Bscan.py',
     description='Plot B-scan from ECHO data',
     epilog='End of help message',
-    usage='python tools/plot_Bscan.py [path_type] [function type]',
+    usage='python tools/plot_Bscan.py [path_type] [function type] [-envelope]',
 )
 parser.add_argument('path_type', choices = ['local', 'SSD'], help='Choose the path type')
 parser.add_argument('function_type', choices = ['load', 'plot'], help='Choose the function type')
+parser.add_argument('-envelope', action='store_true', help='Plot B-scan with envelope')
 args = parser.parse_args()
 
 
@@ -74,6 +76,13 @@ def load_resampled_data():
     return ECHO_for_plot
 
 
+#* Calculate envelove
+def envelope(data):
+    #* Calculate the envelope of the data
+    envelope = np.abs(signal.hilbert(data, axis=0))
+    return envelope
+
+
 #* plot
 font_large = 20
 font_medium = 18
@@ -81,10 +90,16 @@ font_small = 16
 
 def single_plot(plot_data):
     plt.figure(figsize=(18, 6), tight_layout=True)
-    plt.imshow(plot_data, aspect='auto', cmap='seismic',
+    if args.envelope:
+        plt.imshow(plot_data, aspect='auto', cmap='jet',
                 extent=[0, plot_data.shape[1]*trace_interval, plot_data.shape[0]*sample_interval, 0],
-                vmin=-15, vmax=15
+                vmin=0, vmax=50
                 )
+    else:
+        plt.imshow(plot_data, aspect='auto', cmap='seismic',
+                    extent=[0, plot_data.shape[1]*trace_interval, plot_data.shape[0]*sample_interval, 0],
+                    vmin=-15, vmax=15
+                    )
     plt.xlabel('Distance [m]', fontsize=font_large)
     plt.ylabel('Time [ns]', fontsize=font_large)
     plt.tick_params(axis='both', which='major', labelsize=font_medium)
@@ -95,8 +110,12 @@ def single_plot(plot_data):
     plt.colorbar(cax=cax, orientation = 'vertical').set_label('Amplitude', fontsize=font_large)
     cax.tick_params(labelsize=font_small)
 
-    plt.savefig(output_dir + '/Bscan.png')
-    plt.savefig(output_dir + '/Bscan.pdf', format='pdf', dpi=300)
+    if args.envelope:
+        plt.savefig(output_dir + '/Bscan_envelope.png')
+        plt.savefig(output_dir + '/Bscan_envelope.pdf', format='pdf', dpi=300)
+    else:
+        plt.savefig(output_dir + '/Bscan.png')
+        plt.savefig(output_dir + '/Bscan.pdf', format='pdf', dpi=300)
     plt.show()
 
     return plt
@@ -104,6 +123,9 @@ def single_plot(plot_data):
 if args.function_type == 'load':
     resampled_data = load_resampled_data()
     print("B-scan shape:", resampled_data.shape)
+    if args.envelope:
+        print('Calculating envelope...')
+        resampled_data = envelope(resampled_data)
     single_plot(resampled_data)
 elif args.function_type == 'plot':
     print('Function type is plot')
@@ -113,6 +135,10 @@ elif args.function_type == 'plot':
     print('Finished loading B-scan data')
     print("B-scan shape:", resampled_data.shape)
     print('')
+
+    if args.envelope:
+        print('Calculating envelope...')
+        resampled_data = envelope(resampled_data)
     print('Now plotting...')
 
     single_plot(resampled_data)
