@@ -28,7 +28,7 @@ elif args.path_type == 'SSD':
 
 
 #* Define output folder path
-output_dir = os.path.join(os.path.dirname(os.path.dirname(data_path)), 'Processed_Bscan')
+output_dir = os.path.join(os.path.dirname(os.path.dirname(data_path)), 'Processed_Data')
 os.makedirs(output_dir, exist_ok=True)
 png_dir = os.path.join(output_dir, 'png')
 os.makedirs(png_dir, exist_ok=True)
@@ -153,7 +153,7 @@ if args.function_type == 'calc':
     t_2D = np.expand_dims(np.linspace(0, background_removed_Bscan.shape[0] *sample_interval, background_removed_Bscan.shape[0]), axis=1)
     gained_Bscan = background_removed_Bscan * t_2D ** 1.7
     gained_Bscan = gained_Bscan / np.amax(gained_Bscan)
-    np.savetxt(txt_dir + '/gained_Bscan.txt', gained_Bscan, delimiter=' ')
+    np.savetxt(txt_dir + '/4_gained_Bscan.txt', gained_Bscan, delimiter=' ')
     print('Finished gain correction')
 
 elif args.function_type == 'plot':
@@ -172,7 +172,7 @@ elif args.function_type == 'plot':
     background_removed_Bscan = np.loadtxt(txt_dir + '/3_background_removed_Bscan.txt', delimiter=' ')
 
     #* 4. Gain function
-    gained_Bscan = np.loadtxt(txt_dir + '/gained_Bscan.txt', delimiter=' ')
+    gained_Bscan = np.loadtxt(txt_dir + '/4_gained_Bscan.txt', delimiter=' ')
 
     print('Finished data loading')
 
@@ -368,8 +368,8 @@ fig.supylabel('Time (ns)', fontsize=font_medium)
 
 
 #* save plot
-plt.savefig(png_dir + '/0_Processed_Bscan.png', format='png', dpi=300)
-plt.savefig(pdf_dir + '/0_Processed_Bscan.pdf', format='pdf', dpi=300)
+plt.savefig(png_dir + '/0_Processed_Bscan.png', format='png', dpi=120)
+plt.savefig(pdf_dir + '/0_Processed_Bscan.pdf', format='pdf', dpi=600)
 print('Finished plotting 5 panel figure')
 
 plt.show()

@@ -28,7 +28,7 @@ elif args.path_type == 'SSD':
 
 
 #* Define output folder path
-output_dir = os.path.join(os.path.dirname(data_folder_path), 'Resampled_ECHO')
+output_dir = os.path.join(os.path.dirname(data_folder_path), 'Resampled_Data')
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 txt_output_dir = os.path.join(output_dir, 'txt')
