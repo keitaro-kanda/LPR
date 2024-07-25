@@ -2,9 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import mpl_toolkits.axes_grid1 as axgrid1
-from bandpass import processing_filtering
-from remove_background import processing_background_removal
-from time_zero_correction import proccessing_time_zero_correction
 import argparse
 from tqdm import tqdm
 from scipy import signal
@@ -14,7 +11,7 @@ parser = argparse.ArgumentParser(
     prog='run_data_processing.py',
     description='Run bandpass filtering, time-zero correction, and background removal on resampled Bscan data',
     epilog='End of help message',
-    usage='python tools/resampling.py [path_type] [function_type]',
+    usage='python tools/runs_data_processing.py [path_type] [function_type]',
 )
 parser.add_argument('path_type', choices = ['local', 'SSD'], help='Choose the path type')
 parser.add_argument('function_type', choices=['calc', 'plot'], help='Choose the function type')
@@ -84,9 +81,9 @@ def time_correction(data):
     #        peak_index = np.argmax(data[:, i])  # index number, not time
     #        peak.append(peak_index)
     for i in tqdm(range(data.shape[1]), desc='Finding peak time'):
-            peak_index = np.where(data[:, i]>0.5)[0][0] # index number, not time
+            peak_index = np.where(data[:, i]>0)[0][0] # index number, not time
             peak.append(peak_index)
-    time_zero_point = np.median(peak)
+    time_zero_point = np.max(peak)
     #time_zero_record = peak.index(time_zero_point)
     print('Time zero point: ', time_zero_point)
     print('New time zero [s]', time_zero_point * sample_interval * 1e9, ' ns')
@@ -321,7 +318,7 @@ for i in range(len(plot_data)):
     else:
         im = ax.imshow(plot_data[i], aspect='auto', cmap='seismic',
                     extent=[0, plot_data[i].shape[1]*trace_interval, plot_data[i].shape[0]*sample_interval*1e9, 0],
-                    vmin=-15, vmax=15
+                    vmin=-30, vmax=30
                     )
     ax.tick_params(axis='both', which='major', labelsize=font_small)
     ax.set_title(title[i], fontsize=font_large)
@@ -355,7 +352,7 @@ for i in range(len(plot_data)):
     else:
         im = ax[i].imshow(plot_data[i], aspect='auto', cmap='seismic',
                     extent=[0, plot_data[i].shape[1]*trace_interval, plot_data[i].shape[0]*sample_interval*1e9, 0],
-                    vmin=-15, vmax=15
+                    vmin=-30, vmax=30
                     )
     ax[i].tick_params(axis='both', which='major', labelsize=font_small)
     ax[i].set_title(title[i], fontsize=font_large)

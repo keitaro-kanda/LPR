@@ -20,7 +20,7 @@ parser = argparse.ArgumentParser(
     epilog='End of help message',
     usage='python tools/plot_Bscan.py [path_type] [function type] [-envelope]',
 )
-parser.add_argument('path_type', choices = ['local', 'SSD'], help='Choose the path type')
+parser.add_argument('path_type', choices = ['local', 'SSD', 'other'], help='Choose the path type')
 parser.add_argument('function_type', choices = ['load', 'plot'], help='Choose the function type')
 parser.add_argument('-envelope', action='store_true', help='Plot B-scan with envelope')
 args = parser.parse_args()
@@ -32,6 +32,8 @@ if args.path_type == 'local':
     ECHO_dir = 'LPR_2B/Resampled_ECHO/txt'
 elif args.path_type == 'SSD':
     ECHO_dir = '/Volumes/SSD_kanda/LPR/LPR_2B/Resampled_ECHO/txt'
+elif args.path_type == 'other': # Set pass manually
+    data_path= '/Volumes/SSD_kanda/LPR/LPR_2B/Processed_Bscan/txt/2_aligned_Bscan.txt'
 else:
     raise ValueError('Invalid path type')
 
@@ -46,7 +48,12 @@ trace_interval = 3.6e-2 # [m], [Li et al. (2020), Sci. Adv.]
 
 
 #* Define output folder path
-output_dir = os.path.join(os.path.dirname(ECHO_dir))
+if args.path_type == 'other':
+    output_dir = os.path.join(os.path.dirname(os.path.dirname(data_path)), 'test')
+elif args.path_type == 'local' or 'SSD':
+    output_dir = os.path.join(os.path.dirname(ECHO_dir))
+else:
+    raise ValueError('Invalid path type')
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
@@ -98,7 +105,7 @@ def single_plot(plot_data):
     else:
         plt.imshow(plot_data, aspect='auto', cmap='seismic',
                     extent=[0, plot_data.shape[1]*trace_interval, plot_data.shape[0]*sample_interval, 0],
-                    vmin=-15, vmax=15
+                    vmin=-30, vmax=30
                     )
     plt.xlabel('Distance [m]', fontsize=font_large)
     plt.ylabel('Time [ns]', fontsize=font_large)
@@ -120,27 +127,38 @@ def single_plot(plot_data):
 
     return plt
 
-if args.function_type == 'load':
-    resampled_data = load_resampled_data()
+
+
+#* Main
+if args.path_type == 'other':
+    resampled_data = np.loadtxt(data_path)
     print("B-scan shape:", resampled_data.shape)
     if args.envelope:
         print('Calculating envelope...')
         resampled_data = envelope(resampled_data)
-    single_plot(resampled_data)
-elif args.function_type == 'plot':
-    print('Function type is plot')
-    print(' ')
-
-    resampled_data = np.loadtxt(os.path.dirname(ECHO_dir) + '/Bscan.txt')
-    print('Finished loading B-scan data')
-    print("B-scan shape:", resampled_data.shape)
-    print('')
-
-    if args.envelope:
-        print('Calculating envelope...')
-        resampled_data = envelope(resampled_data)
-    print('Now plotting...')
-
     single_plot(resampled_data)
 else:
-    raise ValueError('Invalid function type')
+    if args.function_type == 'load':
+        resampled_data = load_resampled_data()
+        print("B-scan shape:", resampled_data.shape)
+        if args.envelope:
+            print('Calculating envelope...')
+            resampled_data = envelope(resampled_data)
+        single_plot(resampled_data)
+    elif args.function_type == 'plot':
+        print('Function type is plot')
+        print(' ')
+
+        resampled_data = np.loadtxt(os.path.dirname(ECHO_dir) + '/Bscan.txt')
+        print('Finished loading B-scan data')
+        print("B-scan shape:", resampled_data.shape)
+        print('')
+
+        if args.envelope:
+            print('Calculating envelope...')
+            resampled_data = envelope(resampled_data)
+        print('Now plotting...')
+
+        single_plot(resampled_data)
+    else:
+        raise ValueError('Invalid function type')
