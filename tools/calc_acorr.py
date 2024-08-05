@@ -33,6 +33,7 @@ data_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Processed_data/txt/4_gained_Bscan.txt
 #* Load data
 print('Loading data...')
 Bscan_data = np.loadtxt(data_path, delimiter=' ')
+normalized_data = Bscan_data / np.amax(Bscan_data)  # Normalize the data
 print('Data shape:', Bscan_data.shape)
 sample_interval = 0.312500e-9  # [s]
 trace_interval = 3.6e-2 # [m], [Li et al. (2020), Sci. Adv.]
@@ -50,7 +51,7 @@ x_last_idx = int(x_last / trace_interval)
 y_first_idx = int(y_first  * 1e-9 / sample_interval)
 y_last_idx = int(y_last * 1e-9 / sample_interval)
 
-trimmed_data = Bscan_data[y_first_idx:y_last_idx, x_first_idx:x_last_idx]
+trimmed_data = normalized_data[y_first_idx:y_last_idx, x_first_idx:x_last_idx]
 print('Trimmed data shape:', trimmed_data.shape)
 trimmed_data = trimmed_data / np.amax(trimmed_data)  # Normalize the data
 
@@ -119,7 +120,7 @@ def plot(plot_list):
 
     fig, ax = plt.subplots(1, len(plot_list), figsize=(26, 8), tight_layout=True, sharex=True, sharey=True)
 
-    cmap_list = ['seismic', 'jet', 'seismic']
+    cmap_list = ['gray', 'jet', 'seismic']
     title_list = ['Normalized B-scan', 'Envelope', 'Autocorrelation']
     vmin_list = [-1, 0, -np.amax(plot_list[2])]
     vmax_list = [1, np.amax(plot_list[1]), np.amax(plot_list[2])]
