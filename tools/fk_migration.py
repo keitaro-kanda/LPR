@@ -6,20 +6,18 @@ import os
 import argparse
 from tqdm import tqdm
 from scipy.interpolate import RectBivariateSpline
+import json
 
 
-
-#* Data path
-data_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Processed_data/txt/4_gained_Bscan.txt'
-
-
-#* Load data
-print('Loading data...')
-Bscan_data = np.loadtxt(data_path, delimiter=' ')
-normalized_data = Bscan_data / np.amax(Bscan_data)  # Normalize the data
-print('Data shape:', Bscan_data.shape)
-sample_interval = 0.312500e-9  # [s]
-trace_interval = 3.6e-2 # [m], [Li et al. (2020), Sci. Adv.]
+#* Parse command line arguments
+parser = argparse.ArgumentParser(
+    prog='fk_migration.py',
+    description='Calculate f-k migration',
+    epilog='End of help message',
+    usage='python tools/fk_migration.py [function_type]',
+)
+parser.add_argument('function_type', choices=['calc', 'plot'], help='Choose the function type')
+args = parser.parse_args()
 
 
 
@@ -88,25 +86,75 @@ def fk_migration(data, epsilon_r):
 
 
 
-#* Run the f-k migration function
-er = 3.4 # Feng et al. (2024)
-fk_data, v = fk_migration(Bscan_data, er)
+
+#* Data path
+if args.function_type == 'calc':
+    data_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Processed_data/4_Gain_function/4_gain_function.txt'
+    #* Define output folder path
+    output_dir = os.path.join(os.path.dirname(data_path), 'fk_migration')
+    os.makedirs(output_dir, exist_ok=True)
+elif args.function_type == 'plot':
+    data_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Processed_data/4_Gain_function/fk_migration/fk_migration.txt'
+    pamameter_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Processed_data/4_Gain_function/fk_migration/parameters.json'
+    #* Define output folder path
+    output_dir = os.path.dirname(data_path)
+
+
+#* Parameters
+sample_interval = 0.312500e-9  # [s]
+trace_interval = 3.6e-2 # [m], [Li et al. (2020), Sci. Adv.]
 
 
 
-#* Save the data
-output_dir = '/Volumes/SSD_kanda/LPR/LPR_2B/fk_migration'
-os.makedirs(output_dir, exist_ok=True)
-np.savetxt(os.path.join(output_dir, 'fk_migration.txt'), np.abs(fk_data), delimiter=',')
+#* Main part
+if args.function_type == 'calc':
+    #* Load data
+    print('Loading data...')
+    Bscan_data = np.loadtxt(data_path, delimiter=' ')
+    normalized_data = Bscan_data / np.amax(Bscan_data)  # Normalize the data
+    print('Data shape:', Bscan_data.shape)
+
+    #* Calculate the f-k migration
+    er = 3.4 # Feng et al. (2024)
+    fk_data, v = fk_migration(Bscan_data, er)
+    #* Save the data
+    np.savetxt(os.path.join(output_dir, 'fk_migration.txt'), np.abs(fk_data), delimiter=',')
+
+    #* Save the parameters as txt file
+    params = {
+        'epsilon_r': er,
+        'sample_interval': sample_interval,
+        'trace_interval': trace_interval,
+        'input_data_path': data_path
+    }
+    with open(os.path.join(output_dir, 'parameters.json'), 'w') as f:
+        json.dump(params, f)
 
 
+elif args.function_type == 'plot':
+    #* Load data
+    print('Loading data...')
+    fk_data = np.loadtxt(data_path, delimiter=',')
+    print('Data shape:', fk_data.shape)
+
+    #* Load parameters
+    print('Loading parameters...')
+    with open(pamameter_path, 'r') as f:
+        params = json.load(f)
+    er = params['epsilon_r']
+    v = 299792458 / np.sqrt(er)
+
+
+
+fk_data = 10 * np.log10(np.abs(fk_data) / np.amax(np.abs(fk_data)))
 
 #* Plot
+print('Plotting...')
 plt.figure(figsize=(18, 6), facecolor='w', edgecolor='w')
-im = plt.imshow(np.abs(fk_data), cmap='jet', aspect='auto',
+im = plt.imshow(fk_data, cmap='jet', aspect='auto',
                 extent=[0, fk_data.shape[1] * trace_interval,
                 fk_data.shape[0] * sample_interval * v / 2, 0],
-                #vmin=0, vmax=30
+                vmin=-35, vmax=0
                 )
 
 plt.xlabel('x [m]', fontsize=20)
@@ -115,11 +163,12 @@ plt.tick_params(labelsize=18)
 
 
 delvider = axgrid1.make_axes_locatable(plt.gca())
-cax = delvider.append_axes('right', size='5%', pad=0.5)
+cax = delvider.append_axes('right', size='5%', pad=0.1)
 cbar = plt.colorbar(im, cax=cax)
+cbar.set_label('Amplitude [dB]', fontsize=20)
 cbar.ax.tick_params(labelsize=18)
 
 
 plt.savefig(os.path.join(output_dir, 'fk_migration.png'))
-plt.savefig(os.path.join(output_dir, 'fk_migration.pdf'), format='pdf', dpi=300)
+plt.savefig(os.path.join(output_dir, 'fk_migration.pdf'), format='pdf', dpi=600)
 plt.show()

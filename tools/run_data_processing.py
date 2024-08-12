@@ -22,7 +22,7 @@ args = parser.parse_args()
 if args.path_type == 'local' or args.path_type == 'test':
     data_path = 'LPR_2B/Resampled_ECHO/Bscan.txt'
 elif args.path_type == 'SSD':
-    data_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Resampled_ECHO/Bscan.txt'
+    data_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Resampled_data/Bscan.txt'
     print('Data path:', data_path)
 
 
@@ -30,12 +30,19 @@ elif args.path_type == 'SSD':
 #* Define output folder path
 output_dir = os.path.join(os.path.dirname(os.path.dirname(data_path)), 'Processed_Data')
 os.makedirs(output_dir, exist_ok=True)
-png_dir = os.path.join(output_dir, 'png')
-os.makedirs(png_dir, exist_ok=True)
-pdf_dir = os.path.join(output_dir, 'pdf')
-os.makedirs(pdf_dir, exist_ok=True)
-txt_dir = os.path.join(output_dir, 'txt')
-os.makedirs(txt_dir, exist_ok=True)
+
+dir_0 = os.path.join(output_dir, '0_Raw_data')
+os.makedirs(dir_0, exist_ok=True)
+dir_1 = os.path.join(output_dir, '1_Bandpass_filter')
+os.makedirs(dir_1, exist_ok=True)
+dir_2 = os.path.join(output_dir, '2_Time_zero_correction')
+os.makedirs(dir_2, exist_ok=True)
+dir_3 = os.path.join(output_dir, '3_Background_removal')
+os.makedirs(dir_3, exist_ok=True)
+dir_4 = os.path.join(output_dir, '4_Gain_function')
+os.makedirs(dir_4, exist_ok=True)
+dir_5 = os.path.join(output_dir, 'Merged_plot')
+os.makedirs(dir_5, exist_ok=True)
 print('Output dir:', output_dir)
 print('   ')
 
@@ -133,19 +140,19 @@ if args.function_type == 'calc':
     filtered_Bscan = np.zeros(Raw_Bscan.shape)
     for i in tqdm(range(Raw_Bscan.shape[1]), desc='Applying bandpass filter'):
                 filtered_Bscan[:, i] = bandpass_filter(Raw_Bscan[:, i], 250e6, 750e6, 5)
-    np.savetxt(txt_dir + '/1_filtered_Bscan.txt', filtered_Bscan, delimiter=' ')
+    np.savetxt(dir_1 + '/1_bandpass_filter.txt', filtered_Bscan, delimiter=' ')
     print('Finished bandpass filtering')
 
 
     #* 2. Time-zero correction
     time_corrected_Bscan = time_correction(filtered_Bscan)
-    np.savetxt(txt_dir + '/2_aligned_Bscan.txt', time_corrected_Bscan, delimiter=' ')
+    np.savetxt(dir_2 + '/2_time_zero_correction.txt', time_corrected_Bscan, delimiter=' ')
     print('Finished time-zero correction')
 
 
     #* 3. Background removal
     average, background_removed_Bscan = horizontal_high_pass_filter(time_corrected_Bscan, 0, 9.6e6, 5)
-    np.savetxt(txt_dir + '/3_background_removed_Bscan.txt', background_removed_Bscan, delimiter=' ')
+    np.savetxt(dir_3 + '/3_background_removal.txt', background_removed_Bscan, delimiter=' ')
     print('Finished background removal')
 
 
@@ -153,7 +160,7 @@ if args.function_type == 'calc':
     t_2D = np.expand_dims(np.linspace(0, background_removed_Bscan.shape[0] *sample_interval, background_removed_Bscan.shape[0]), axis=1)
     gained_Bscan = background_removed_Bscan * t_2D ** 1.7
     gained_Bscan = gained_Bscan / np.amax(gained_Bscan)
-    np.savetxt(txt_dir + '/4_gained_Bscan.txt', gained_Bscan, delimiter=' ')
+    np.savetxt(dir_4 + '/4_gain_function.txt', gained_Bscan, delimiter=' ')
     print('Finished gain correction')
 
 elif args.function_type == 'plot':
@@ -163,145 +170,30 @@ elif args.function_type == 'plot':
 
 
     #* 1. Bandpass filtering
-    filtered_Bscan = np.loadtxt(txt_dir + '/1_filtered_Bscan.txt', delimiter=' ')
+    filtered_Bscan = np.loadtxt(dir_1 + '/1_bandpass_filter.txt', delimiter=' ')
 
     #* 2. Time-zero correction
-    time_corrected_Bscan = np.loadtxt(txt_dir + '/2_aligned_Bscan.txt', delimiter=' ')
+    time_corrected_Bscan = np.loadtxt(dir_2 + '/2_time_zero_correction.txt', delimiter=' ')
 
     #* 3. Background removal
-    background_removed_Bscan = np.loadtxt(txt_dir + '/3_background_removed_Bscan.txt', delimiter=' ')
+    background_removed_Bscan = np.loadtxt(dir_3 + '/3_background_removal.txt', delimiter=' ')
 
     #* 4. Gain function
-    gained_Bscan = np.loadtxt(txt_dir + '/4_gained_Bscan.txt', delimiter=' ')
+    gained_Bscan = np.loadtxt(dir_4 + '/4_gain_function.txt', delimiter=' ')
 
     print('Finished data loading')
 
-"""
-if args.function_type == 'calc':
-    filtered_Bscan = np.zeros(Raw_Bscan.shape)
-    for i in tqdm(range(Raw_Bscan.shape[1]), desc='Applying bandpass filter'):
-                filtered_Bscan[:, i] = bandpass_filter(Raw_Bscan[:, i], 250e6, 750e6, 5)
-    np.savetxt(txt_dir + '/1_filtered_Bscan.txt', filtered_Bscan, delimiter=' ')
-elif args.function_type == 'plot':
-    filtered_Bscan = np.loadtxt(txt_dir + '/1_filtered_Bscan.txt', delimiter=' ')
-else:
-    print('Invalid function type')
-    exit()
-print('Finished bandpass filtering')
-print(filtered_Bscan.shape)
-
-
-
-#* process time zero correction
-if args.function_type == 'calc':
-    time_zero_correction = proccessing_time_zero_correction(filtered_Bscan)
-    peak_time = time_zero_correction.find_peak_time()
-    aligned_Bscan = time_zero_correction.align_peak_time()
-    #aligned_Bscan = time_zero_correction.zero_corrections()
-    np.savetxt(txt_dir + '/2_aligned_Bscan.txt', aligned_Bscan, delimiter=' ')
-elif args.function_type == 'plot':
-    aligned_Bscan = np.loadtxt(txt_dir + '/2_aligned_Bscan.txt', delimiter=' ')
-print('Finished time-zero correction')
-print(aligned_Bscan.shape)
-
-
-
-#* process background removal
-if args.function_type == 'calc':
-    #background_removal = processing_background_removal(aligned_Bscan)
-    #background_data, background_removed_Bscan = background_removal.subtract_background()
-
-    #* Holizontal high pass filter
-    def horizontal_high_pass_filter(data, time_delay, cuttoff, fs, order):
-        normal_cutoff = cuttoff / (0.5 * fs)
-
-        b, a = signal.butter(order, normal_cutoff, btype='high', analog=False)
-        y = data
-        for i in tqdm(range(time_delay, data.shape[0]), desc='Applying horizontal high pass filter'):
-            y[i, :] = signal.filtfilt(b, a, data[i, :])
-        return y
-
-    background_removed_Bscan = horizontal_high_pass_filter(aligned_Bscan, 30, 9.6e6, 1/sample_interval, 5)
-    np.savetxt(txt_dir + '/3_background_removed_Bscan.txt', background_removed_Bscan, delimiter=' ')
-elif args.function_type == 'plot':
-    background_removed_Bscan = np.loadtxt(txt_dir + '/3_background_removed_Bscan.txt', delimiter=' ')
-print('Finished background removal')
-print(background_removed_Bscan.shape)
-
-
-#* Process gain function
-if args.function_type == 'calc':
-    t_2D = np.expand_dims(np.linspace(0, background_removed_Bscan.shape[0] *sample_interval, background_removed_Bscan.shape[0]), axis=1)
-    gained_Bscan = background_removed_Bscan * t_2D ** 1.7
-    #* Gain function from [Feng et al. (2023)]
-    eps_r = 3.4
-    loss_tangent = 0.006
-    c = 3e8 # [m/s]
-    v = c / np.sqrt(eps_r)
-    wavelength = v / 500e6 # [m]
-    r = t_2D * v / 2
-    alpha = np.pi / wavelength * np.sqrt(eps_r) * loss_tangent
-    gained_Bscan = background_removed_Bscan * r**2 * np.exp(2 * alpha * r)
-    gained_Bscan = gained_Bscan / np.max(gained_Bscan)
-    np.savetxt(txt_dir + '/gained_Bscan.txt', gained_Bscan, delimiter=' ')
-elif args.function_type == 'plot':
-    gained_Bscan = np.loadtxt(txt_dir + '/gained_Bscan.txt', delimiter=' ')
-print('Finished gain function')
-
-
-print('Finished all processing')
-if args.function_type == 'calc':
-    np.savetxt(txt_dir + '/4_processed_Bscan.txt', gained_Bscan, delimiter=' ')
-elif args.function_type == 'plot':
-    gained_Bscan = np.loadtxt(txt_dir + '/4_processed_Bscan.txt', delimiter=' ')
-"""
 
 
 plot_data = [Raw_Bscan, filtered_Bscan, time_corrected_Bscan, background_removed_Bscan, gained_Bscan]
-title = ['Raw B-scan', 'Bandpass filtered B-scan', 'Time-zero corrected B-scan', 'Background removed B-scan', 'Gained B-scan']
-
-
-#sample_interval_ns = sample_interval * 1e9
-#trace_interval = 3.6e-2 # [m], [Li et al. (2020), Sci. Adv.]
+title = ['Raw B-scan', 'Bandpass filter', 'Time-zero correction', 'Background removal', 'Gain function']
+dir_list = [dir_0, dir_1, dir_2, dir_3, dir_4]
 
 
 #* Plot
 font_large = 20
 font_medium = 18
 font_small = 16
-
-
-#* Plot averaged background
-"""
-t = np.linspace(0, background_removed_Bscan.shape[0] *sample_interval, background_removed_Bscan.shape[0])
-plt.figure(figsize=(8, 6), tight_layout=True)
-plt.plot(t, background_data)
-
-plt.title('Background noise', fontsize=font_large)
-plt.xlabel('Time [ns]', fontsize=font_medium)
-plt.ylabel('Amplitude', fontsize=font_medium)
-plt.tick_params(axis='both', which='major', labelsize=font_small)
-
-plt.savefig(output_dir + '/Background_noise.png')
-plt.close()
-"""
-
-
-#* Plot gain function
-"""
-plt.figure(figsize=(8, 6), tight_layout=True)
-plt.plot(t, t**1.7)
-
-plt.title('Gain function', fontsize=font_large)
-plt.xlabel('2-way travel time [ns]', fontsize=font_medium)
-plt.ylabel('Gain', fontsize=font_medium)
-plt.tick_params(axis='both', which='major', labelsize=font_small)
-plt.yscale('log')
-
-plt.savefig(output_dir + '/Gain_function.png')
-plt.close()
-"""
-
 
 #* Plot single panel figure x
 print('   ')
@@ -331,8 +223,8 @@ for i in range(len(plot_data)):
     plt.colorbar(im, cax=cax, orientation = 'vertical').set_label('Amplitude', fontsize=font_large)
     cax.tick_params(labelsize=font_small)
 
-    plt.savefig(png_dir + '/' + str(i+1) + '_' + title[i] + '.png', format='png', dpi=300)
-    plt.savefig(pdf_dir + '/' + str(i+1) + '_' + title[i] + '.pdf', format='pdf', dpi=300)
+    plt.savefig(dir_list[i] + '/' + str(i) + '_' + title[i] + '.png', format='png', dpi=120)
+    plt.savefig(dir_list[i] + '/' + str(i) + '_' + title[i] + '.pdf', format='pdf', dpi=600)
     print('Finished plotting', title[i])
     plt.close()
 
@@ -368,8 +260,8 @@ fig.supylabel('Time (ns)', fontsize=font_medium)
 
 
 #* save plot
-plt.savefig(png_dir + '/0_Processed_Bscan.png', format='png', dpi=120)
-plt.savefig(pdf_dir + '/0_Processed_Bscan.pdf', format='pdf', dpi=600)
+plt.savefig(dir_5 + '/Merged.png', format='png', dpi=120)
+plt.savefig(dir_5 + '/Merged.pdf', format='pdf', dpi=600)
 print('Finished plotting 5 panel figure')
 
 plt.show()
