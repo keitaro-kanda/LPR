@@ -13,8 +13,9 @@ from natsort import natsorted
 from scipy import signal
 import matplotlib.colors as colors
 
-data_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Processed_Bscan/txt/gained_Bscan.txt'
-output_dir = '/Volumes/SSD_kanda/LPR/LPR_2B/test/envelope'
+data_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Processed_data/4_Gain_function/4_gain_function.txt'
+#* Define output folder path
+output_dir = os.path.join(os.path.dirname(data_path), 'envelope')
 os.makedirs(output_dir, exist_ok=True)
 
 print('Loading data...')
@@ -60,6 +61,6 @@ cax = delvider.append_axes('right', size='3%', pad=0.1)
 plt.colorbar(cax=cax, orientation = 'vertical').set_label('Amplitude', fontsize=font_large)
 cax.tick_params(labelsize=font_small)
 
-plt.savefig(output_dir + '/envelope.png', dpi=300)
-plt.savefig(output_dir + '/envelope.pdf', format='pdf', dpi=300)
+plt.savefig(output_dir + '/envelope.png', dpi=120)
+plt.savefig(output_dir + '/envelope.pdf', format='pdf', dpi=600)
 plt.show()

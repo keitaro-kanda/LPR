@@ -89,7 +89,7 @@ def fk_migration(data, epsilon_r):
 
 #* Data path
 if args.function_type == 'calc':
-    data_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Processed_data/4_Gain_function/4_gain_function.txt'
+    data_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Processed_data/3_Background_removal/3_Background_removal.txt'
     #* Define output folder path
     output_dir = os.path.join(os.path.dirname(data_path), 'fk_migration')
     os.makedirs(output_dir, exist_ok=True)
@@ -169,6 +169,6 @@ cbar.set_label('Amplitude [dB]', fontsize=20)
 cbar.ax.tick_params(labelsize=18)
 
 
-plt.savefig(os.path.join(output_dir, 'fk_migration.png'))
+plt.savefig(os.path.join(output_dir, 'fk_migration.png'), format='png', dpi=120)
 plt.savefig(os.path.join(output_dir, 'fk_migration.pdf'), format='pdf', dpi=600)
 plt.show()

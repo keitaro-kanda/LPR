@@ -108,7 +108,7 @@ def time_correction(data):
 
 
 #* Holizontal high pass filter
-def horizontal_high_pass_filter(data, time_delay, cuttoff, order):
+def horizontal_high_pass_filter(data):
     """
     normal_cutoff = cuttoff / (0.5 * fs)
 
@@ -151,7 +151,7 @@ if args.function_type == 'calc':
 
 
     #* 3. Background removal
-    average, background_removed_Bscan = horizontal_high_pass_filter(time_corrected_Bscan, 0, 9.6e6, 5)
+    average, background_removed_Bscan = horizontal_high_pass_filter(time_corrected_Bscan)
     np.savetxt(dir_3 + '/3_background_removal.txt', background_removed_Bscan, delimiter=' ')
     print('Finished background removal')
 
