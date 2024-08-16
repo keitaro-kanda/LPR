@@ -52,6 +52,8 @@ print('   ')
 sample_interval = 0.312500e-9# [s]
 fs = 1/sample_interval  # Sampling frequency
 trace_interval = 3.6e-2 # [m], [Li et al. (2020), Sci. Adv.]
+epsilon_0 = 8.854187817e-12  # [F/m]
+c = 299792458  # [m/s]
 
 
 #* Define functions
@@ -108,16 +110,7 @@ def time_correction(data):
 
 
 #* Holizontal high pass filter
-def horizontal_high_pass_filter(data):
-    """
-    normal_cutoff = cuttoff / (0.5 * fs)
-
-    b, a = signal.butter(order, normal_cutoff, btype='high', analog=False)
-    y = np.zeros(data.shape)
-    for i in tqdm(range(time_delay, data.shape[0]), desc='Applying horizontal high pass filter'):
-        y[i, :] = signal.filtfilt(b, a, data[i, :])
-    return y
-    """
+def background_removal(data):
     background_data = np.mean(data, axis=1)
     background_removed_data = np.zeros_like(data)
     for i in tqdm(range(data.shape[1]), desc='Subtracting background'):
@@ -126,42 +119,81 @@ def horizontal_high_pass_filter(data):
 
 
 
+def gain(data, er, tan_delta, freq):
+    t_2D = np.expand_dims(np.arange(0, data.shape[0]*sample_interval, sample_interval), axis=1)
+    gain_func = t_2D**2 * c**2 / (4 * er) * np.exp(np.pi * t_2D * freq * np.sqrt(er * epsilon_0)* tan_delta)
+
+    #* Plot gain function
+    fig, ax = plt.subplots(figsize=(10, 8), tight_layout=True)
+    ax.plot(gain_func, t_2D/1e-9)
+
+    ax.set_xlabel('Gain function', fontsize=20)
+    ax.set_xscale('log')
+    ax.set_xlim(1e-2, 1e5)
+    ax.set_ylabel('2-way travel time [ns]', fontsize=20)
+    ax.invert_yaxis()
+    ax.tick_params(labelsize=18)
+    ax.grid(which='major', axis='both', linestyle='-.')
+    ax.text(0.1, 0.1, r'$\varepsilon_r = $' + str(er) + ', tan$\delta = $' + str(round(tan_delta, 3)),
+            fontsize=18, transform=ax.transAxes)
+
+    plt.savefig(dir_4 + '/Gain_function.png', format='png', dpi=120)
+    plt.savefig(dir_4 + '/Gain_function.pdf', format='pdf', dpi=300)
+    plt.close()
+    print('Plot of gain function is successfully saved.')
+    print(' ')
+
+    output = data * gain_func
+    return output
+
+
 #* Processing pipeline
 if args.function_type == 'calc':
     #* 0. Prepare raw Bscan data
     Raw_Bscan = np.loadtxt(data_path, delimiter=' ')
     print("Bscan shape:", Raw_Bscan.shape)
+    print('')
 
     #* test
     #time_corrected_Bscan = time_correction(Raw_Bscan)
 
 
     #* 1. Bandpass filtering
+    print('Applying bandpass filter')
     filtered_Bscan = np.zeros(Raw_Bscan.shape)
     for i in tqdm(range(Raw_Bscan.shape[1]), desc='Applying bandpass filter'):
                 filtered_Bscan[:, i] = bandpass_filter(Raw_Bscan[:, i], 250e6, 750e6, 5)
-    np.savetxt(dir_1 + '/1_bandpass_filter.txt', filtered_Bscan, delimiter=' ')
+    np.savetxt(dir_1 + '/1_Bscan_filter.txt', filtered_Bscan, delimiter=' ')
     print('Finished bandpass filtering')
+    print(' ')
 
 
     #* 2. Time-zero correction
+    print('Applying time-zero correction')
     time_corrected_Bscan = time_correction(filtered_Bscan)
-    np.savetxt(dir_2 + '/2_time_zero_correction.txt', time_corrected_Bscan, delimiter=' ')
+    np.savetxt(dir_2 + '/2_Bscan_time_correction.txt', time_corrected_Bscan, delimiter=' ')
     print('Finished time-zero correction')
+    print(' ')
 
 
     #* 3. Background removal
-    average, background_removed_Bscan = horizontal_high_pass_filter(time_corrected_Bscan)
-    np.savetxt(dir_3 + '/3_background_removal.txt', background_removed_Bscan, delimiter=' ')
+    print('Applying background removal')
+    average, background_removed_Bscan = background_removal(time_corrected_Bscan)
+    np.savetxt(dir_3 + '/3_Bscan_background_removal.txt', background_removed_Bscan, delimiter=' ')
     print('Finished background removal')
+    print(' ')
+
 
 
     #* 4. Gain function
-    t_2D = np.expand_dims(np.linspace(0, background_removed_Bscan.shape[0] *sample_interval, background_removed_Bscan.shape[0]), axis=1)
-    gained_Bscan = background_removed_Bscan * t_2D ** 1.7
-    gained_Bscan = gained_Bscan / np.amax(gained_Bscan)
-    np.savetxt(dir_4 + '/4_gain_function.txt', gained_Bscan, delimiter=' ')
-    print('Finished gain correction')
+    print('Applying gain function')
+    #t_2D = np.expand_dims(np.linspace(0, background_removed_Bscan.shape[0] *sample_interval, background_removed_Bscan.shape[0]), axis=1)
+    #gained_Bscan = background_removed_Bscan * t_2D ** 1.7
+    gained_Bscan = gain(background_removed_Bscan, 3.4, 0.006, 500e6)
+    #gained_Bscan = gained_Bscan / np.amax(gained_Bscan)
+    np.savetxt(dir_4 + '/4_Bscan_gain.txt', gained_Bscan, delimiter=' ')
+    print('Finished gain function')
+    print(' ')
 
 elif args.function_type == 'plot':
     #* 0. Prepare raw Bscan data
@@ -170,16 +202,16 @@ elif args.function_type == 'plot':
 
 
     #* 1. Bandpass filtering
-    filtered_Bscan = np.loadtxt(dir_1 + '/1_bandpass_filter.txt', delimiter=' ')
+    filtered_Bscan = np.loadtxt(dir_1 + '/1_Bscan_filter.txt', delimiter=' ')
 
     #* 2. Time-zero correction
-    time_corrected_Bscan = np.loadtxt(dir_2 + '/2_time_zero_correction.txt', delimiter=' ')
+    time_corrected_Bscan = np.loadtxt(dir_2 + '/2_Bscan_time_correction.txt', delimiter=' ')
 
     #* 3. Background removal
-    background_removed_Bscan = np.loadtxt(dir_3 + '/3_background_removal.txt', delimiter=' ')
+    background_removed_Bscan = np.loadtxt(dir_3 + '/3_Bscan_background_removal.txt', delimiter=' ')
 
     #* 4. Gain function
-    gained_Bscan = np.loadtxt(dir_4 + '/4_gain_function.txt', delimiter=' ')
+    gained_Bscan = np.loadtxt(dir_4 + '/4_Bscan_gain.txt', delimiter=' ')
 
     print('Finished data loading')
 
@@ -205,7 +237,7 @@ for i in range(len(plot_data)):
     if i == 4:
         im = ax.imshow(plot_data[i], aspect='auto', cmap='seismic',
                 extent=[0, plot_data[i].shape[1]*trace_interval, plot_data[i].shape[0]*sample_interval*1e9, 0],
-                vmin=-0.05, vmax=0.05
+                vmin=-np.amax(np.abs(plot_data[i]))/5, vmax=np.amax(np.abs(plot_data[i]))/5
                 )
     else:
         im = ax.imshow(plot_data[i], aspect='auto', cmap='seismic',
@@ -239,7 +271,7 @@ for i in range(len(plot_data)):
     if i == 4:
         im = ax[i].imshow(plot_data[i], aspect='auto', cmap='seismic',
                 extent=[0, plot_data[i].shape[1]*trace_interval, plot_data[i].shape[0]*sample_interval*1e9, 0],
-                vmin=-0.05, vmax=0.05
+                vmin=-np.amax(np.abs(plot_data[i]))/5, vmax=np.amax(np.abs(plot_data[i]))/5
                 )
     else:
         im = ax[i].imshow(plot_data[i], aspect='auto', cmap='seismic',

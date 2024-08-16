@@ -89,7 +89,7 @@ def fk_migration(data, epsilon_r):
 
 #* Data path
 if args.function_type == 'calc':
-    data_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Processed_data/3_Background_removal/3_Background_removal.txt'
+    data_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Processed_Data/4_Gain_function/4_Bscan_gain.txt'
     #* Define output folder path
     output_dir = os.path.join(os.path.dirname(data_path), 'fk_migration')
     os.makedirs(output_dir, exist_ok=True)
@@ -154,7 +154,7 @@ plt.figure(figsize=(18, 6), facecolor='w', edgecolor='w')
 im = plt.imshow(fk_data, cmap='jet', aspect='auto',
                 extent=[0, fk_data.shape[1] * trace_interval,
                 fk_data.shape[0] * sample_interval * v / 2, 0],
-                vmin=-35, vmax=0
+                vmin=-30, vmax=0
                 )
 
 plt.xlabel('x [m]', fontsize=20)

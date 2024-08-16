@@ -1,35 +1,48 @@
-import numpy as np
-from scipy import signal
+import matplotlib as mpl
 import matplotlib.pyplot as plt
+import numpy as np
+import os
+from scipy import signal
+import argparse
+from tqdm import tqdm
+import mpl_toolkits.axes_grid1 as axgrid1
 
-# Filter specifications
-lowcut = 250e6
-highcut = 750e6
-sample_interval = 0.3125e-9  # Sample interval
-fs = 1/sample_interval  # Sampling frequency
 
-# Design the Butterworth band-pass filter
-order = 4
-nyquist = 0.5 * fs
-low = lowcut / nyquist
-high = highcut / nyquist
 
-b, a = signal.butter(order, [low, high], btype='band')
+print('Loading data...')
+data_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Processed_data/4_Gain_function/4_gain_function.txt'
+data = np.loadtxt(data_path, delimiter=' ')
+print('Data shape:', data.shape)
 
-# Frequency response
-w, h = signal.freqz(b, a, worN=8000)
-frequencies = (w / np.pi) * nyquist
 
-# Plot the frequency response
-plt.figure(figsize=(10, 6))
-plt.plot(frequencies / 1e6, abs(h), 'b')
-plt.title('Band-pass Filter Frequency Response')
-plt.xlabel('Frequency (MHz)')
-plt.ylabel('Gain')
-plt.axvline(lowcut / 1e6, color='k', linestyle='--')
-plt.axvline(highcut / 1e6, color='k', linestyle='--')
-plt.axvline(150, color='r', linestyle='--')
-plt.axvline(850, color='r', linestyle='--')
-plt.ylim(0, 1.2)
-plt.grid()
+#* Parameters
+sample_interval = 0.312500e-9  # [s]
+trace_interval = 3.6e-2 # [m], [Li et al. (2020), Sci. Adv.]
+
+
+
+
+
+
+sig = data[:, 500]
+tm = np.arange(0, len(sig)*sample_interval, sample_interval)
+
+f, t, Sxx = signal.spectrogram(sig, 1/sample_interval, nperseg=1024, noverlap=512, nfft=1024, mode='magnitude')
+t = t / 1e-9 # [ns]
+f = f / 1e6 # [MHz]
+Sxx = 10 * np.log10(Sxx/np.amax(Sxx))
+
+#* Plot the spectrogram
+fig, ax = plt.subplots(figsize = (10, 8))
+im = ax.imshow(Sxx, aspect='auto',
+                extent=[t[0], t[-1], f[0], f[-1]],
+                cmap='jet', origin='lower',
+                vmin=-30, vmax=0)
+ax.set_ylabel('Frequency [Hz]')
+ax.set_xlabel('Time [s]')
+ax.set_title('Spectrogram')
+#ax.set_ylim(0, 2000)
+
+cbar = fig.colorbar(im, ax=ax)
+
 plt.show()
