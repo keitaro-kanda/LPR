@@ -48,7 +48,7 @@ if not os.path.exists(position_output_dir):
 #medf = np.zeros(0)
 
 def resampling(data): # input is 2D array including position data
-    positions = data[:3, :]
+    positions = data[:4, :]
     signals = data[4:, :]
     #* Do not consider first 300 datapoints
     img = signals[300:, :]

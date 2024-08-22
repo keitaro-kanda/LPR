@@ -21,62 +21,93 @@ args = parser.parse_args()
 
 #* Define data folder path
 if args.path_type == 'local':
-    data_folder_path = 'LPR_2B/ECHO'
+    #data_folder_path = 'LPR_2B/ECHO'
     position_folder_path = 'LPR_2B/Position'
 elif args.path_type == 'SSD':
-    data_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B/ECHO'
-    position_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Position'
-output_dir = os.path.join(os.path.dirname(data_folder_path), 'Position')
-if not os.path.exists(output_dir):
-    os.makedirs(output_dir)
+    #data_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B/ECHO'
+    position_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Resampled_Data/position'
 
 
 
 def load_positions():
-    for ECHO_data in tqdm(natsorted(os.listdir(data_folder_path))):
-        record_count = []
-        VELOCITY = []
-        XPOSITION = []
-        YPOSITION = []
-        ZPOSITION = []
-        reference_X = []
-        reference_Y = []
-        reference_Z = []
-        distance = []
+    VELOCITY = []
+    XPOSITION = []
+    YPOSITION = []
+    ZPOSITION = []
+    distance = []
+    for data_file in tqdm(natsorted(os.listdir(position_folder_path))):
         #* Load only .txt files
-        if not ECHO_data.endswith('.txt'):
+        if not data_file.endswith('.txt'):
             continue
-        if ECHO_data.startswith('._'):
+        if data_file.startswith('._'):
             continue
+        data_path = os.path.join(position_folder_path, data_file)
+        data = np.loadtxt(data_path, delimiter=' ')
 
-        ECHO_data_path = os.path.join(data_folder_path, ECHO_data)
-        data = np.loadtxt(ECHO_data_path, delimiter=' ')
 
         #* Load record_count, XPOSITION, YPOSITION, ZPOSITION
         for i in range(data.shape[1]):
 
-            record_count.append(i + 1)
-            VELOCITY.append(data[1, i])
-            XPOSITION.append(data[2, i])
-            YPOSITION.append(data[3, i])
-            ZPOSITION.append(data[4, i])
-            reference_X.append(data[5, i])
-            reference_Y.append(data[6, i])
-            reference_Z.append(data[7, i])
+            VELOCITY.append(data[0, i])
+            XPOSITION.append(data[1, i])
+            YPOSITION.append(data[2, i])
+            ZPOSITION.append(data[3, i])
 
             distance.append(distance[-1] + np.sqrt((XPOSITION[i] - XPOSITION[i-1])**2 + (YPOSITION[i] - YPOSITION[i-1])**2) if distance else 0)
 
-        #* Save record_count, XPOSITION, YPOSITION, ZPOSITION as 4xN array
-        positions = np.array([record_count, VELOCITY, XPOSITION, YPOSITION, ZPOSITION, distance, reference_X, reference_Y, reference_Z])
+    #* Save record_count, XPOSITION, YPOSITION, ZPOSITION as 4xN array
+    positions = np.array([VELOCITY, XPOSITION, YPOSITION, ZPOSITION, distance])
+    print('positions shape:', positions.shape)
 
-        #* sort by record_count
-        positions = positions[:, np.argsort(positions[0])]
+    #* Save positions with header
+    header = 'Velocity X Y Z distance'
+    np.savetxt(os.path.join(os.path.dirname(position_folder_path), 'position.txt'), positions.T, delimiter=' ', header=header, comments='')
+    print('Save positions as position.txt')
 
-        #* Save positions with header
-        header = 'record_number Velocity X Y Z distance Refernce_X Reference_Y Reference_z'
-        sequence_id = ECHO_data.split('_')[-1].split('.')[0]
-        np.savetxt(os.path.join(output_dir, 'position_' + str(sequence_id) + '.txt'), positions.T, delimiter=' ', header=header, comments='')
 
+    #
+    total_x = np.array([])
+    total_y = np.array([])
+    total_z = np.array([])
+    for i in range(len(XPOSITION)):
+        if i == 0:
+            total_x = np.array([XPOSITION[i]])
+            total_y = np.array([YPOSITION[i]])
+            total_z = np.array([ZPOSITION[i]])
+        else:
+            total_x = np.append(total_x, total_x[-1] + XPOSITION[i])
+            total_y = np.append(total_y, total_y[-1] + YPOSITION[i])
+            total_z = np.append(total_z, total_z[-1] + ZPOSITION[i])
+
+    #* Plot positions
+    plot_list = [XPOSITION, YPOSITION, ZPOSITION]
+    y_label = ['x [m]', 'y [m]', 'z [m]']
+    fig, ax = plt.subplots(3, 1, figsize=(20, 15), tight_layout=True, sharex=True)
+    for i in range(len(plot_list)):
+        ax[i].plot(plot_list[i])
+        ax[i].grid()
+        ax[i].set_xlabel('Record number' , fontsize=20)
+        ax[i].set_ylabel('Position [m]', fontsize=20)
+        ax[i].tick_params(labelsize=18)
+    plt.show()
+
+    #* Plot tolal z
+    fig = plt.figure(figsize=(20, 10), tight_layout=True)
+    plt.plot(total_z)
+    plt.grid()
+    plt.xlabel('Record number', fontsize=20)
+    plt.ylabel('Z [m]', fontsize=20)
+    plt.tick_params(labelsize=18)
+    plt.show()
+
+    #* Plot track of CE-4
+    fig = plt.figure(figsize=(20, 20), tight_layout=True)
+    plt.plot(total_y, total_x)
+    plt.grid()
+    plt.xlabel('East-West', fontsize=20)
+    plt.ylabel('North-South', fontsize=20)
+    plt.tick_params(labelsize=18)
+    plt.show()
 
 
 def plot():
