@@ -23,7 +23,7 @@ args = parser.parse_args()
 if args.path_type == 'local':
     data_folder_path = 'LPR_2B/original_data'
 elif args.path_type == 'SSD':
-    data_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B/original_data'
+    data_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B/original_binary'
 else:
     print('Invalid path type, please choose either local or SSD')
     exit()
@@ -175,7 +175,7 @@ record_format = record_format_2B if channel in ['LPR_2B', 'LPR_2A'] else record_
 #* Make 'loaded_data' directory and 'ECHO' directory
 loaded_data_dir = os.path.join(os.path.dirname(data_folder_path), 'loaded_data')
 os.makedirs(loaded_data_dir, exist_ok=True)
-ECHO_dir = os.path.join(os.path.dirname(data_folder_path), 'ECHO')
+ECHO_dir = os.path.join(os.path.dirname(data_folder_path), 'loaded_data_echo_position')
 os.makedirs(ECHO_dir, exist_ok=True)
 
 
@@ -197,13 +197,13 @@ for filename in tqdm(natsorted(os.listdir(data_folder_path)), desc='Total Progre
     loaded_data_output_dir = os.path.join(loaded_data_dir, sequence_id)
     os.makedirs(loaded_data_output_dir, exist_ok=True)
 
-    #* Make list for ECHO data obtained each sequence
-    ECHO = []
-
     #* Process check print
     print(f'Processing {filename} ({file_size} bytes)')
 
     records = int(file_size / 8307) if channel in ['LPR_2B', 'LPR_2A'] else int(file_size / 32883)
+
+    #* Make list for ECHO data obtained each sequence
+    save_data = np.zeros((2052, records))
 
     #* Load the of each records
     for record_index in tqdm(range(records), desc=sequence_id):
@@ -263,15 +263,19 @@ for filename in tqdm(natsorted(os.listdir(data_folder_path)), desc='Total Progre
 
 
         #* Save the echo data to a list to make Bscan data
-        ECHO.append(loaded_data['ECHO_DATA'])
+        save_data[0, record_index] = loaded_data['VELOCITY'][0]
+        save_data[1, record_index] = loaded_data['XPOSITION'][0]
+        save_data[2, record_index] = loaded_data['YPOSITION'][0]
+        save_data[3, record_index] = loaded_data['ZPOSITION'][0]
+        save_data[4:, record_index] = loaded_data['ECHO_DATA']
+        #print('ECHO data shape:', np.array(loaded_data['ECHO_DATA']).shape)
 
 
     #* Save the ECHO data as a txt file
-    ECHO = np.array(ECHO).T
-    ECHO[0] = ECHO[0].astype(str)
-    np.savetxt(f"{ECHO_dir}/ECHO_{sequence_id}.txt", ECHO, )
+    save_data[0] = save_data[0].astype(str)
+    np.savetxt(f"{ECHO_dir}/data_{sequence_id}.txt", save_data, )
     print('Finished saving ECHO data')
-    print('ECHO shape:', ECHO.shape)
+    print('ECHO shape:', save_data.shape)
     print('  ')
 
 """

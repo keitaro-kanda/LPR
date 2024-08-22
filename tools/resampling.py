@@ -37,16 +37,21 @@ if not os.path.exists(txt_output_dir):
 plot_output_dir = os.path.join(output_dir, 'plot')
 if not os.path.exists(plot_output_dir):
     os.makedirs(plot_output_dir)
+position_output_dir = os.path.join(output_dir, 'position')
+if not os.path.exists(position_output_dir):
+    os.makedirs(position_output_dir)
 
 
 #* init data_2B for data and medf for interest extrapolation
 #* 2048 is read by the header .2BL and it is fixed for all LPR_2B files [time dims]
-data_2B = np.zeros((0, 2048))
-medf = np.zeros(0)
+#data_2B = np.zeros((0, 2048))
+#medf = np.zeros(0)
 
-def resampling(data): # input is 2D array
+def resampling(data): # input is 2D array including position data
+    positions = data[:3, :]
+    signals = data[4:, :]
     #* Do not consider first 300 datapoints
-    img = data[300:, :]
+    img = signals[300:, :]
 
     #* Compute the derivative of the data in x direction with Sobel with a kernel size of 5
 	#* This should eliminate the horizonatal lines
@@ -78,17 +83,20 @@ def resampling(data): # input is 2D array
     idx = np.where(medf == 1)[0]
     if np.sum(idx) == 0:
         data_filtered = data[:, idx]
+        positions_filtered = positions[:, idx]
         print('No interesting data found')
     else:
         data_filtered = data[:, idx]
+        positions_filtered = positions[:, idx]
         print('Raw data shape was: ', data.shape)
         print('Filtered data shape is: ', data_filtered.shape)
 
 
         #* Save filtered data as .txt file
         np.savetxt(txt_output_dir + '/' + str(sequence_id) + '_resampled.txt', data_filtered, delimiter=' ')
+        np.savetxt(position_output_dir + '/' + str(sequence_id) + '_resampled_position.txt', positions_filtered, delimiter=' ')
 
-    return sobelx, med_denoised, med, medf, data_filtered
+    return sobelx, med_denoised, med, medf, data_filtered, positions_filtered
 
 
 #* Condunct resampling
@@ -113,7 +121,7 @@ for ECHO_data in tqdm(natsorted(os.listdir(data_folder_path))):
     print('Now processing...')
     print('   ')
 
-    sobelx, med_denoised, med, medf, data_filtered = resampling(raw_data)
+    sobelx, med_denoised, med, medf, data_filtered, positions_filtered = resampling(raw_data)
     data_filtered4plot = np.zeros(raw_data.shape)
     data_filtered4plot[:, :data_filtered.shape[1]] = data_filtered
 
@@ -122,8 +130,8 @@ for ECHO_data in tqdm(natsorted(os.listdir(data_folder_path))):
     resampled_trace_num += data_filtered.shape[1]
     if ECHO_data == natsorted(os.listdir(data_folder_path))[-1]:
         with open(output_dir + '/total_trace_num.txt', 'w') as f:
-            f.write('Number of total traces before resampling:', str(total_trace_num))
-            f.write('Number of total traces after resampling:', str(resampled_trace_num))
+            f.write('Number of total traces before resampling: ' + str(total_trace_num) + '\n')
+            f.write('Number of total traces after resampling: '+ str(resampled_trace_num))
 
 
     #* Plot
