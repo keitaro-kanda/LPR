@@ -31,7 +31,7 @@ args = parser.parse_args()
 if args.path_type == 'local':
     ECHO_dir = 'LPR_2B/Resampled_ECHO/txt'
 elif args.path_type == 'SSD':
-    ECHO_dir = '/Volumes/SSD_kanda/LPR/LPR_2B/Resampled_ECHO/txt'
+    ECHO_dir = '/Volumes/SSD_kanda/LPR/LPR_2B/Resampled_Data/txt'
 elif args.path_type == 'other': # Set pass manually
     data_path= '/Volumes/SSD_kanda/LPR/LPR_2B/Processed_Bscan/txt/2_aligned_Bscan.txt'
 else:
