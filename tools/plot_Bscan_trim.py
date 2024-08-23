@@ -35,7 +35,7 @@ print('Loading data...')
 data = np.loadtxt(data_path, delimiter=' ')
 cbar_max = np.amax(np.abs(data)) / 5
 cbar_min = -cbar_max
-#data = 10 * np.log10(data/np.amax(np.abs(data)))  # Normalize the data
+data = 10 * np.log10(data/np.amax(np.abs(data)))  # Normalize the data
 print('Data shape:', data.shape)
 sample_interval = 0.312500e-9  # [s]
 trace_interval = 3.6e-2 # [m], [Li et al. (2020), Sci. Adv.]
@@ -45,9 +45,9 @@ trace_interval = 3.6e-2 # [m], [Li et al. (2020), Sci. Adv.]
 #* Define the function to plot
 def plot(data_array, x1, x2, y1, y2):
     plt.figure(figsize=(12, 8), tight_layout=True)
-    plt.imshow(data_array, aspect='auto', cmap='seismic',
+    plt.imshow(data_array, aspect='auto', cmap='jet',
                 extent=[x1, x2, y2, y1],
-                vmin=cbar_min, vmax=cbar_max
+                vmin=-35, vmax=0
                 )
     plt.xlabel('Distance [m]', fontsize=20)
     plt.ylabel('Time [ns]', fontsize=20)
