@@ -1,12 +1,9 @@
-import json
 import numpy as np
 import matplotlib.pyplot as plt
 import mpl_toolkits.axes_grid1 as axgrid1
 import os
 import argparse
 from tqdm import tqdm
-from scipy.interpolate import RectBivariateSpline
-import json
 
 
 #* Parse command line arguments
@@ -22,7 +19,7 @@ args = parser.parse_args()
 
 #* Data path
 if args.function_type == 'calc':
-    data_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Processed_Data/4_Gain_function/4_Bscan_gain.txt'
+    data_path = '/Volumes/SSD_Kanda_BUFFALO/LPR/LPR_2B/Processed_Data/4_Gain_function/4_Bscan_gain.txt'
     #* Define output folder path
     output_dir = os.path.join(os.path.dirname(data_path), 'Matched_filter')
     os.makedirs(output_dir, exist_ok=True)
