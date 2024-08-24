@@ -82,7 +82,7 @@ cbar.set_label('Amplitude', fontsize=20)
 cbar.ax.tick_params(labelsize=18)
 
 
-fig.supxlabel('Time [ns]', fontsize=20)
+fig.supylabel('Time [ns]', fontsize=20)
 
 plt.savefig(os.path.join(output_dir, f'{args.x}_t{args.t_first}_{args.t_last}.png'), dpi=120)
 plt.savefig(os.path.join(output_dir, f'{args.x}_t{args.t_first}_{args.t_last}.pdf'), dpi=300)
