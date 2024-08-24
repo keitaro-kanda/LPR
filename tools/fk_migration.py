@@ -163,7 +163,7 @@ elif args.function_type == 'plot':
 
 #* Plot
 print('Plotting...')
-plt.figure(figsize=(18, 6), facecolor='w', edgecolor='w')
+plt.figure(figsize=(18, 6), facecolor='w', edgecolor='w', tight_layout=True)
 im = plt.imshow(fk_data, cmap='jet', aspect='auto',
                 extent=[0, fk_data.shape[1] * trace_interval,
                 fk_data.shape[0] * sample_interval * v, 0],
