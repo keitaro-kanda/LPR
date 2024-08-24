@@ -14,8 +14,11 @@ parser = argparse.ArgumentParser(
     prog='fk_migration.py',
     description='Calculate f-k migration',
     epilog='End of help message',
-    usage='python tools/fk_migration.py [function_type]',
+    usage='python tools/fk_migration.py [data_path] [function_type] ',
 )
+parser.add_argument('data_path', help='Path to the txt file of data. \
+                    If function_type is plot, this should be the path to the fk_migration.txt. \
+                    If function_type is calc, this should be the path to the B-scan data')
 parser.add_argument('function_type', choices=['calc', 'plot'], help='Choose the function type')
 args = parser.parse_args()
 
@@ -88,6 +91,12 @@ def fk_migration(data, epsilon_r):
 
 
 #* Data path
+data_path = args.data_path
+if args.function_type == 'plot':
+    pamameter_path = os.path.join(os.path.dirname(data_path), 'parameters.json')
+    output_dir = os.path.join(os.path.dirname(data_path), 'fk_migration')
+    os.makedirs(output_dir, exist_ok=True)
+"""
 if args.function_type == 'calc':
     data_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Processed_Data/4_Gain_function/4_Bscan_gain.txt'
     #* Define output folder path
@@ -98,6 +107,7 @@ elif args.function_type == 'plot':
     pamameter_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Processed_data/4_Gain_function/fk_migration/parameters.json'
     #* Define output folder path
     output_dir = os.path.dirname(data_path)
+"""
 
 
 #* Parameters
@@ -118,7 +128,7 @@ if args.function_type == 'calc':
     er = 3.4 # Feng et al. (2024)
     fk_data, v = fk_migration(Bscan_data, er)
     #* Save the data
-    np.savetxt(os.path.join(output_dir, 'fk_migration.txt'), np.abs(fk_data), delimiter=',')
+    np.savetxt(os.path.join(output_dir, 'fk_migration.txt'), np.abs(fk_data), delimiter=' ')
 
     #* Save the parameters as txt file
     params = {
@@ -134,8 +144,11 @@ if args.function_type == 'calc':
 elif args.function_type == 'plot':
     #* Load data
     print('Loading data...')
-    fk_data = np.loadtxt(data_path, delimiter=',')
+    fk_data = np.loadtxt(data_path, delimiter=' ')
     print('Data shape:', fk_data.shape)
+
+    #* Set output directory
+    output_dir = os.path.dirname(data_path)
 
     #* Load parameters
     print('Loading parameters...')
@@ -146,15 +159,15 @@ elif args.function_type == 'plot':
 
 
 
-fk_data = 10 * np.log10(np.abs(fk_data) / np.amax(np.abs(fk_data)))
+#fk_data = 10 * np.log10(np.abs(fk_data) / np.amax(np.abs(fk_data)))
 
 #* Plot
 print('Plotting...')
 plt.figure(figsize=(18, 6), facecolor='w', edgecolor='w')
 im = plt.imshow(fk_data, cmap='jet', aspect='auto',
                 extent=[0, fk_data.shape[1] * trace_interval,
-                fk_data.shape[0] * sample_interval * v / 2, 0],
-                vmin=-30, vmax=0
+                fk_data.shape[0] * sample_interval * v, 0],
+                vmin=0, vmax=np.amax(fk_data)/5
                 )
 
 plt.xlabel('x [m]', fontsize=20)
@@ -165,7 +178,7 @@ plt.tick_params(labelsize=18)
 delvider = axgrid1.make_axes_locatable(plt.gca())
 cax = delvider.append_axes('right', size='5%', pad=0.1)
 cbar = plt.colorbar(im, cax=cax)
-cbar.set_label('Amplitude [dB]', fontsize=20)
+cbar.set_label('Amplitude', fontsize=20)
 cbar.ax.tick_params(labelsize=18)
 
 
