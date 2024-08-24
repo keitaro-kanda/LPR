@@ -85,43 +85,43 @@ fft = 10 * np.log10(np.abs(fft) / np.max(np.abs(fft)))
 
 #* Apply the matched filter to the data
 data_compressed = np.zeros(data.shape)
-for i in tqdm(range(data.shape[1]), desc='Calculating matched filter'):
+for i in tqdm(range(data.shape[1]), desc='Calculating pulse compression'):
     if args.func_type == 'matched':
         data_compressed[:, i] = mached_filter(data[:, i], refer)
     elif args.func_type == 'wiener':
-        wiener_beta = 1e-4
+        wiener_beta = 1e-2
         data_compressed[:, i] = wiener_filter(data[:, i], wiener_beta, refer)
 
-data_matched = np.abs(data_compressed)
+
 if args.func_type == 'matched':
-    np.savetxt(os.path.join(output_dir, 'matched_filter.txt'), data_matched, delimiter=' ')
+    np.savetxt(os.path.join(output_dir, 'matched_filter.txt'), data_compressed, delimiter=' ')
 elif args.func_type == 'wiener':
     output_dir = os.path.join(output_dir, f'beta_{wiener_beta}')
     os.makedirs(output_dir, exist_ok=True)
-    np.savetxt(os.path.join(output_dir, 'wiener_filter.txt'), data_matched, delimiter=' ')
+    np.savetxt(os.path.join(output_dir, 'wiener_filter.txt'), data_compressed, delimiter=' ')
 
 
-data_matched = 10 * np.log10(data_matched / np.max(data_matched))
+#data_matched = 10 * np.log10(data_compressed / np.max(data_compressed))
 
 
 #* Plot
 print('Plotting...')
 plt.figure(figsize=(18, 6), facecolor='w', edgecolor='w', tight_layout=True)
-im = plt.imshow(data_matched, cmap='jet', aspect='auto',
-                extent=[0, data_matched.shape[1] * trace_interval,
-                data_matched.shape[0] * sample_interval / 1e-9, 0],
-                vmin=-35, vmax=0
+im = plt.imshow(data_compressed, cmap='seismic', aspect='auto',
+                extent=[0, data_compressed.shape[1] * trace_interval,
+                data_compressed.shape[0] * sample_interval / 1e-9, 0],
+                vmin=-np.max(np.abs(data_compressed))/5, vmax=np.max(np.abs(data_compressed))/5
                 )
 
 plt.xlabel('x [m]', fontsize=20)
-plt.ylabel('Time [ns]]', fontsize=20)
+plt.ylabel('Time [ns]', fontsize=20)
 plt.tick_params(labelsize=18)
 
 
 delvider = axgrid1.make_axes_locatable(plt.gca())
 cax = delvider.append_axes('right', size='5%', pad=0.1)
 cbar = plt.colorbar(im, cax=cax)
-cbar.set_label('Amplitude [dB]', fontsize=20)
+cbar.set_label('Amplitude', fontsize=20)
 cbar.ax.tick_params(labelsize=18)
 
 
