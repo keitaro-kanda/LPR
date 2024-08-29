@@ -22,7 +22,7 @@ args = parser.parse_args()
 if args.path_type == 'local' or args.path_type == 'test':
     data_path = 'LPR_2B/Resampled_ECHO/Bscan.txt'
 elif args.path_type == 'SSD':
-    data_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Resampled_data/Bscan.txt'
+    data_path = '/Volumes/SSD_Kanda_BUFFALO/LPR/LPR_2B/Resampled_Data/Bscan.txt'
     print('Data path:', data_path)
 
 
@@ -245,9 +245,9 @@ for i in range(len(plot_data)):
                     vmin=-30, vmax=30
                     )
     ax.tick_params(axis='both', which='major', labelsize=font_small)
-    ax.set_title(title[i], fontsize=font_large)
+    #ax.set_title(title[i], fontsize=font_large)
 
-    ax.set_xlabel('Trace number', fontsize=font_medium)
+    ax.set_xlabel('Moving distance [m]', fontsize=font_medium)
     ax.set_ylabel('Time (ns)', fontsize=font_medium)
 
     delvider = axgrid1.make_axes_locatable(ax)
@@ -286,7 +286,7 @@ for i in range(len(plot_data)):
     plt.colorbar(im, cax=cax, orientation = 'vertical').set_label('Amplitude', fontsize=font_large)
     cax.tick_params(labelsize=font_small)
 
-fig.supxlabel('Distance [m]', fontsize=font_medium)
+fig.supxlabel('Moving distance [m]', fontsize=font_medium)
 fig.supylabel('Time (ns)', fontsize=font_medium)
 
 
