@@ -125,8 +125,8 @@ def plot(Ascan_data, t_array, envelope_data, background_value, t_first, t_last, 
 
 
     #* Save the plot
-    plt.savefig(os.path.join(output_dir, f'{x}_t{t_first}_{t_last}.png'), dpi=120)
-    plt.savefig(os.path.join(output_dir, f'{x}_t{t_first}_{t_last}.pdf'), dpi=300)
+    plt.savefig(os.path.join(output_dir_fig, f'{x}_t{t_first}_{t_last}.png'), dpi=120)
+    plt.savefig(os.path.join(output_dir_fig, f'{x}_t{t_first}_{t_last}.pdf'), dpi=300)
 
     if args.auto:
         plt.close()
@@ -135,12 +135,21 @@ def plot(Ascan_data, t_array, envelope_data, background_value, t_first, t_last, 
 
 
 if args.auto:
-    plot_list = np.loadtxt(os.path.join(output_dir, 'plot_list.txt'))
+    plot_list = np.loadtxt(os.path.join(output_dir, 'plot_list.txt', delimiter=' '))
     for i in tqdm(range(plot_list.shape[0]), desc='Plot A-scan'):
+        #* Set the output directory
+        output_dir_fig = os.path.join(output_dir, f'x={int(plot_list[i, 0]/100)*100}_{int(plot_list[i, 0]/100)*100+100}')
+        os.makedirs(output_dir_fig, exist_ok=True)
+
         Ascan, envelope, background, t_array, peak_idx, peak_value, Bscan_trim, x_first_idx, x_last_idx = make_plot_data(Bscan, plot_list[i, 0], plot_list[i, 1], plot_list[i, 2])
         plot(Ascan, t_array, envelope, background, plot_list[i, 1], plot_list[i, 2], peak_idx, peak_value, Bscan_trim, plot_list[i, 0], x_first_idx, x_last_idx)
 
 else:
+    #* Make directory to save the plot
+    output_dir_fig = os.path.join(output_dir, f'x={int(args.x/100)*100}_{int(args.x/100)*100+100}')
+    os.makedirs(output_dir_fig, exist_ok=True)
+
+
     #* Save x, t_first, t_last to txt file
     plot_params = [args.x, args.t_first, args.t_last]
     plot_params = np.array(plot_params).reshape(1, 3)
@@ -157,13 +166,11 @@ else:
         print('Plot list saved at', os.path.join(output_dir, 'plot_list.txt'))
     else:
         plot_list = np.loadtxt(os.path.join(output_dir, 'plot_list.txt'))
-        #* もし同じパラメータがあればスキップ
-        for i in range(plot_list.shape[0]):
-            if np.allclose(plot_params, plot_list[i]):
-                print('The same parameters are already in the list. Skip.')
-                break
-            else:
-                plot_list = np.vstack([plot_list, plot_params])
-                plot_list = plot_list[plot_list[:, 0].argsort()]
-                np.savetxt(os.path.join(output_dir, 'plot_list.txt'), plot_list)
-                print('Plot list saved at', os.path.join(output_dir, 'plot_list.txt'))
+        #* もし同じパラメータがあればスキップ，なければ追加して保存
+        if not np.any(np.all(plot_list == plot_params, axis=1)):
+            plot_list = np.vstack([plot_list, plot_params])
+            plot_list = plot_list[plot_list[:, 0].argsort()]
+            np.savetxt(os.path.join(output_dir, 'plot_list.txt'), plot_list, fmt='%.1f', delimiter=' ')
+            print('Plot list saved at', os.path.join(output_dir, 'plot_list.txt'))
+        else:
+            print('The plot list already has the same parameters. Skip saving.')
