@@ -54,15 +54,15 @@ scatter_x_idx = []
 scatter_time_idx = []
 scatter_value = []
 
-data_trim = data[int(50e-9/sample_interval):, :]
-envelope_trim = envelope[int(50e-9/sample_interval):, :]
-backgrounds = np.mean(np.abs(data_trim), axis=0)
+#data_trim = data[int(50e-9/sample_interval):, :]
+#envelope_trim = envelope[int(50e-9/sample_interval):, :]
+backgrounds = np.mean(np.abs(data[int(50e-9/sample_interval):, :]), axis=0)
 thresholds = backgrounds * 3
 
 
 #* Detect the peak
 for i in tqdm(range(data.shape[1]), desc='Detecting peaks'):
-    above_threshold_indices = np.where(envelope_trim[:, i] > thresholds[i])[0]
+    above_threshold_indices = np.where(envelope[:, i] > thresholds[i])[0]
 
     if len(above_threshold_indices) > 0:
         # Find the start and end of each group of indices above the threshold
@@ -70,11 +70,11 @@ for i in tqdm(range(data.shape[1]), desc='Detecting peaks'):
 
         for group in split_points:
             start, end = group[0], group[-1] + 1
-            peak_idx_in_group = np.argmax(np.abs(envelope_trim[start:end, i])) + start
+            peak_idx_in_group = np.argmax(np.abs(envelope[start:end, i])) + start
 
             scatter_x_idx.append(i*trace_interval) # [m]
-            scatter_time_idx.append(peak_idx_in_group * sample_interval * 1e9 + 50) # [ns]
-            scatter_value.append(data_trim[peak_idx_in_group, i])
+            scatter_time_idx.append(peak_idx_in_group * sample_interval * 1e9) # [ns]
+            scatter_value.append(data[peak_idx_in_group, i])
             #if data[peak_idx_in_group, i] > 0:
             #    scatter_value.append(1)
             #else:
