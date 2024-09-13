@@ -43,7 +43,37 @@ print('Data shape:', Bscan.shape)
 
 
 
-#* Extract A-scan data from B-scan data
+#* Detect the peak
+envelope = np.abs(signal.hilbert(Bscan, axis=0))
+
+scatter_x_idx = []
+scatter_time_idx = []
+scatter_value = []
+
+backgrounds = np.mean(np.abs(Bscan[int(50e-9/sample_interval):, :]), axis=0)
+thresholds = backgrounds * 3
+
+for i in tqdm(range(Bscan.shape[1]), desc='Detecting peaks'):
+    above_threshold_indices = np.where(envelope[:, i] > thresholds[i])[0]
+
+    if len(above_threshold_indices) > 0:
+        # Find the start and end of each group of indices above the threshold
+        split_points = np.split(above_threshold_indices, np.where(np.diff(above_threshold_indices) != 1)[0] + 1)
+
+        for group in split_points:
+            start, end = group[0], group[-1] + 1
+            peak_idx_in_group = np.argmax(np.abs(envelope[start:end, i])) + start
+
+            scatter_x_idx.append(i) # index
+            scatter_time_idx.append(peak_idx_in_group) # index
+            scatter_value.append(Bscan[peak_idx_in_group, i])
+
+scatters = np.vstack((scatter_x_idx, scatter_time_idx, scatter_value)).T
+print('Scatter shape:', scatters.shape)
+
+
+
+#* Define function to extract A-scan data from B-scan data
 def make_plot_data(Bscan_data, x, t_first, t_last):
     x_idx = int(x / trace_interval)
     t_first_idx = int(t_first * 1e-9 / sample_interval)
@@ -77,18 +107,20 @@ def make_plot_data(Bscan_data, x, t_first, t_last):
 
 
 
-    #* Closeup B-scan around the A-scan
+    #* Closeup B-scan and peak data around the A-scan
     x_first_idx = x_idx - int(15/trace_interval) # index
     x_last_idx = x_idx + int(15/trace_interval) # index
     Bscan_trim = Bscan[t_first_idx:t_last_idx, x_first_idx:x_last_idx]
+    scatter_trim = scatters[(scatters[:, 0] >= x_first_idx) & (scatters[:, 0] < x_last_idx)
+                                    & (scatters[:, 1] >= t_first_idx) & (scatters[:, 1] < t_last_idx)]
 
-    return Ascan, envelope, background, t_array, peak_idx, peak_value, Bscan_trim, x_first_idx, x_last_idx
+    return Ascan, envelope, background, t_array, peak_idx, peak_value, Bscan_trim, scatter_trim, x_first_idx, x_last_idx
 
 
 
 #* Plot
-def plot(Ascan_data, t_array, envelope_data, background_value, t_first, t_last, peak_idx, peak_value, Bscan_data, x, x_first_idx, x_last_idx):
-    fig, ax = plt.subplots(1, 2, figsize=(16, 8), sharey=True, tight_layout=True)
+def plot(Ascan_data, t_array, envelope_data, background_value, t_first, t_last, peak_idx, peak_value, Bscan_data, scatter_data, x, x_first_idx, x_last_idx):
+    fig, ax = plt.subplots(1, 2, figsize=(18, 8), sharey=True, tight_layout=True)
 
     #* Plot A-scan
     ax[0].plot(Ascan_data, t_array, color='black', label='Signal')
@@ -105,21 +137,32 @@ def plot(Ascan_data, t_array, envelope_data, background_value, t_first, t_last, 
 
 
 
-    #* Plot B-scan
+    #* Plot B-scan and detected peaks
     im = ax[1].imshow(Bscan_data,
-                    aspect='auto', cmap='seismic',
-                    vmin=-np.amax(np.abs(Bscan))/5, vmax=np.amax(np.abs(Bscan))/5,
+                    aspect='auto', cmap='gray',
+                    vmin=-5000, vmax=5000,
                     extent=[x_first_idx*trace_interval, x_last_idx*trace_interval, t_last, t_first])
+    scatter = ax[1].scatter(scatter_data[:, 0]*trace_interval, scatter_data[:, 1]*sample_interval*1e9,
+                        c=scatter_data[:, 2], cmap='bwr', s=5, alpha=0.5,
+                        vmin = -3000, vmax = 3000)
     ax[1].set_xlabel('Distance [m]', fontsize=20)
     ax[1].tick_params(labelsize=18)
 
     ax[1].vlines(x, t_first, t_last, color='k', linestyle='-.')
 
+    ax[1].grid(which='both', axis='both', linestyle='-.', color='white')
+
+
     delvider = axgrid1.make_axes_locatable(ax[1])
-    cax = delvider.append_axes('right', size='3%', pad=0.1)
-    cbar = plt.colorbar(im, cax=cax)
-    cbar.set_label('Amplitude', fontsize=20)
-    cbar.ax.tick_params(labelsize=18)
+    cax_im = delvider.append_axes('right', size='3%', pad=0.1)
+    cbar_im = plt.colorbar(im, cax=cax_im, orientation = 'vertical')
+    cbar_im.set_label('Amplitude', fontsize=18)
+    cbar_im.ax.tick_params(labelsize=16)
+
+    cax_scatter = delvider.append_axes('right', size='3%', pad=1.5)
+    cbar_scatter = plt.colorbar(scatter, cax=cax_scatter, orientation = 'vertical')
+    cbar_scatter.set_label('Peak amplitude', fontsize=18)
+    cbar_scatter.ax.tick_params(labelsize=16)
 
     fig.supylabel('Time [ns]', fontsize=20)
 
@@ -135,14 +178,14 @@ def plot(Ascan_data, t_array, envelope_data, background_value, t_first, t_last, 
 
 
 if args.auto:
-    plot_list = np.loadtxt(os.path.join(output_dir, 'plot_list.txt', delimiter=' '))
+    plot_list = np.loadtxt(os.path.join(output_dir, 'plot_list.txt'), delimiter=' ')
     for i in tqdm(range(plot_list.shape[0]), desc='Plot A-scan'):
         #* Set the output directory
         output_dir_fig = os.path.join(output_dir, f'x={int(plot_list[i, 0]/100)*100}_{int(plot_list[i, 0]/100)*100+100}')
         os.makedirs(output_dir_fig, exist_ok=True)
 
-        Ascan, envelope, background, t_array, peak_idx, peak_value, Bscan_trim, x_first_idx, x_last_idx = make_plot_data(Bscan, plot_list[i, 0], plot_list[i, 1], plot_list[i, 2])
-        plot(Ascan, t_array, envelope, background, plot_list[i, 1], plot_list[i, 2], peak_idx, peak_value, Bscan_trim, plot_list[i, 0], x_first_idx, x_last_idx)
+        Ascan, envelope, background, t_array, peak_idx, peak_value, Bscan_trim, scatter_trim, x_first_idx, x_last_idx = make_plot_data(Bscan, plot_list[i, 0], plot_list[i, 1], plot_list[i, 2])
+        plot(Ascan, t_array, envelope, background, plot_list[i, 1], plot_list[i, 2], peak_idx, peak_value, Bscan_trim, scatter_trim, plot_list[i, 0], x_first_idx, x_last_idx)
 
 else:
     #* Make directory to save the plot
@@ -156,8 +199,8 @@ else:
 
 
     #* Make plot
-    Ascan, envelope, background, t_array, peak_idx, peak_value, Bscan_trim, x_first_idx, x_last_idx = make_plot_data(Bscan, args.x, args.t_first, args.t_last)
-    plot(Ascan, t_array, envelope, background, args.t_first, args.t_last,peak_idx, peak_value,  Bscan_trim, args.x, x_first_idx, x_last_idx)
+    Ascan, envelope, background, t_array, peak_idx, peak_value, Bscan_trim, scatter_trim, x_first_idx, x_last_idx = make_plot_data(Bscan, args.x, args.t_first, args.t_last)
+    plot(Ascan, t_array, envelope, background, args.t_first, args.t_last,peak_idx, peak_value,  Bscan_trim, scatter_trim, args.x, x_first_idx, x_last_idx)
 
 
     #* Save the plot parameters

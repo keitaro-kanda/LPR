@@ -75,10 +75,6 @@ for i in tqdm(range(data.shape[1]), desc='Detecting peaks'):
             scatter_x_idx.append(i*trace_interval) # [m]
             scatter_time_idx.append(peak_idx_in_group * sample_interval * 1e9) # [ns]
             scatter_value.append(data[peak_idx_in_group, i])
-            #if data[peak_idx_in_group, i] > 0:
-            #    scatter_value.append(1)
-            #else:
-            #    scatter_value.append(-1)
 
 
 scatter_x_idx = np.array(scatter_x_idx)
