@@ -25,7 +25,7 @@ def main():
     parser = argparse.ArgumentParser(
         description='Bスキャンプロットビューア（PyQtGraph版）',
         epilog='End of help message',
-        usage='python plot_viewer.py [file_path]',
+        usage='python tools/plot_viewer.py [file_path]',
         prog='plot_viewer.py'
         )
     parser.add_argument('file_path', type=str, help='データファイルのパスを指定してください')
