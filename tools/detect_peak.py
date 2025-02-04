@@ -8,17 +8,6 @@ import gc
 from scipy.signal import hilbert
 
 
-# #* Parse command line arguments
-# parser = argparse.ArgumentParser(
-#     prog='detect_peak.py',
-#     description='Detect echo peak from B-scan data and plot',
-#     epilog='End of help message',
-#     usage='python tools/detect_peak.py [data_path]',
-# )
-# parser.add_argument('data_path', help='Path to the txt file of data.')
-# args = parser.parse_args()
-
-
 
 #* Get input parameters
 print('データファイルのパスを入力してください:')
@@ -53,23 +42,6 @@ print('Finished loading data.')
 print(' ')
 
 
-
-#* Calculate the envelope
-#envelope = np.abs(hilbert(data, axis=0))
-
-
-
-# #* Detect peak from the B-scan data
-# scatter_x_idx = []
-# scatter_time_idx = []
-# scatter_value = []
-
-# #data_trim = data[int(50e-9/sample_interval):, :]
-# #envelope_trim = envelope[int(50e-9/sample_interval):, :]
-# backgrounds = np.mean(np.abs(data[int(50e-9/sample_interval):, :]), axis=0)
-# thresholds = backgrounds * 3
-
-
 #* Detect the peak
 print('Detecting peaks...')
 echo_info = []
@@ -80,7 +52,7 @@ for trace_idx in tqdm(range(data.shape[1]), desc='Detecting peaks'):
     peaks_in_Ascan = []
     for i in range(1, Ascan.shape[0]-1):  # 境界を避けるため1からスタート
         #* Detect local maxima of the envelope
-        if envelope[i-1] < envelope[i] > envelope[i+1] and i * sample_interval * 1e9 > 20:  # 20ns以降のピークのみを検出
+        if envelope[i-1] < envelope[i] > envelope[i+1] and i * sample_interval * 1e9 > 20 and envelope[i] > 1000:  # 20ns以降のピークのみを検出
             peaks_in_Ascan.append(i)
 
     #* Calculate the FWHM
@@ -232,9 +204,9 @@ def plot(Bscan_data, scatter_data, x1, x2, y1, y2):
 
 
     #* Set labels
-    ax.set_xlabel('Distance [m]', fontsize=20)
-    ax.set_ylabel('Time [ns]', fontsize=20)
-    ax.tick_params(labelsize=16)
+    ax.set_xlabel('Distance [m]', fontsize=24)
+    ax.set_ylabel('Time [ns]', fontsize=24)
+    ax.tick_params(labelsize=20)
 
     ax.grid(which='both', axis='both', linestyle='-.', color='white')
 
@@ -242,13 +214,11 @@ def plot(Bscan_data, scatter_data, x1, x2, y1, y2):
     delvider = axgrid1.make_axes_locatable(ax)
     cax_im = delvider.append_axes('right', size='3%', pad=0.1)
     cbar_im = plt.colorbar(im, cax=cax_im, orientation = 'vertical')
-    cbar_im.set_label('Amplitude', fontsize=18)
-    cbar_im.ax.tick_params(labelsize=16)
+    cbar_im.ax.tick_params(labelsize=20)
 
     cax_scatter = delvider.append_axes('right', size='3%', pad=1.5)
     cbar_scatter = plt.colorbar(scatter, cax=cax_scatter, orientation = 'vertical')
-    cbar_scatter.set_label('Peak amplitude', fontsize=18)
-    cbar_scatter.ax.tick_params(labelsize=16)
+    cbar_scatter.ax.tick_params(labelsize=20)
 
 
     filename_base = f'/x{x1}_y{y1}'
