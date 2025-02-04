@@ -74,8 +74,8 @@ print(' ')
 print('Detecting peaks...')
 echo_info = []
 
-for j in tqdm(range(data.shape[1]), desc='Detecting peaks'):
-    Ascan = data[:, j]
+for trace_idx in tqdm(range(data.shape[1]), desc='Detecting peaks'):
+    Ascan = data[:, trace_idx]
     envelope = np.abs(hilbert(Ascan))
     peaks_in_Ascan = []
     for i in range(1, Ascan.shape[0]-1):  # 境界を避けるため1からスタート
@@ -197,7 +197,7 @@ for j in tqdm(range(data.shape[1]), desc='Detecting peaks'):
 
         echo_info.append({
             # 'x_idx': j,
-            'x': j * trace_interval,
+            'x': trace_idx * trace_interval,
             # 'env_peak_idx': peak_idx,
             # 'env_peak_time': time[peak_idx],
             # 'env_peak_value': peak_amplitude,
@@ -213,37 +213,6 @@ np.savetxt(os.path.join(output_dir, 'peak_x_t_values.txt'), peak_x_t_values, fmt
 print('Peak shape:', peak_x_t_values.shape)
 print('Finished detecting peaks.')
 print(' ')
-
-
-"""
-for i in tqdm(range(data.shape[1]), desc='Detecting peaks'):
-    above_threshold_indices = np.where(envelope[:, i] > thresholds[i])[0]
-
-    if len(above_threshold_indices) > 0:
-        # Find the start and end of each group of indices above the threshold
-        split_points = np.split(above_threshold_indices, np.where(np.diff(above_threshold_indices) != 1)[0] + 1)
-
-        for group in split_points:
-            start, end = group[0], group[-1] + 1
-            peak_idx_in_group = np.argmax(np.abs(envelope[start:end, i])) + start
-
-            scatter_x_idx.append(i*trace_interval) # [m]
-            scatter_time_idx.append(peak_idx_in_group * sample_interval * 1e9) # [ns]
-            scatter_value.append(data[peak_idx_in_group, i])
-
-
-scatter_x_idx = np.array(scatter_x_idx)
-scatter_time_idx = np.array(scatter_time_idx)
-scatter_value = np.array(scatter_value)
-
-scatters = np.vstack((scatter_x_idx, scatter_time_idx, scatter_value)).T
-print('Scatter shape:', scatters.shape)
-"""
-
-
-#* Calculate dB
-#envelope[envelope == 0] = 1e-10
-#envelope_db = 10 * np.log10(envelope/np.amax(envelope))
 
 
 
@@ -304,20 +273,20 @@ def plot_grid(data, peak_values, output_dir_trim_png, output_dir_trim_pdf,
     y_max = data.shape[0] * sample_interval / 1e-9  # [ns]
 
     # グリッド開始位置の配列を生成
-    x_starts = np.arange(0, x_max, grid_size)  # 物理的な距離[m]でグリッドを生成
-    y_starts = np.arange(0, y_max, grid_size)  # 時間[ns]でグリッドを生成
+    x_starts = np.arange(0, x_max, grid_size)  # [m]
+    y_starts = np.arange(0, y_max, grid_size)  # [ns]
 
     total_plots = len(x_starts) * len(y_starts)
     with tqdm(total=total_plots, desc='グリッドプロット作成中') as pbar:
         for x_start in x_starts:
-            x_end = min(x_max, x_start + grid_size*trace_interval)
+            x_end = min(x_max, x_start + grid_size) # [m]
             # インデックスに変換
             x_start_idx = int(x_start/trace_interval)
             x_end_idx = int(x_end/trace_interval)
             x_slice = slice(x_start_idx, x_end_idx)
 
             for y_start in y_starts:
-                y_end = min(y_max, y_start + grid_size*sample_interval*1e9)
+                y_end = min(y_max, y_start + grid_size) # [ns]
                 # インデックスに変換
                 y_start_idx = int(y_start/(sample_interval*1e9))
                 y_end_idx = int(y_end/(sample_interval*1e9))
