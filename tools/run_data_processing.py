@@ -2,26 +2,26 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import mpl_toolkits.axes_grid1 as axgrid1
-import argparse
 from tqdm import tqdm
 from scipy import signal
 
-#* Parse command line arguments
-parser = argparse.ArgumentParser(
-    prog='run_data_processing.py',
-    description='Run bandpass filtering, time-zero correction, and background removal on resampled Bscan data',
-    epilog='End of help message',
-    usage='python tools/runs_data_processing.py [path_type] [function_type]',
-)
-parser.add_argument('path_type', choices = ['local', 'SSD'], help='Choose the path type')
-parser.add_argument('function_type', choices=['calc', 'plot'], help='Choose the function type')
-args = parser.parse_args()
+#* Get input parameters
+print('パスタイプを選択してください（local または SSD）:')
+path_type = input().strip().lower()
+if path_type not in ['local', 'ssd']:
+    print('エラー: パスタイプは local または SSD を指定してください')
+    exit(1)
 
+print('機能タイプを選択してください（calc または plot）:')
+function_type = input().strip().lower()
+if function_type not in ['calc', 'plot']:
+    print('エラー: 機能タイプは calc または plot を指定してください')
+    exit(1)
 
 #* Define data folder path
-if args.path_type == 'local' or args.path_type == 'test':
+if path_type == 'local':
     data_path = 'LPR_2B/Resampled_ECHO/Bscan.txt'
-elif args.path_type == 'SSD':
+elif path_type == 'ssd':
     data_path = '/Volumes/SSD_Kanda_BUFFALO/LPR/LPR_2B/Resampled_Data/Bscan.txt'
     print('Data path:', data_path)
 
@@ -54,6 +54,8 @@ fs = 1/sample_interval  # Sampling frequency
 trace_interval = 3.6e-2 # [m], [Li et al. (2020), Sci. Adv.]
 epsilon_0 = 8.854187817e-12  # [F/m]
 c = 299792458  # [m/s]
+reciever_time_delay = 28.203e-9  # [s], [Su et al., 2014]
+
 
 
 #* Define functions
@@ -148,9 +150,12 @@ def gain(data, er, tan_delta, freq):
 
 
 #* Processing pipeline
-if args.function_type == 'calc':
+if function_type == 'calc':
     #* 0. Prepare raw Bscan data
     Raw_Bscan = np.loadtxt(data_path, delimiter=' ')
+
+    #* time delayを考慮して、データをスライス
+    Raw_Bscan = Raw_Bscan[int(reciever_time_delay/sample_interval):, :]
     print("Bscan shape:", Raw_Bscan.shape)
     print('')
 
@@ -195,7 +200,7 @@ if args.function_type == 'calc':
     print('Finished gain function')
     print(' ')
 
-elif args.function_type == 'plot':
+elif function_type == 'plot':
     #* 0. Prepare raw Bscan data
     Raw_Bscan = np.loadtxt(data_path, delimiter=' ')
     print("Bscan shape:", Raw_Bscan.shape)
