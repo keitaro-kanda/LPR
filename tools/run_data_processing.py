@@ -117,6 +117,34 @@ def background_removal(data):
     background_removed_data = np.zeros_like(data)
     for i in tqdm(range(data.shape[1]), desc='Subtracting background'):
         background_removed_data[:, i] =  data[:, i] - background_data
+
+    #* Plot background data
+    fig, ax = plt.subplots(1, 2, figsize=(12, 8), tight_layout=True)
+    time = np.arange(0, data.shape[0]*sample_interval/1e-9, sample_interval/1e-9)
+    ax[0].plot(background_data, time)
+
+    ax[0].set_xlabel('Amplitude', fontsize=20)
+    ax[0].set_ylabel('Time [ns]', fontsize=20)
+    ax[0].tick_params(labelsize=18)
+    ax[0].grid(which='major', axis='both', linestyle='-.')
+    ax[0].invert_yaxis()
+    ax[0].set_ylim(np.max(time), 0)
+
+    ax[1].plot(background_data, time)
+
+    ax[1].set_xlabel('Amplitude', fontsize=20)
+    ax[1].set_ylabel('Time [ns]', fontsize=20)
+    ax[1].tick_params(labelsize=18)
+    ax[1].grid(which='major', axis='both', linestyle='-.')
+    ax[1].invert_yaxis()
+    ax[1].set_ylim(100, 0)
+
+    plt.savefig(dir_3 + '/Background_data.png', format='png', dpi=120)
+    plt.savefig(dir_3 + '/Background_data.pdf', format='pdf', dpi=300)
+    plt.close()
+    print('Plot of background data is successfully saved.')
+    print(' ')
+
     return background_data,  background_removed_data
 
 
@@ -146,6 +174,34 @@ def gain(data, er, tan_delta, freq):
     print(' ')
 
     output = data * gain_func
+
+    background_gained = np.mean(output, axis=1)
+    fig, ax = plt.subplots(1, 2, figsize=(12, 8), tight_layout=True)
+    time = np.arange(0, data.shape[0]*sample_interval/1e-9, sample_interval/1e-9)
+    ax[0].plot(background_gained, time)
+
+    ax[0].set_xlabel('Amplitude', fontsize=20)
+    ax[0].set_ylabel('Time [ns]', fontsize=20)
+    ax[0].tick_params(labelsize=18)
+    ax[0].grid(which='major', axis='both', linestyle='-.')
+    ax[0].invert_yaxis()
+    ax[0].set_ylim(np.max(time), 0)
+
+    ax[1].plot(background_gained, time)
+
+    ax[1].set_xlabel('Amplitude', fontsize=20)
+    ax[1].set_ylabel('Time [ns]', fontsize=20)
+    ax[1].tick_params(labelsize=18)
+    ax[1].grid(which='major', axis='both', linestyle='-.')
+    ax[1].invert_yaxis()
+    ax[1].set_ylim(100, 0)
+
+    plt.savefig(dir_4 + '/Background_gained.png', format='png', dpi=120)
+    plt.savefig(dir_4 + '/Background_gained.pdf', format='pdf', dpi=300)
+    plt.close()
+    print('Plot of background data is successfully saved.')
+    print(' ')
+
     return output
 
 
@@ -253,7 +309,7 @@ for i in range(len(plot_data)):
     #ax.set_title(title[i], fontsize=font_large)
 
     ax.set_xlabel('Moving distance [m]', fontsize=font_medium)
-    ax.set_ylabel('Time (ns)', fontsize=font_medium)
+    ax.set_ylabel('Time [ns]', fontsize=font_medium)
 
     delvider = axgrid1.make_axes_locatable(ax)
     cax = delvider.append_axes('right', size='3%', pad=0.1)
@@ -292,7 +348,7 @@ for i in range(len(plot_data)):
     cax.tick_params(labelsize=font_small)
 
 fig.supxlabel('Moving distance [m]', fontsize=font_medium)
-fig.supylabel('Time (ns)', fontsize=font_medium)
+fig.supylabel('Time [ns]', fontsize=font_medium)
 
 
 
