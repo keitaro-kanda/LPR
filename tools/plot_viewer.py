@@ -4,6 +4,7 @@ import pyqtgraph as pg
 from PyQt5 import QtCore, QtGui, QtWidgets
 import matplotlib.pyplot as plt
 import matplotlib.cm as mpl_cm
+from scipy.signal import hilbert
 
 
 # 軸範囲の設定
@@ -31,6 +32,7 @@ def main():
 
     # データの読み込み
     data = load_data(bscan_path)
+    envelop = np.abs(hilbert(data, axis=0))
     if peak_path:
         peak_data = load_data(peak_path)
 
@@ -52,6 +54,7 @@ def main():
 
     # B-scanプロットアイテムの作成
     bscan_plot_item = pg.PlotItem() # 変数名変更
+    bscan_plot_item.setTitle("B-scan", **{'font-size': '32pt'})
     bscan_plot_item.setLabel('bottom', 'x [m]', **{'font-size': '28pt'})
     bscan_plot_item.setLabel('left', 'Time [ns]', **{'font-size': '28pt'})
     bscan_plot_item.getAxis('bottom').setStyle(tickFont=QtGui.QFont('', 16))
@@ -123,13 +126,16 @@ def main():
 
     # A-scanプロットデータ初期化用Pen # 追記
     ascan_pen = pg.mkPen(color='w', width=2) # 黒色の線 # 修正
+    env_pen = pg.mkPen(color='r', width=2) # 赤色の線 # 追記
 
     # A-scanプロットアイテムにPlotCurveItemを追加 # 追記
     ascan_curve = pg.PlotCurveItem(pen=ascan_pen)
     ascan_plot_item.addItem(ascan_curve)
+    env_curve = pg.PlotCurveItem(pen=env_pen)
+    ascan_plot_item.addItem(env_curve)
 
     # 縦線 (InfiniteLine) の作成 # 追記
-    v_line = pg.InfiniteLine(angle=90, movable=True) # 垂直方向、移動可能
+    v_line = pg.InfiniteLine(angle=90, movable=True, label='A-scan plot position') # 垂直方向、移動可能
     bscan_plot_item.addItem(v_line)
 
     # 縦線の初期位置を設定 (B-scanの中央) # 追記
@@ -147,13 +153,15 @@ def main():
         if 0 <= trace_index < data.shape[1]:
             # A-scanデータの抽出
             ascan_data = data[:, trace_index]
+            env_data = envelop[:, trace_index]
 
             # A-scanプロットを更新
             time_axis = np.arange(len(ascan_data)) * sample_interval / 1e-9 # 時間軸[ns]
             ascan_curve.setData(x=ascan_data, y=time_axis) # 振幅 vs 時間
+            env_curve.setData(x=env_data, y=time_axis) # エンベロープ vs 時間
 
             # A-scanプロットのタイトルを更新 (選択したx座標を表示)
-            ascan_plot_item.setTitle(f"A-scan at x = {x_pos:.2f} [m]")
+            ascan_plot_item.setTitle(f"A-scan at x = {x_pos:.2f} [m]", **{'font-size': '32pt'})
 
             # A-scanのY軸範囲をB-scanのY軸範囲に合わせる # 追記
             ascan_plot_item.setYRange(*bscan_plot_item.viewRange()[1]) # setYRange(y_min, y_max) に * 記法でリスト展開
@@ -162,6 +170,7 @@ def main():
             ascan_curve.clear() # データ範囲外の場合はA-scanプロットをクリア
             ascan_plot_item.setTitle("A-scan (データ範囲外)") # タイトルを更新
             ascan_plot_item.setYRange(y_start, y_end) # データ範囲外の場合はA-scanのY軸範囲を初期値に戻す # 追記
+
 
     # 縦線の位置変更シグナルとA-scan表示更新関数を接続 # 追記
     v_line.sigPositionChanged.connect(update_ascan)
