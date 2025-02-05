@@ -39,11 +39,11 @@ def main():
 
     win.resize(2400, 800)
 
-    cmap_Bscan_mpl = mpl_cm.get_cmap('bwr') # matplotlibのカラーマップオブジェクトを取得 # 修正
-    lut = (cmap_Bscan_mpl(np.linspace(0, 1, 256)) * 255).astype(np.uint8) # NumPy配列形式のLUTを作成 # 修正
-    cmap_Bscan = pg.ColorMap(pos=np.linspace(0, 1, 256), color=lut) # pyqtgraph.ColorMapオブジェクトを作成 # 修正
+    cmap_Bscan_mpl = mpl_cm.get_cmap('bwr') # matplotlibのカラーマップオブジェクトを取得
+    lut = (cmap_Bscan_mpl(np.linspace(0, 1, 256)) * 255).astype(np.uint8) # NumPy配列形式のLUTを作成
+    cmap_Bscan = pg.ColorMap(pos=np.linspace(0, 1, 256), color=lut) # pyqtgraph.ColorMapオブジェクトを作成
 
-    cmap_peaks_mpl = mpl_cm.get_cmap('seismic') # matplotlibのカラーマップオブジェクトを取得 # 修正
+    cmap_peaks_mpl = mpl_cm.get_cmap('seismic') # matplotlibのカラーマップオブジェクトを取得
 
     # レイアウトの列幅比率を設定（プロット領域を広くする）
     win.ci.layout.setColumnStretchFactor(0, 8)  # B-scanプロット領域の列を8に設定
@@ -74,7 +74,7 @@ def main():
     # イメージアイテムの作成
     img = pg.ImageItem()
     img.setImage(data.T)
-    img.setLookupTable(lut) # LUTはNumPy配列のまま使用 # 修正
+    img.setLookupTable(lut) # LUTはNumPy配列のまま使用
     img.setLevels([np.min(data), np.max(data)])
 
     # 画像の位置とスケールを設定
@@ -117,65 +117,61 @@ def main():
     ascan_plot_item.getAxis('bottom').setStyle(tickFont=QtGui.QFont('', 16))
     ascan_plot_item.getAxis('left').setStyle(tickFont=QtGui.QFont('', 16))
     ascan_plot_item.showGrid(x=True, y=True, alpha=0.5)
-    ascan_plot_item.setYRange(y_start, y_end) # B-scanとY軸範囲を合わせる
+    ascan_plot_item.setYRange(y_start, y_end) # 初期Y軸範囲設定 (初期状態ではB-scanと合わせる) # 修正
     ascan_plot_item.invertY(True) # B-scanとY軸方向を合わせる
+    # ascan_plot_item.setBackgroundColor('w') # A-scanプロットの背景を白に設定
 
     # A-scanプロットデータ初期化用Pen # 追記
-    ascan_pen = pg.mkPen(color='b', width=2) # 青色の線
+    ascan_pen = pg.mkPen(color='w', width=2) # 黒色の線 # 修正
 
     # A-scanプロットアイテムにPlotCurveItemを追加 # 追記
     ascan_curve = pg.PlotCurveItem(pen=ascan_pen)
     ascan_plot_item.addItem(ascan_curve)
 
-    # B-scanクリック時のイベントハンドラ # 追記
-    def on_bscan_clicked(event):
-        try: # エラーハンドリング開始
-            if bscan_plot_item is None: # 念のため bscan_plot_item が None でないかチェック
-                print("Error: bscan_plot_item is None in on_bscan_clicked")
-                return
-            if bscan_plot_item.scene() is None: # scene() が None でないかチェック
-                print("Error: bscan_plot_item.scene() is None in on_bscan_clicked")
-                return
+    # 縦線 (InfiniteLine) の作成 # 追記
+    v_line = pg.InfiniteLine(angle=90, movable=True) # 垂直方向、移動可能
+    bscan_plot_item.addItem(v_line)
 
-            pos = event.pos()
-            x_pos = pos.x()
+    # 縦線の初期位置を設定 (B-scanの中央) # 追記
+    initial_x_pos = x_end / 2.0
+    v_line.setPos(initial_x_pos)
 
-            # x座標をトレース番号に変換
-            trace_index = int(x_pos / trace_interval)
+    # A-scan表示更新関数 # 追記
+    def update_ascan():
+        x_pos = v_line.value() # 縦線の現在位置を取得
 
-            # データ範囲外クリック対策
-            if 0 <= trace_index < data.shape[1]:
-                # A-scanデータの抽出
-                ascan_data = data[:, trace_index]
+        # x座標をトレース番号に変換
+        trace_index = int(x_pos / trace_interval)
 
-                # A-scanプロットを更新
-                time_axis = np.arange(len(ascan_data)) * sample_interval / 1e-9 # 時間軸[ns]
-                ascan_curve.setData(x=ascan_data, y=time_axis) # 振幅 vs 時間
+        # データ範囲外位置対策
+        if 0 <= trace_index < data.shape[1]:
+            # A-scanデータの抽出
+            ascan_data = data[:, trace_index]
 
-                # A-scanプロットのタイトルを更新 (選択したx座標を表示)
-                ascan_plot_item.setTitle(f"A-scan at x = {x_pos:.2f} [m]")
-            else:
-                print("クリック位置がデータ範囲外です。")
-        except Exception as e: # 例外発生時の処理
-            print(f"Error in on_bscan_clicked: {e}") # エラー内容を詳細に表示
+            # A-scanプロットを更新
+            time_axis = np.arange(len(ascan_data)) * sample_interval / 1e-9 # 時間軸[ns]
+            ascan_curve.setData(x=ascan_data, y=time_axis) # 振幅 vs 時間
 
+            # A-scanプロットのタイトルを更新 (選択したx座標を表示)
+            ascan_plot_item.setTitle(f"A-scan at x = {x_pos:.2f} [m]")
 
-    # B-scanプロットアイテムにクリックイベントハンドラを登録 # 追記
-    try: # エラーハンドリング開始
-        if bscan_plot_item is None: # 念のため bscan_plot_item が None でないかチェック
-            print(f"bscan_plot_item is None: {bscan_plot_item}") # ← 【追加】bscan_plot_item の値を出力
-            print("Error: bscan_plot_item is None at registration")
-        if bscan_plot_item.scene() is None: # scene() が None でないかチェック
-            print("Error: bscan_plot_item.scene() is None at registration")
+            # A-scanのY軸範囲をB-scanのY軸範囲に合わせる # 追記
+            ascan_plot_item.setYRange(*bscan_plot_item.viewRange()[1]) # setYRange(y_min, y_max) に * 記法でリスト展開
         else:
-            bscan_plot_item.scene().sigMouseClicked.connect(on_bscan_clicked)
-    except Exception as e: # 例外発生時の処理
-        print(f"Error registering click handler: {e}") # エラー内容を詳細に表示
+            print("縦線位置がデータ範囲外です。")
+            ascan_curve.clear() # データ範囲外の場合はA-scanプロットをクリア
+            ascan_plot_item.setTitle("A-scan (データ範囲外)") # タイトルを更新
+            ascan_plot_item.setYRange(y_start, y_end) # データ範囲外の場合はA-scanのY軸範囲を初期値に戻す # 追記
 
+    # 縦線の位置変更シグナルとA-scan表示更新関数を接続 # 追記
+    v_line.sigPositionChanged.connect(update_ascan)
+
+    # 初期A-scan表示 # 追記
+    update_ascan() # 初期位置でのA-scanを表示
 
     # プロットアイテムとカラーバーの配置
     max_value = np.abs(data).max()
-    colorbar = pg.ColorBarItem(values=(-max_value/5, max_value/5), colorMap=cmap_Bscan) # pyqtgraph.ColorMapオブジェクトを渡す # 修正
+    colorbar = pg.ColorBarItem(values=(-max_value/5, max_value/5), colorMap=cmap_Bscan) # pyqtgraph.ColorMapオブジェクトを渡す
     colorbar.setImageItem(img)
     win.addItem(bscan_plot_item, row=0, col=0) # B-scanを配置
     win.addItem(colorbar, row=0, col=1)
