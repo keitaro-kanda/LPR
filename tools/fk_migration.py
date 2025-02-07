@@ -93,21 +93,9 @@ def fk_migration(data, epsilon_r):
 #* Data path
 data_path = args.data_path
 if args.function_type == 'plot':
-    pamameter_path = os.path.join(os.path.dirname(data_path), 'parameters.json')
-    output_dir = os.path.join(os.path.dirname(data_path), 'fk_migration')
-    os.makedirs(output_dir, exist_ok=True)
-"""
-if args.function_type == 'calc':
-    data_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Processed_Data/4_Gain_function/4_Bscan_gain.txt'
-    #* Define output folder path
-    output_dir = os.path.join(os.path.dirname(data_path), 'fk_migration')
-    os.makedirs(output_dir, exist_ok=True)
-elif args.function_type == 'plot':
-    data_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Processed_data/4_Gain_function/fk_migration/fk_migration.txt'
-    pamameter_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Processed_data/4_Gain_function/fk_migration/parameters.json'
-    #* Define output folder path
-    output_dir = os.path.dirname(data_path)
-"""
+    pamameter_path = os.path.join(os.path.dirname(data_path), 'fk_migration/parameters.json')
+output_dir = os.path.join(os.path.dirname(data_path), 'fk_migration')
+os.makedirs(output_dir, exist_ok=True)
 
 
 #* Parameters
@@ -144,11 +132,9 @@ if args.function_type == 'calc':
 elif args.function_type == 'plot':
     #* Load data
     print('Loading data...')
-    fk_data = np.loadtxt(data_path, delimiter=' ')
+    fk_data_path = os.path.join(os.path.dirname(data_path), 'fk_migration/fk_migration.txt')
+    fk_data = np.loadtxt(fk_data_path, delimiter=' ')
     print('Data shape:', fk_data.shape)
-
-    #* Set output directory
-    output_dir = os.path.dirname(data_path)
 
     #* Load parameters
     print('Loading parameters...')
@@ -164,10 +150,10 @@ elif args.function_type == 'plot':
 #* Plot
 print('Plotting...')
 plt.figure(figsize=(18, 6), facecolor='w', edgecolor='w', tight_layout=True)
-im = plt.imshow(fk_data, cmap='jet', aspect='auto',
+im = plt.imshow(fk_data, cmap='viridis', aspect='auto',
                 extent=[0, fk_data.shape[1] * trace_interval,
                 fk_data.shape[0] * sample_interval * v, 0],
-                vmin=0, vmax=np.amax(fk_data)/5
+                vmin=0, vmax=np.amax(fk_data)/3
                 )
 
 plt.xlabel('x [m]', fontsize=20)
