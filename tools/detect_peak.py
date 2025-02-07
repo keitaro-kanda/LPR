@@ -21,9 +21,9 @@ if not os.path.exists(data_path):
 output_dir = os.path.join(os.path.dirname(data_path), 'detect_peak')
 os.makedirs(output_dir, exist_ok=True)
 
-output_dir_trim_png = os.path.join(output_dir, 'trim/png')
+output_dir_trim_png = os.path.join(output_dir, 'trim_png')
 os.makedirs(output_dir_trim_png, exist_ok=True)
-output_dir_trim_pdf = os.path.join(output_dir, 'trim/pdf')
+output_dir_trim_pdf = os.path.join(output_dir, 'trim_pdf')
 os.makedirs(output_dir_trim_pdf, exist_ok=True)
 
 
@@ -52,7 +52,7 @@ for trace_idx in tqdm(range(data.shape[1]), desc='Detecting peaks'):
     peaks_in_Ascan = []
     for i in range(1, Ascan.shape[0]-1):  # 境界を避けるため1からスタート
         #* Detect local maxima of the envelope
-        if envelope[i-1] < envelope[i] > envelope[i+1] and i * sample_interval * 1e9 > 20 and envelope[i] > 1000:  # 20ns以降のピークのみを検出
+        if envelope[i-1] < envelope[i] > envelope[i+1] and envelope[i] > 100:
             peaks_in_Ascan.append(i)
 
     #* Calculate the FWHM
@@ -189,18 +189,18 @@ print(' ')
 
 
 #* Define the function to plot
-def plot(Bscan_data, scatter_data, x1, x2, y1, y2):
+def plot(Bscan_data, scatter_data, x1, x2, y1, y2, max_value):
     fig = plt.figure(figsize=(18, 8), tight_layout=True)
     ax = fig.add_subplot(111)
 
-    im = ax.imshow(Bscan_data, aspect='auto', cmap='gray',
+    im = ax.imshow(Bscan_data, aspect='auto', cmap='viridis',
                     extent=[x1, x2, y2, y1],
-                    vmin=-3000, vmax=3000
+                    vmin = -max_value/7, vmax = max_value/7
                     )
     scatter = ax.scatter(scatter_data[:, 0], scatter_data[:, 1], # +50 to compensate the trim
                         c=scatter_data[:, 2], cmap='seismic', s=1,
                         #vmin = -scatter_max/5, vmax = scatter_max/5
-                        vmin = -3000, vmax = 3000)
+                        vmin = -max_value/7, vmax = max_value/7)
 
 
     #* Set labels
@@ -231,14 +231,14 @@ def plot(Bscan_data, scatter_data, x1, x2, y1, y2):
     return plt
 
 
-def plot_grid(data, peak_values, output_dir_trim_png, output_dir_trim_pdf,
-                grid_size=100, trace_interval=3.6e-2, sample_interval=0.312500e-9):
+def plot_grid(data, peak_values, output_dir_trim_png, output_dir_trim_pdf,max_value):
     """グリッド状にB-scanデータを分割してプロット
     Args:
         data: B-scanデータ配列
         peak_values: ピーク検出結果の配列 (x, time, amplitude)
         grid_size: 分割グリッドのサイズ（デフォルト: 100）, [m]にも[ns]にも使える
     """
+    grid_size = 100
     x_max = data.shape[1] * trace_interval  # [m]
     y_max = data.shape[0] * sample_interval / 1e-9  # [ns]
 
@@ -271,9 +271,10 @@ def plot_grid(data, peak_values, output_dir_trim_png, output_dir_trim_pdf,
                 peak_values_trim = peak_values[mask]
 
                 if len(peak_values_trim) > 0:  # ピークが存在する場合のみプロット
-                    plot(data_trim, peak_values_trim, x_start, x_end, y_start, y_end)
+                    plot(data_trim, peak_values_trim, x_start, x_end, y_start, y_end, max_value)
                 pbar.update(1)
 
 #* Plot
 print('プロット作成開始...')
-plot_grid(data, peak_x_t_values, output_dir_trim_png, output_dir_trim_pdf)
+max_value = np.abs(data).max()
+plot_grid(data, peak_x_t_values, output_dir_trim_png, output_dir_trim_pdf, max_value)
