@@ -22,10 +22,10 @@ args = parser.parse_args()
 #* Define data folder path
 if args.path_type == 'local':
     #data_folder_path = 'LPR_2B/ECHO'
-    position_folder_path = 'LPR_2B/Position'
+    position_folder_path = 'LPR_2B/Resampled_Data/position'
 elif args.path_type == 'SSD':
     #data_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B/ECHO'
-    position_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Resampled_Data/position'
+    position_folder_path = '/Volumes/SSD_Kanda_BUFFALO/LPR/LPR_2B/Resampled_Data/position'
 
 
 
@@ -78,6 +78,7 @@ def load_positions():
             total_x = np.append(total_x, total_x[-1] + XPOSITION[i])
             total_y = np.append(total_y, total_y[-1] + YPOSITION[i])
             total_z = np.append(total_z, total_z[-1] + ZPOSITION[i])
+            #total_z = np.append(total_z, ZPOSITION[i])
 
     #* Plot positions
     plot_list = [XPOSITION, YPOSITION, ZPOSITION]
@@ -87,8 +88,10 @@ def load_positions():
         ax[i].plot(plot_list[i])
         ax[i].grid()
         ax[i].set_xlabel('Record number' , fontsize=20)
-        ax[i].set_ylabel('Position [m]', fontsize=20)
+        ax[i].set_ylabel(y_label[i], fontsize=20)
         ax[i].tick_params(labelsize=18)
+
+    plt.savefig(os.path.join(position_folder_path, 'plot_position.png'))
     plt.show()
 
     #* Plot tolal z
@@ -98,6 +101,8 @@ def load_positions():
     plt.xlabel('Record number', fontsize=20)
     plt.ylabel('Z [m]', fontsize=20)
     plt.tick_params(labelsize=18)
+
+    plt.savefig(os.path.join(position_folder_path, 'total_z.png'))
     plt.show()
 
     #* Plot track of CE-4
@@ -107,6 +112,8 @@ def load_positions():
     plt.xlabel('East-West', fontsize=20)
     plt.ylabel('North-South', fontsize=20)
     plt.tick_params(labelsize=18)
+
+    plt.savefig(os.path.join(position_folder_path, 'plot_track.png'))
     plt.show()
 
 
