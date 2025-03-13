@@ -41,7 +41,7 @@ def main():
 
     win.resize(2400, 800)
 
-    cmap_Bscan_mpl = mpl_cm.get_cmap('bwr') # matplotlibのカラーマップオブジェクトを取得
+    cmap_Bscan_mpl = mpl_cm.get_cmap('viridis') # matplotlibのカラーマップオブジェクトを取得
     lut = (cmap_Bscan_mpl(np.linspace(0, 1, 256)) * 255).astype(np.uint8) # NumPy配列形式のLUTを作成
     cmap_Bscan = pg.ColorMap(pos=np.linspace(0, 1, 256), color=lut) # pyqtgraph.ColorMapオブジェクトを作成
 
@@ -180,7 +180,7 @@ def main():
 
     # プロットアイテムとカラーバーの配置
     max_value = np.abs(data).max()
-    colorbar = pg.ColorBarItem(values=(-max_value/5, max_value/5), colorMap=cmap_Bscan) # pyqtgraph.ColorMapオブジェクトを渡す
+    colorbar = pg.ColorBarItem(values=(-max_value/8, max_value/8), colorMap=cmap_Bscan) # pyqtgraph.ColorMapオブジェクトを渡す
     colorbar.setImageItem(img)
     win.addItem(bscan_plot_item, row=0, col=0) # B-scanを配置
     win.addItem(colorbar, row=0, col=1)
