@@ -25,9 +25,25 @@ if data_type not in ['raw', 'bandpass_filtered', 'time_zero_corrected', 'backgro
     print('エラー: 無効なデータ種類です')
     exit(1)
 
-print('エンベロープを計算しますか？（y/n）:')
+print('エンベロープを計算しますか？（y/n、デフォルト：n）:')
 envelope_option = input().strip().lower()
-use_envelope = envelope_option.startswith('y')
+use_envelope = envelope_option.startswith('y') if envelope_option else False
+
+print('プロット範囲を限定しますか？（y/n、デフォルト：n）:')
+plot_range_option = input().strip().lower()
+use_plot_range = plot_range_option.startswith('y') if plot_range_option else False
+
+plot_range = None
+if use_plot_range:
+    print('プロット範囲を入力してください（x_start x_end y_start y_end）[m, m, ns, ns]:')
+    try:
+        x_start, x_end, y_start, y_end = map(float, input().strip().split())
+        plot_range = [x_start, x_end, y_start, y_end]
+    except ValueError:
+        print('エラー: 無効な入力形式です。デフォルトの範囲を使用します。')
+        use_plot_range = False
+
+
 
 
 #* パラメータ
@@ -37,6 +53,13 @@ trace_interval = 3.6e-2 # [m], [Li et al. (2020), Sci. Adv.]
 
 #* 出力フォルダパスの定義
 output_dir = os.path.dirname(data_path)
+if use_envelope:
+    output_dir = os.path.join(output_dir, 'envelope')
+if plot_range_option:
+    output_dir = os.path.join(output_dir, 'Trimmed_plot_selected_range')
+
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
 
 
 #* エンベロープ計算
@@ -78,6 +101,11 @@ def single_plot(plot_data):
                     vmin=-10, vmax=10
                     )
     
+    # プロット範囲の設定
+    if use_plot_range:
+        plt.xlim(plot_range[0], plot_range[1])
+        plt.ylim(plot_range[3], plot_range[2])  # y軸は逆転しているため、順序を入れ替え
+    
     plt.xlabel('Moving distance [m]', fontsize=font_medium)
     plt.ylabel('Time [ns]', fontsize=font_medium)
     plt.tick_params(axis='both', which='major', labelsize=font_small)
@@ -89,12 +117,12 @@ def single_plot(plot_data):
     cax.tick_params(labelsize=font_small)
 
     # 出力ファイル名
-    file_base = os.path.splitext(os.path.basename(data_path))[0]
-    title_suffix = ""
-    if use_envelope:
-        title_suffix = "_envelope"
-    output_path_png = os.path.join(output_dir, f'{file_base}_{title_suffix}.png')
-    output_path_pdf = os.path.join(output_dir, f'{file_base}_{title_suffix}.pdf')
+    if plot_range_option:
+        file_base = f'x_{plot_range[0]}_{plot_range[1]}_t{plot_range[2]}_{plot_range[3]}'
+    else:
+        file_base = os.path.splitext(os.path.basename(data_path))[0]
+    output_path_png = os.path.join(output_dir, f'{file_base}.png')
+    output_path_pdf = os.path.join(output_dir, f'{file_base}.pdf')
     
     plt.savefig(output_path_png, format='png', dpi=120)
     plt.savefig(output_path_pdf, format='pdf', dpi=600)
