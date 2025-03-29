@@ -296,14 +296,14 @@ for i in range(len(plot_data)):
     ax = fig.add_subplot(111)
     #fig, ax = plt.subplots(1, 1, figsize=(18, 6), tight_layout=True)
     if i == 4:
-        im = ax.imshow(plot_data[i], aspect='auto', cmap='seismic',
+        im = ax.imshow(plot_data[i], aspect='auto', cmap='viridis',
                 extent=[0, plot_data[i].shape[1]*trace_interval, plot_data[i].shape[0]*sample_interval*1e9, 0],
-                vmin=-np.amax(np.abs(plot_data[i]))/5, vmax=np.amax(np.abs(plot_data[i]))/5
+                vmin=-np.amax(np.abs(plot_data[i]))/10, vmax=np.amax(np.abs(plot_data[i]))/10
                 )
     else:
-        im = ax.imshow(plot_data[i], aspect='auto', cmap='seismic',
+        im = ax.imshow(plot_data[i], aspect='auto', cmap='viridis',
                     extent=[0, plot_data[i].shape[1]*trace_interval, plot_data[i].shape[0]*sample_interval*1e9, 0],
-                    vmin=-30, vmax=30
+                    vmin=-10, vmax=10
                     )
     ax.tick_params(axis='both', which='major', labelsize=font_small)
     #ax.set_title(title[i], fontsize=font_large)
@@ -330,14 +330,14 @@ fig, ax = plt.subplots(len(plot_data), 1, figsize=(18, 20), tight_layout=True, s
 
 for i in range(len(plot_data)):
     if i == 4:
-        im = ax[i].imshow(plot_data[i], aspect='auto', cmap='seismic',
+        im = ax[i].imshow(plot_data[i], aspect='auto', cmap='viridis',
                 extent=[0, plot_data[i].shape[1]*trace_interval, plot_data[i].shape[0]*sample_interval*1e9, 0],
-                vmin=-np.amax(np.abs(plot_data[i]))/5, vmax=np.amax(np.abs(plot_data[i]))/5
+                vmin=-np.amax(np.abs(plot_data[i]))/10, vmax=np.amax(np.abs(plot_data[i]))/10
                 )
     else:
-        im = ax[i].imshow(plot_data[i], aspect='auto', cmap='seismic',
+        im = ax[i].imshow(plot_data[i], aspect='auto', cmap='viridis',
                     extent=[0, plot_data[i].shape[1]*trace_interval, plot_data[i].shape[0]*sample_interval*1e9, 0],
-                    vmin=-30, vmax=30
+                    vmin=-10, vmax=10
                     )
     ax[i].tick_params(axis='both', which='major', labelsize=font_small)
     ax[i].set_title(title[i], fontsize=font_large)
