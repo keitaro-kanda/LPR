@@ -6,6 +6,8 @@ from tqdm import tqdm
 import argparse
 from natsort import natsorted
 
+
+"""
 #* Parse command line arguments
 parser = argparse.ArgumentParser(
     prog='read_binary.py',
@@ -15,18 +17,19 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument('path_type', choices = ['local', 'SSD'], help='Choose the path type')
 args = parser.parse_args()
+"""
 
 
 
 
 #* Set the data folder path
-if args.path_type == 'local':
-    data_folder_path = 'LPR_2B/original_data'
-elif args.path_type == 'SSD':
-    data_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B/original_binary'
-else:
-    print('Invalid path type, please choose either local or SSD')
-    exit()
+# if args.path_type == 'local':
+#    data_folder_path = 'LPR_2B/original_data'
+# elif args.path_type == 'SSD':
+data_folder_path = '/Volumes/SSD_Kanda_BUFFALO/LPR/LPR_2B/original_binary'
+# else:
+#     print('Invalid path type, please choose either local or SSD')
+#     exit()
 
 
 
@@ -194,7 +197,7 @@ for filename in tqdm(natsorted(os.listdir(data_folder_path)), desc='Total Progre
     sequence_id = filename.split('_')[-2]
 
     #* Make output directory for loaded_data of each sequence
-    loaded_data_output_dir = os.path.join(loaded_data_dir, sequence_id)
+    loaded_data_output_dir = os.path.join(loaded_data_dir, sequence_id) # Save the data in 'loaded_data/sequence_id'
     os.makedirs(loaded_data_output_dir, exist_ok=True)
 
     #* Process check print
@@ -203,7 +206,7 @@ for filename in tqdm(natsorted(os.listdir(data_folder_path)), desc='Total Progre
     records = int(file_size / 8307) if channel in ['LPR_2B', 'LPR_2A'] else int(file_size / 32883)
 
     #* Make list for ECHO data obtained each sequence
-    save_data = np.zeros((2052, records))
+    save_data = np.zeros((2055, records))
 
     #* Load the of each records
     for record_index in tqdm(range(records), desc=sequence_id):
@@ -267,13 +270,21 @@ for filename in tqdm(natsorted(os.listdir(data_folder_path)), desc='Total Progre
         save_data[1, record_index] = loaded_data['XPOSITION'][0]
         save_data[2, record_index] = loaded_data['YPOSITION'][0]
         save_data[3, record_index] = loaded_data['ZPOSITION'][0]
-        save_data[4:, record_index] = loaded_data['ECHO_DATA']
+        save_data[4, record_index] = loaded_data['REFERENCE_POINT_XPOSITION'][0]
+        save_data[5, record_index] = loaded_data['REFERENCE_POINT_YPOSITION'][0]
+        save_data[6, record_index] = loaded_data['REFERENCE_POINT_ZPOSITION'][0]
+        save_data[7:, record_index] = loaded_data['ECHO_DATA']
         #print('ECHO data shape:', np.array(loaded_data['ECHO_DATA']).shape)
 
 
     #* Save the ECHO data as a txt file
+    header = ['VELOCITY', 'XPOSITION', 'YPOSITION', 'ZPOSITION',
+                'REFERENCE_POINT_XPOSITION', 'REFERENCE_POINT_YPOSITION', 'REFERENCE_POINT_ZPOSITION',
+                'Observed amplitude (7:)']
+
     save_data[0] = save_data[0].astype(str)
-    np.savetxt(f"{ECHO_dir}/data_{sequence_id}.txt", save_data, )
+
+    np.savetxt(f"{ECHO_dir}/data_{sequence_id}.txt", save_data, header=' '.join(header), comments='') # ヘッダーを追加
     print('Finished saving ECHO data')
     print('ECHO shape:', save_data.shape)
     print('  ')
