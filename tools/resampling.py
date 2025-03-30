@@ -10,6 +10,7 @@ from scipy import ndimage
 
 
 #* Parse command line arguments
+"""
 parser = argparse.ArgumentParser(
     prog='resampling.py',
     description='Resampling ECHO data',
@@ -25,7 +26,8 @@ if args.path_type == 'local' or args.path_type == 'test':
     data_folder_path = 'LPR_2B/ECHO'
 elif args.path_type == 'SSD':
     data_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B/ECHO'
-
+"""
+data_folder_path = '/Volumes/SSD_Kanda_BUFFALO/LPR/LPR_2B/loaded_data_echo_position'
 
 #* Define output folder path
 output_dir = os.path.join(os.path.dirname(data_folder_path), 'Resampled_Data')
@@ -48,8 +50,8 @@ if not os.path.exists(position_output_dir):
 #medf = np.zeros(0)
 
 def resampling(data): # input is 2D array including position data
-    positions = data[:4, :]
-    signals = data[4:, :]
+    positions = data[:7, :] # data containes header.
+    signals = data[7:, :] # 0-6: velocity and position data
     #* Do not consider first 300 datapoints
     img = signals[300:, :]
 
@@ -82,11 +84,11 @@ def resampling(data): # input is 2D array including position data
 
     idx = np.where(medf == 1)[0]
     if np.sum(idx) == 0:
-        data_filtered = data[:, idx]
+        data_filtered = signals[:, idx]
         positions_filtered = positions[:, idx]
         print('No interesting data found')
     else:
-        data_filtered = data[:, idx]
+        data_filtered = signals[:, idx]
         positions_filtered = positions[:, idx]
         print('Raw data shape was: ', data.shape)
         print('Filtered data shape is: ', data_filtered.shape)
@@ -95,6 +97,9 @@ def resampling(data): # input is 2D array including position data
         #* Save filtered data as .txt file
         np.savetxt(txt_output_dir + '/' + str(sequence_id) + '_resampled.txt', data_filtered, delimiter=' ')
         np.savetxt(position_output_dir + '/' + str(sequence_id) + '_resampled_position.txt', positions_filtered, delimiter=' ')
+        header_position = 'velocity, position_x, position_y, position_z, reference_point_x, reference_point_y, reference_point_z'
+        np.savetxt(position_output_dir + '/' + str(sequence_id) + '_resampled_position.txt',
+                    positions_filtered, delimiter=' ', header=header_position)
 
     return sobelx, med_denoised, med, medf, data_filtered, positions_filtered
 
@@ -110,7 +115,7 @@ for ECHO_data in tqdm(natsorted(os.listdir(data_folder_path))):
         continue
 
     ECHO_data_path = os.path.join(data_folder_path, ECHO_data)
-    raw_data = np.loadtxt(ECHO_data_path, delimiter=' ', skiprows=0)
+    raw_data = np.loadtxt(ECHO_data_path, delimiter=' ', skiprows=1) # skip the header
     sequence_id = ECHO_data.split('_')[-1].split('.')[0]
 
     print('---------------------------------')
@@ -122,7 +127,7 @@ for ECHO_data in tqdm(natsorted(os.listdir(data_folder_path))):
     print('   ')
 
     sobelx, med_denoised, med, medf, data_filtered, positions_filtered = resampling(raw_data)
-    data_filtered4plot = np.zeros(raw_data.shape)
+    data_filtered4plot = np.zeros((2048, data_filtered.shape[1]))
     data_filtered4plot[:, :data_filtered.shape[1]] = data_filtered
 
 
