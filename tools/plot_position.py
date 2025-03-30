@@ -31,10 +31,13 @@ elif args.path_type == 'SSD':
 
 def load_positions():
     VELOCITY = []
-    XPOSITION = []
-    YPOSITION = []
-    ZPOSITION = []
+    XPOSITION = [] # Reference point cordinate
+    YPOSITION = [] # Reference point cordinate
+    ZPOSITION = [] # Reference point cordinate
     distance = []
+    X_ref = [] # Landing-site cordinate
+    Y_ref = [] # Landing-site cordinate
+    Z_ref = [] # Landing-site cordinate
     for data_file in tqdm(natsorted(os.listdir(position_folder_path))):
         #* Load only .txt files
         if not data_file.endswith('.txt'):
@@ -52,6 +55,9 @@ def load_positions():
             XPOSITION.append(data[1, i])
             YPOSITION.append(data[2, i])
             ZPOSITION.append(data[3, i])
+            X_ref.append(data[4, i])
+            Y_ref.append(data[5, i])
+            Z_ref.append(data[6, i])
 
             distance.append(distance[-1] + np.sqrt((XPOSITION[i] - XPOSITION[i-1])**2 + (YPOSITION[i] - YPOSITION[i-1])**2) if distance else 0)
 
@@ -143,7 +149,7 @@ def plot():
 
         #* Load position data
         if positions4plot.size > 0:
-            positions4plot = np.concatenate((positions4plot, positions))
+            positions4plot = np.hstack((positions4plot, positions))
         else:
             positions4plot = positions
 
