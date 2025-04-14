@@ -7,6 +7,7 @@ from natsort import natsorted
 import argparse
 
 
+"""
 #* Parse command line arguments
 parser = argparse.ArgumentParser(
     prog='plot_position.py',
@@ -25,11 +26,20 @@ if args.path_type == 'local':
     position_folder_path = 'LPR_2B/Resampled_Data/position'
 elif args.path_type == 'SSD':
     #data_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B/ECHO'
-    position_folder_path = '/Volumes/SSD_Kanda_BUFFALO/LPR/LPR_2B/Resampled_Data/position'
+"""
+
+#* Data folder path
+position_folder_path = '/Volumes/SSD_Kanda_BUFFALO/LPR/LPR_2B/Resampled_Data/position'
+
+#* Output folder path
+output_dir = os.path.join(os.path.dirname(position_folder_path), 'position_plot')
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
 
 
 
 def load_positions():
+    alternative_seq_id = []
     VELOCITY = []
     XPOSITION = [] # Reference point cordinate
     YPOSITION = [] # Reference point cordinate
@@ -38,7 +48,10 @@ def load_positions():
     X_ref = [] # Landing-site cordinate
     Y_ref = [] # Landing-site cordinate
     Z_ref = [] # Landing-site cordinate
+
+    id = 0 # alternative to sequence_id
     for data_file in tqdm(natsorted(os.listdir(position_folder_path))):
+        id += 1
         #* Load only .txt files
         if not data_file.endswith('.txt'):
             continue
@@ -50,7 +63,10 @@ def load_positions():
 
         #* Load record_count, XPOSITION, YPOSITION, ZPOSITION
         for i in range(data.shape[1]):
+            #* Extract sequence_id and convert to float
+            alternative_seq_id.append(id)
 
+            #* Extract data
             VELOCITY.append(data[0, i])
             XPOSITION.append(data[1, i])
             YPOSITION.append(data[2, i])
@@ -61,13 +77,18 @@ def load_positions():
 
             distance.append(distance[-1] + np.sqrt((XPOSITION[i] - XPOSITION[i-1])**2 + (YPOSITION[i] - YPOSITION[i-1])**2) if distance else 0)
 
-    #* Save record_count, XPOSITION, YPOSITION, ZPOSITION as 4xN array
-    positions = np.array([VELOCITY, XPOSITION, YPOSITION, ZPOSITION, distance])
-    print('positions shape:', positions.shape)
-
-    #* Save positions with header
-    header = 'Velocity X Y Z distance'
-    np.savetxt(os.path.join(os.path.dirname(position_folder_path), 'position.txt'), positions.T, delimiter=' ', header=header, comments='')
+    #* 保存用に配列を作成
+    positions_data = np.column_stack([
+        alternative_seq_id, VELOCITY, XPOSITION, YPOSITION, ZPOSITION, X_ref, Y_ref, Z_ref
+    ])
+    header = 'alternative_sequence_id Velocity XPOSITION YPOSITION ZPOSITION x_ref y_ref z_ref'
+    
+    #* 全て浮動小数点数データとして保存
+    #header = 'sequence_id Velocity XPOSITION YPOSITION ZPOSITION x_ref y_ref z_ref'
+    np.savetxt(os.path.join(output_dir, 'position.txt'), positions_data,
+                #fmt='%.0e %.18e %.18e %.18e %.18e %.18e %.18e %.18e',  # sequence_idは小数点なしの浮動小数点数として保存
+                delimiter=' ', header=header, comments='')
+    
     print('Save positions as position.txt')
 
 
@@ -86,7 +107,18 @@ def load_positions():
             total_z = np.append(total_z, total_z[-1] + ZPOSITION[i])
             #total_z = np.append(total_z, ZPOSITION[i])
 
-    #* Plot positions
+    #* Plot Velocity
+    fig = plt.figure(figsize=(20, 10), tight_layout=True)
+    plt.plot(VELOCITY)
+    plt.grid()
+    plt.xlabel('Record number', fontsize=20)
+    plt.ylabel('Velocity [m/s]', fontsize=20)
+    plt.tick_params(labelsize=18)
+    plt.savefig(os.path.join(output_dir, 'plot_velocity.png'))
+    plt.show()
+
+
+    #* Plot XPOSITION, YPOSITION, ZPOSITION
     plot_list = [XPOSITION, YPOSITION, ZPOSITION]
     y_label = ['x [m]', 'y [m]', 'z [m]']
     fig, ax = plt.subplots(3, 1, figsize=(20, 15), tight_layout=True, sharex=True)
@@ -96,9 +128,27 @@ def load_positions():
         ax[i].set_xlabel('Record number' , fontsize=20)
         ax[i].set_ylabel(y_label[i], fontsize=20)
         ax[i].tick_params(labelsize=18)
+    plt.suptitle('XPOSITION, YPOSITION, ZPOSITION', fontsize=24)
 
-    plt.savefig(os.path.join(position_folder_path, 'plot_position.png'))
+    plt.savefig(os.path.join(output_dir, 'plot_position.png'))
     plt.show()
+
+
+    #* Plot x_ref, y_ref, z_ref
+    plot_list = [X_ref, Y_ref, Z_ref]
+    y_label = ['x [m]', 'y [m]', 'z [m]']
+    fig, ax = plt.subplots(3, 1, figsize=(20, 15), tight_layout=True, sharex=True)
+    for i in range(len(plot_list)):
+        ax[i].plot(plot_list[i])
+        ax[i].grid()
+        ax[i].set_xlabel('Record number' , fontsize=20)
+        ax[i].set_ylabel(y_label[i], fontsize=20)
+        ax[i].tick_params(labelsize=18)
+    plt.suptitle('x_ref, y_ref, z_ref', fontsize=24)
+
+    plt.savefig(os.path.join(output_dir, 'plot_reference.png'))
+    plt.show()
+
 
     #* Plot tolal z
     fig = plt.figure(figsize=(20, 10), tight_layout=True)
@@ -108,8 +158,9 @@ def load_positions():
     plt.ylabel('Z [m]', fontsize=20)
     plt.tick_params(labelsize=18)
 
-    plt.savefig(os.path.join(position_folder_path, 'total_z.png'))
+    plt.savefig(os.path.join(output_dir, 'total_z.png'))
     plt.show()
+
 
     #* Plot track of CE-4
     fig = plt.figure(figsize=(20, 20), tight_layout=True)
@@ -119,7 +170,7 @@ def load_positions():
     plt.ylabel('North-South', fontsize=20)
     plt.tick_params(labelsize=18)
 
-    plt.savefig(os.path.join(position_folder_path, 'plot_track.png'))
+    plt.savefig(os.path.join(output_dir, 'plot_track.png'))
     plt.show()
 
 
@@ -224,7 +275,7 @@ def plot():
     #* set xticks
     fig.supxlabel('Sequence ID', fontsize=fontsize_large)
 
-    plt.savefig(os.path.join(position_folder_path, 'plot_position.png'))
+    plt.savefig(os.path.join(output_dir, 'plot_position.png'))
     plt.show()
 
 
@@ -252,13 +303,15 @@ def plot():
     plt.tick_params(labelsize=fontsize_medium)
 
 
-    plt.savefig(os.path.join(position_folder_path, 'plot_track.png'))
+    plt.savefig(os.path.join(output_dir, 'plot_track.png'))
     plt.show()
 
+load_positions()
+#plot()
 
 
 
-
+"""
 if args.function_type == 'load':
     load_positions()
 elif args.function_type == 'plot':
@@ -269,3 +322,4 @@ elif args.function_type == 'both':
 else:
     print('Invalid function type')
     exit()
+"""
