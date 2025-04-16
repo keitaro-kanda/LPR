@@ -54,14 +54,14 @@ class PlotParams:
 
     def _compute_params(self):
         if self.data_type == 'Bscan':
-            cmap = 'seismic'
-            vmin = -np.amax(np.abs(self.data_array)) / 5
-            vmax = np.amax(np.abs(self.data_array)) / 5
+            cmap = 'viridis'
+            vmin = -np.amax(np.abs(self.data_array)) / 10
+            vmax = np.amax(np.abs(self.data_array)) / 10
             xlabel = 'Distance [m]'
             ylabel = 'Time [ns]'
             cbar_label = 'Amplitude'
         elif self.data_type == 'pulse_compression':
-            cmap = 'seismic'
+            cmap = 'viridis'
             cbar_max = np.amax(np.abs(self.data_array)) / 5
             vmin = -cbar_max
             vmax = cbar_max
@@ -69,7 +69,7 @@ class PlotParams:
             ylabel = 'Time [ns]'
             cbar_label = 'Amplitude'
         elif self.data_type == 'fk_migration':
-            cmap = 'jet'
+            cmap = 'viridis'
             vmin = 0
             vmax = np.amax(np.abs(self.data_array)) / 5
             xlabel = 'Distance [m]'
@@ -91,7 +91,7 @@ def plot(data_array, x1, x2, y1, y2, data_type):
     cmap, vmin, vmax, xlabel, ylabel, cbar_label = plot_params.get_params()
 
     #* Plot
-    plt.figure(figsize=(12, 8), tight_layout=True)
+    plt.figure(figsize=(18, 8), tight_layout=True)
     plt.imshow(data_array, aspect='auto', cmap=cmap,
                 extent=[x1, x2, y2, y1],
                 vmin=vmin, vmax=vmax)
@@ -121,10 +121,10 @@ def plot(data_array, x1, x2, y1, y2, data_type):
 if args.data_type == 'fk_migration':
     v = 299792458 / np.sqrt(3.4)  # [m/s]
     x_first_list = np.arange(0, data.shape[1] * trace_interval, 100) # [m]
-    y_first_list = np.arange(0, data.shape[0] * sample_interval * v, 200e-9 * v / 2) # [m]
+    y_first_list = np.arange(0, data.shape[0] * sample_interval * v, 100e-9 * v / 2) # [m]
 else:
     x_first_list = np.arange(0, data.shape[1] * trace_interval, 100) # [m]
-    y_first_list = np.arange(0, data.shape[0] * sample_interval * 1e9, 200) # [ns]
+    y_first_list = np.arange(0, data.shape[0] * sample_interval * 1e9, 100) # [ns]
 
 
 for x_first in tqdm(x_first_list):
@@ -132,10 +132,10 @@ for x_first in tqdm(x_first_list):
         #* Define the last point of the trimmed data
         if args.data_type == 'fk_migration':
             x_last = min(data.shape[1] * trace_interval, x_first + 100)
-            y_last = min(data.shape[0] * sample_interval * v, y_first + 200e-9 * v /2)
+            y_last = min(data.shape[0] * sample_interval * v, y_first + 100e-9 * v /2)
         else:
             x_last = min(data.shape[1] * trace_interval, x_first + 100) # [m]
-            y_last = min(data.shape[0] * sample_interval * 1e9, y_first + 200) # [ns]
+            y_last = min(data.shape[0] * sample_interval * 1e9, y_first + 100) # [ns]
 
         #* Define trimming area in index
         x_first_idx = int(x_first / trace_interval) # [index]
