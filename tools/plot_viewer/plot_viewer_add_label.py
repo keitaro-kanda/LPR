@@ -5,46 +5,39 @@ import numpy as np
 import pyqtgraph as pg
 from PyQt5 import QtCore, QtGui, QtWidgets
 import matplotlib as mpl
-import matplotlib.pyplot as plt
 from scipy.signal import hilbert
 
 def load_data(file_path):
-    """テキストまたはCSVファイルからデータを読み込み"""
     print("データを読み込んでいます...")
     data = np.loadtxt(file_path, delimiter=' ')
     print("データの読み込みが完了しました。")
     return data
 
 def get_color_for_label(label):
-    """ラベル番号に応じた色(R,G,B)を返す"""
     mapping = {
-        1: (255, 0, 0),      # 赤
-        2: (0, 255, 0),      # 緑
-        3: (0, 0, 255),      # 青
-        4: (255, 255, 0),    # 黄
-        5: (255, 0, 255),    # マゼンタ
-        6: (0, 255, 255)     # シアン
+        1: (255, 0, 0),
+        2: (0, 255, 0),
+        3: (0, 0, 255),
+        4: (255, 255, 0),
+        5: (255, 0, 255),
+        6: (0, 255, 255),
     }
     return mapping.get(label, (255, 255, 255))
 
 class LabelMarker(QtWidgets.QGraphicsEllipseItem):
     """
-    B-scan上に追加するマーカーアイテム。
-    クリック位置を中心として、半径1の縁無しの円を描画し、
-    ラベル番号に応じた色で塗りつぶします。
-    ダブルクリックで編集・削除のコンテキストメニューが表示されます。
+    半径1の縁無し点を描画し、ラベル番号に応じた色で塗りつぶすマーカー。
+    ダブルクリックで編集／削除メニューを表示し、time_top/bottom入力も可能。
     """
-    def __init__(self, x, y, label_value, key, on_edit, on_delete, radius=0.7, *args, **kwargs):
-        # (x, y) を中心とするように位置補正
-        super().__init__(x - radius, y - radius, 2 * radius, 2 * radius, *args, **kwargs)
+    def __init__(self, x, y, info_dict, key, on_edit, on_delete, radius=1, *args, **kwargs):
+        super().__init__(x - radius, y - radius, 2*radius, 2*radius, *args, **kwargs)
         self.key = key
-        self.label_value = label_value
+        self.info = info_dict    # {"x":..., "y":..., "label":..., "time_top":..., "time_bottom":...}
         self.on_edit = on_edit
         self.on_delete = on_delete
-        self.radius = radius
-        r, g, b = get_color_for_label(label_value)
+        r, g, b = get_color_for_label(self.info["label"])
         self.setBrush(QtGui.QBrush(QtGui.QColor(r, g, b)))
-        self.setPen(QtGui.QPen(QtCore.Qt.NoPen))  # 縁無し
+        self.setPen(QtGui.QPen(QtCore.Qt.NoPen))
         self.setFlag(QtWidgets.QGraphicsItem.ItemIsSelectable, True)
         self.setAcceptHoverEvents(True)
 
@@ -54,42 +47,65 @@ class LabelMarker(QtWidgets.QGraphicsEllipseItem):
         deleteAct = menu.addAction("Delete Label")
         action = menu.exec_(ev.screenPos())
         if action == editAct:
-            try:
-                current_value = int(self.label_value)
-            except:
-                current_value = 1
-            new_value, ok = QtWidgets.QInputDialog.getInt(
-                None, "Edit Label", "Enter new label (1-6):",
-                current_value, 1, 6)
-            if ok:
-                self.label_value = new_value
-                r, g, b = get_color_for_label(new_value)
-                self.setBrush(QtGui.QBrush(QtGui.QColor(r, g, b)))
-                self.on_edit(self.key, new_value)
+            # 1) ラベル番号編集
+            current_label = int(self.info.get("label", 1))
+            new_label, ok_label = QtWidgets.QInputDialog.getInt(
+                None, "Edit Label", "Enter new label (1–6):",
+                current_label, 1, 6)
+            if not ok_label:
+                ev.accept()
+                return
+            self.info["label"] = new_label
+
+            # 2) ラベルが 3 または 6 の場合、time_top/bottom を入力
+            if new_label in (3, 6):
+                # デフォルト値を数値保証
+                default_top = self.info.get("time_top")
+                default_top = float(default_top) if isinstance(default_top, (int, float)) else 0.0
+                t_top, ok_top = QtWidgets.QInputDialog.getDouble(
+                    None, "time_top [ns]", "Enter time_top (ns):",
+                    default_top, 0.0, 1e6, 1)
+                if not ok_top:
+                    ev.accept()
+                    return
+                default_bot = self.info.get("time_bottom")
+                default_bot = float(default_bot) if isinstance(default_bot, (int, float)) else 0.0
+                t_bot, ok_bot = QtWidgets.QInputDialog.getDouble(
+                    None, "time_bottom [ns]", "Enter time_bottom (ns):",
+                    default_bot, 0.0, 1e6, 1)
+                if not ok_bot:
+                    ev.accept()
+                    return
+                self.info["time_top"] = round(t_top, 1)
+                self.info["time_bottom"] = round(t_bot, 1)
+            else:
+                # 3/6 以外なら時刻情報をクリア
+                self.info["time_top"] = None
+                self.info["time_bottom"] = None
+
+            # 3) 色の更新 & コールバック
+            r, g, b = get_color_for_label(new_label)
+            self.setBrush(QtGui.QBrush(QtGui.QColor(r, g, b)))
+            self.on_edit(self.key, self.info)
+
         elif action == deleteAct:
             self.scene().removeItem(self)
             self.on_delete(self.key)
+
         ev.accept()
 
 class CustomViewBox(pg.ViewBox):
-    """
-    カスタム ViewBox:
-    マウス左クリックイベントを捕捉し、クリック位置（View座標系）を指定のコールバックに渡す。
-    すでに LabelMarker 上でクリックされた場合は、新たなラベル追加を行わない。
-    """
     def __init__(self, on_click_callback, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.on_click_callback = on_click_callback
 
     def mouseClickEvent(self, ev):
-        # シーン上のアイテムを取得（クリック位置をシーン座標から取得）
-        scene_items = self.scene().items(ev.scenePos())
-        for it in scene_items:
+        # 既存マーカー上のクリックはスキップ
+        for it in self.scene().items(ev.scenePos()):
             if isinstance(it, LabelMarker):
                 ev.ignore()
                 return
         if ev.button() == QtCore.Qt.LeftButton:
-            # シーン座標から View 座標への変換
             viewPos = self.mapSceneToView(ev.scenePos())
             self.on_click_callback(viewPos)
             ev.accept()
@@ -97,184 +113,171 @@ class CustomViewBox(pg.ViewBox):
             ev.ignore()
 
 def main():
-    # 入力プロンプトでファイルパスを取得
     bscan_path = input("B-scanデータファイルのパスを入力してください:").strip()
-    json_input = input("JSONファイルのパスを入力してください（空の場合はB-scanファイルと同じディレクトリのlabels.jsonを使用）:").strip()
+    json_input = input("JSONファイルのパスを入力してください（空→同ディレクトリ _labels.json）:").strip()
     if not json_input:
         json_input = bscan_path.replace('.txt', '_labels.json')
-    print('   ')
-    
-    # B-scanデータとエンベロープの読み込み
+    print()
+
     data = load_data(bscan_path)
     envelop = np.abs(hilbert(data, axis=0))
 
-    # パラメータ設定
-    sample_interval = 0.312500e-9    # [s]
-    trace_interval = 3.6e-2          # [m]
-    x_start = 0
-    x_end = data.shape[1] * trace_interval
-    y_start = 0
-    y_end = data.shape[0] * sample_interval / 1e-9  # ns換算
+    sample_interval = 0.312500e-9
+    trace_interval = 3.6e-2
+    x_start, x_end = 0, data.shape[1] * trace_interval
+    y_start, y_end = 0, data.shape[0] * sample_interval / 1e-9
 
-    # Qtアプリケーションとウィンドウ生成
+    # JSON 読み込み & マイグレーション
+    labels_dict = {}
+    if os.path.exists(json_input):
+        try:
+            jd = json.load(open(json_input, 'r'))
+            for k, v in jd.get("results", {}).items():
+                # 旧形式リスト→新形式 dict に変換
+                if isinstance(v, list) and len(v) >= 3:
+                    labels_dict[k] = {
+                        "x": v[0], "y": v[1], "label": v[2],
+                        "time_top": (v[3] if len(v) > 3 else None),
+                        "time_bottom": (v[4] if len(v) > 4 else None)
+                    }
+                else:
+                    labels_dict[k] = v
+        except Exception as e:
+            print("JSON読み込みエラー:", e)
+
+    def save():
+        with open(json_input, 'w') as f:
+            json.dump({"results": labels_dict}, f, indent=4)
+
+    # 再インデックス（1,2,3…）
+    items = {}
+    def reindex():
+        new_ld, new_items = {}, {}
+        for i, oldk in enumerate(sorted(labels_dict, key=lambda x: int(x)), start=1):
+            newk = str(i)
+            new_ld[newk] = labels_dict[oldk]
+            if oldk in items:
+                marker = items[oldk]
+                marker.key = newk
+                new_items[newk] = marker
+        labels_dict.clear()
+        labels_dict.update(new_ld)
+        items.clear()
+        items.update(new_items)
+        save()
+
+    def on_edit(key, info):
+        labels_dict[key] = info
+        save()
+
+    def on_delete(key):
+        if key in labels_dict:
+            del labels_dict[key]
+        reindex()
+
+    # マーカー追加コールバック
+    def on_click(viewPos):
+        x, y = viewPos.x(), viewPos.y()
+        if not (x_start <= x <= x_end and y_start <= y <= y_end):
+            return
+        lab, ok = QtWidgets.QInputDialog.getInt(None, "Add Label", "Enter label (1–6):", 1, 1, 6)
+        if not ok:
+            return
+        tt = tb = None
+        if lab in (3, 6):
+            tt, ok1 = QtWidgets.QInputDialog.getDouble(None, "time_top [ns]", "Enter time_top:", 0.0, 0.0, 1e6, 1)
+            if not ok1:
+                return
+            tb, ok2 = QtWidgets.QInputDialog.getDouble(None, "time_bottom [ns]", "Enter time_bottom:", 0.0, 0.0, 1e6, 1)
+            if not ok2:
+                return
+            tt, tb = round(tt, 1), round(tb, 1)
+        key = str(len(labels_dict) + 1)
+        info = {"x": x, "y": y, "label": lab, "time_top": tt, "time_bottom": tb}
+        labels_dict[key] = info
+        save()
+        m = LabelMarker(x, y, info, key, on_edit, on_delete, radius=1)
+        plot.addItem(m)
+        items[key] = m
+
     app = QtWidgets.QApplication(sys.argv)
-    win = pg.GraphicsLayoutWidget(show=True, title=f"B-scan Viewer: {bscan_path}")
+    win = pg.GraphicsLayoutWidget(show=True, title=bscan_path)
     win.resize(2400, 800)
 
-    # Matplotlibカラーマップ（viridis）設定
-    cmap_Bscan_mpl = mpl.colormaps.get_cmap('viridis')
-    lut = (cmap_Bscan_mpl(np.linspace(0, 1, 256)) * 255).astype(np.uint8)
-    cmap_Bscan = pg.ColorMap(pos=np.linspace(0, 1, 256), color=lut)
+    # カラーマップ
+    cmap = mpl.colormaps.get_cmap('viridis')
+    lut = (cmap(np.linspace(0, 1, 256)) * 255).astype(np.uint8)
+    cpg = pg.ColorMap(np.linspace(0, 1, 256), lut)
 
-    # レイアウト設定（B-scan領域、カラーバー、A-scan領域）
     win.ci.layout.setColumnStretchFactor(0, 8)
     win.ci.layout.setColumnStretchFactor(1, 2)
     win.ci.layout.setColumnStretchFactor(2, 4)
 
-    # 既存のラベル情報の読み込み（存在すれば）
-    labels_dict = {}    # キー: "1", "2", …, 値: [x, y, ラベル番号]
-    if os.path.exists(json_input):
-        try:
-            with open(json_input, 'r') as f:
-                json_data = json.load(f)
-                if "results" in json_data:
-                    labels_dict = json_data["results"]
-        except Exception as e:
-            print("JSON読み込みエラー:", e)
+    # B-scan PlotItem
+    vb = CustomViewBox(on_click)
+    plot = pg.PlotItem(viewBox=vb, title="B-scan")
+    plot.setLabel('bottom', 'x [m]')
+    plot.setLabel('left', 'Time [ns]')
+    plot.showGrid(True, True)
+    plot.setXRange(x_start, x_end)
+    plot.setYRange(y_start, y_end)
+    plot.invertY(True)
 
-    def save_labels():
-        with open(json_input, "w") as f:
-            json.dump({"results": labels_dict}, f, indent=4)
-
-    # LabelMarker オブジェクト管理用辞書
-    label_items = {}
-
-    # 再インデックス用関数：現在のラベル辞書および marker のキーを 1, 2, 3, ... に再設定する。
-    def reindex_labels():
-        new_labels_dict = {}
-        new_label_items = {}
-        # 現在のキーを数値順にソート
-        sorted_keys = sorted(labels_dict.keys(), key=lambda k: int(k))
-        for i, old_key in enumerate(sorted_keys, start=1):
-            new_key = str(i)
-            new_labels_dict[new_key] = labels_dict[old_key]
-            if old_key in label_items:
-                marker = label_items[old_key]
-                marker.key = new_key
-                new_label_items[new_key] = marker
-        labels_dict.clear()
-        labels_dict.update(new_labels_dict)
-        label_items.clear()
-        label_items.update(new_label_items)
-        save_labels()
-
-    def on_label_edit(key, new_label):
-        if key in labels_dict:
-            x, y, _ = labels_dict[key]
-            labels_dict[key] = [x, y, new_label]
-            save_labels()
-
-    def on_label_delete(key):
-        if key in labels_dict:
-            del labels_dict[key]
-            # 再インデックスしてキーを連番に更新
-            reindex_labels()
-
-    # B-scan領域でのクリック時にラベル（マーカー）を追加
-    def on_viewbox_click(viewPos):
-        x = viewPos.x()
-        y = viewPos.y()
-        # 座標範囲チェック
-        if not (x_start <= x <= x_end and y_start <= y <= y_end):
-            return
-        label_value, ok = QtWidgets.QInputDialog.getInt(
-            None, "Add Label", "Enter label (1-6):", 1, 1, 6)
-        if ok:
-            key = str(len(labels_dict) + 1)
-            labels_dict[key] = [x, y, label_value]
-            save_labels()
-            marker = LabelMarker(x, y, label_value, key, on_label_edit, on_label_delete, radius=1)
-            bscan_plot_item.addItem(marker)
-            label_items[key] = marker
-
-    # CustomViewBox の作成
-    custom_vb = CustomViewBox(on_viewbox_click)
-
-    # PlotItem生成時に custom_vb を viewBox として指定
-    bscan_plot_item = pg.PlotItem(viewBox=custom_vb, title="B-scan")
-    bscan_plot_item.setLabel('bottom', 'x [m]')
-    bscan_plot_item.setLabel('left', 'Time [ns]')
-    bscan_plot_item.showGrid(x=True, y=True, alpha=0.5)
-    bscan_plot_item.setXRange(x_start, x_end)
-    bscan_plot_item.setYRange(y_start, y_end)
-    bscan_plot_item.invertY(True)
-
-    # B-scan画像の ImageItem 作成と設定
-    img = pg.ImageItem()
-    img.setImage(data.T)
+    img = pg.ImageItem(data.T)
     img.setLookupTable(lut)
-    img.setLevels([np.min(data), np.max(data)])
-    img_rect = QtCore.QRectF(x_start, y_start, x_end - x_start, y_end - y_start)
-    img.setRect(img_rect)
-    bscan_plot_item.addItem(img)
+    img.setRect(QtCore.QRectF(x_start, y_start, x_end-x_start, y_end-y_start))
+    plot.addItem(img)
 
-    # JSONから読み込んだ既存ラベルの再描画
-    for key, value in labels_dict.items():
-        x, y, label_value = value
-        marker = LabelMarker(x, y, label_value, key, on_label_edit, on_label_delete, radius=1)
-        bscan_plot_item.addItem(marker)
-        label_items[key] = marker
+    # 既存マーカー復元
+    for k, info in labels_dict.items():
+        m = LabelMarker(info["x"], info["y"], info, k, on_edit, on_delete, radius=1)
+        plot.addItem(m)
+        items[k] = m
 
-    # 以下、A-scan 表示用の設定（元コードの内容を踏襲）
-    ascan_plot_item = pg.PlotItem()
-    ascan_plot_item.setLabel('bottom', 'Amplitude')
-    ascan_plot_item.setLabel('left', 'Time [ns]')
-    ascan_plot_item.showGrid(x=True, y=True, alpha=0.5)
-    ascan_plot_item.setYRange(y_start, y_end)
-    ascan_plot_item.invertY(True)
-    ascan_pen = pg.mkPen(color='w', width=2)
-    env_pen = pg.mkPen(color='r', width=2)
-    ascan_curve = pg.PlotCurveItem(pen=ascan_pen)
-    ascan_plot_item.addItem(ascan_curve)
-    env_curve = pg.PlotCurveItem(pen=env_pen)
-    ascan_plot_item.addItem(env_curve)
-    
-    # 縦線（InfiniteLine）で A-scan 表示位置を指定
-    v_line = pg.InfiniteLine(angle=90, movable=True, label='A-scan plot position')
-    bscan_plot_item.addItem(v_line)
-    initial_x_pos = x_end / 2.0
-    v_line.setPos(initial_x_pos)
-    
+    # A-scan 領域
+    ascan = pg.PlotItem()
+    ascan.setLabel('bottom', 'Amplitude')
+    ascan.setLabel('left', 'Time [ns]')
+    ascan.showGrid(True, True)
+    ascan.setYRange(y_start, y_end)
+    ascan.invertY(True)
+    pen = pg.mkPen('w', width=2)
+    pen2 = pg.mkPen('r', width=2)
+    c1 = pg.PlotCurveItem(pen=pen)
+    c2 = pg.PlotCurveItem(pen=pen2)
+    ascan.addItem(c1)
+    ascan.addItem(c2)
+    vline = pg.InfiniteLine(angle=90, movable=True)
+    plot.addItem(vline)
+    vline.setPos(x_end/2)
+
     def update_ascan():
-        x_pos = v_line.value()
-        trace_index = int(x_pos / trace_interval)
-        if 0 <= trace_index < data.shape[1]:
-            ascan_data = data[:, trace_index]
-            env_data = envelop[:, trace_index]
-            time_axis = np.arange(len(ascan_data)) * sample_interval / 1e-9
-            ascan_curve.setData(x=ascan_data, y=time_axis)
-            env_curve.setData(x=env_data, y=time_axis)
-            ascan_plot_item.setTitle(f"A-scan at x = {x_pos:.2f} [m]")
-            ascan_plot_item.setYRange(*bscan_plot_item.viewRange()[1])
+        xpos = vline.value()
+        idx = int(xpos / trace_interval)
+        if 0 <= idx < data.shape[1]:
+            a = data[:, idx]
+            e = envelop[:, idx]
+            t = np.arange(len(a)) * sample_interval / 1e-9
+            c1.setData(a, t)
+            c2.setData(e, t)
+            ascan.setTitle(f"A-scan at x={xpos:.2f}m")
+            ascan.setYRange(*plot.viewRange()[1])
         else:
-            ascan_curve.clear()
-            ascan_plot_item.setTitle("A-scan (データ範囲外)")
-            ascan_plot_item.setYRange(y_start, y_end)
-    v_line.sigPositionChanged.connect(update_ascan)
+            c1.clear()
+            ascan.setTitle("out of range")
+            ascan.setYRange(y_start, y_end)
+
+    vline.sigPositionChanged.connect(update_ascan)
     update_ascan()
 
-    # カラーバー設定（B-scan画像の右側）
-    max_value = np.abs(data).max()
-    colorbar = pg.ColorBarItem(values=(-max_value/8, max_value/8), colorMap=cmap_Bscan)
+    colorbar = pg.ColorBarItem(values=(-abs(data).max()/8, abs(data).max()/8), colorMap=cpg)
     colorbar.setImageItem(img)
 
-    # プロットアイテムの配置
-    win.addItem(bscan_plot_item, row=0, col=0)
-    win.addItem(colorbar, row=0, col=1)
-    win.addItem(ascan_plot_item, row=0, col=2)
-
+    win.addItem(plot, 0, 0)
+    win.addItem(colorbar, 0, 1)
+    win.addItem(ascan, 0, 2)
     win.show()
     sys.exit(app.exec_())
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
