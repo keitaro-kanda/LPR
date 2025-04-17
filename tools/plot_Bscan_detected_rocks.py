@@ -47,9 +47,9 @@ if not os.path.exists(labels_path):
 with open(labels_path, 'r') as f:
     labels_data = json.load(f)
 results = labels_data.get('results', {})
-x = np.array([v[0] for v in results.values()])
-t = np.array([v[1] for v in results.values()])
-lab = np.array([v[2] for v in results.values()], dtype=int)
+x   = np.array([v['x']            for v in results.values()])
+t   = np.array([v['y']            for v in results.values()])
+lab = np.array([v['label']        for v in results.values()], dtype=int)
 
 # --- パラメータ ---
 sample_interval = 0.312500  # [ns]
@@ -89,7 +89,8 @@ def single_plot(plot_data, label_keys=None, suffix=''):
         vmin = -vmax
     im = ax.imshow(
         plot_data,
-        aspect='equal', cmap='viridis',
+        aspect='auto',
+        cmap='viridis',
         extent=[0, plot_data.shape[1]*trace_interval,
                 plot_data.shape[0]*sample_interval, 0],
         vmin=vmin, vmax=vmax
