@@ -113,4 +113,19 @@ with open(table_txt, 'w') as f:
         f.write(f'{s:.3f}\t{n}\n')
 print('累積データ保存:', table_txt)
 
+# ------------------------------------------------------------------
+# 8. Label‑3 (valid) 詳細ダンプ　　　　　　　　　# <<< NEW (group 3 dump)
+# ------------------------------------------------------------------
+if mask3_valid.any():
+    x3, t3 = x[mask3_valid], t[mask3_valid]
+    top3, bot3 = time_top[mask3_valid], time_bottom[mask3_valid]
+    dump_path = os.path.join(output_dir, 'Label3_detail.txt')
+    with open(dump_path, 'w') as f:
+        f.write('#x\t t\t time_top\t time_bottom\n')
+        for xi, ti, tp, bt in zip(x3, t3, top3, bot3):
+            f.write(f'{xi:.6f}\t{ti:.6f}\t{tp:.3f}\t{bt:.3f}\n')
+    print('Label‑3 詳細を保存:', dump_path)
+else:
+    print('有効な Label‑3 が見つからず、詳細ファイルは作成されませんでした。')
+
 print('すべて完了しました！')
