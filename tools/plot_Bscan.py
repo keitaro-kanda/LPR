@@ -82,12 +82,12 @@ def single_plot(plot_data):
         if use_envelope:
             plt.imshow(plot_data, aspect='auto', cmap='viridis',
                     extent=[0, plot_data.shape[1]*trace_interval, plot_data.shape[0]*sample_interval, 0],
-                    vmin=0, vmax=np.amax(np.abs(plot_data))/10
+                    vmin=0, vmax=np.amax(np.abs(plot_data))/15
                     )
         else:
             plt.imshow(plot_data, aspect='auto', cmap='viridis',
                     extent=[0, plot_data.shape[1]*trace_interval, plot_data.shape[0]*sample_interval, 0],
-                    vmin=-np.amax(np.abs(plot_data))/10, vmax=np.amax(np.abs(plot_data))/10
+                    vmin=-np.amax(np.abs(plot_data))/15, vmax=np.amax(np.abs(plot_data))/10
                     )
     else:
         if use_envelope:

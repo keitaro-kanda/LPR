@@ -55,8 +55,8 @@ class PlotParams:
     def _compute_params(self):
         if self.data_type == 'Bscan':
             cmap = 'viridis'
-            vmin = -np.amax(np.abs(self.data_array)) / 10
-            vmax = np.amax(np.abs(self.data_array)) / 10
+            vmin = -np.amax(np.abs(self.data_array)) / 15
+            vmax = np.amax(np.abs(self.data_array)) / 15
             xlabel = 'Distance [m]'
             ylabel = 'Time [ns]'
             cbar_label = 'Amplitude'
