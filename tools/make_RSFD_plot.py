@@ -62,6 +62,7 @@ er = 9.0
 c  = 299_792_458  # m/s
 sizes_group3 = (time_bottom[mask3_valid] - time_top[mask3_valid]) * 1e-9 * c / np.sqrt(er) * 0.5 * 100  # [cm]
 all_sizes_cm = np.concatenate([size_label1, size_label2, sizes_group3])
+#all_sizes_cm = sizes_group3 # Group3のみだとどうなる？の検証
 if all_sizes_cm.size == 0:
     raise RuntimeError('有効なラベル1–3が見つかりませんでした。')
 
