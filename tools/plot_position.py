@@ -29,7 +29,7 @@ elif args.path_type == 'SSD':
 """
 
 #* Data folder path
-position_folder_path = '/Volumes/SSD_Kanda_BUFFALO/LPR/LPR_2B/Resampled_Data/position'
+position_folder_path = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Resampled_Data_xml/position'
 
 #* Output folder path
 output_dir = os.path.join(os.path.dirname(position_folder_path), 'position_plot')
@@ -98,15 +98,20 @@ def load_positions():
     total_z = np.array([])
     for i in range(len(XPOSITION)):
         if i == 0:
-            total_x = np.array([XPOSITION[i]])
-            total_y = np.array([YPOSITION[i]])
-            total_z = np.array([ZPOSITION[i]])
+            # total_x = np.array([XPOSITION[i]])
+            # total_y = np.array([YPOSITION[i]])
+            # total_z = np.array([ZPOSITION[i]])
+            total_x = np.array([X_ref[0]])
+            total_y = np.array([Y_ref[0]])
+            total_z = np.array([Z_ref[0]])
         else:
-            total_x = np.append(total_x, total_x[-1] + XPOSITION[i])
-            total_y = np.append(total_y, total_y[-1] + YPOSITION[i])
-            total_z = np.append(total_z, total_z[-1] + ZPOSITION[i])
+            # total_x = np.append(total_x, total_x[-1] + XPOSITION[i])
+            # total_y = np.append(total_y, total_y[-1] + YPOSITION[i])
+            # total_z = np.append(total_z, total_z[-1] + ZPOSITION[i])
             #total_z = np.append(total_z, ZPOSITION[i])
-
+            total_x = np.append(total_x, X_ref[i] + XPOSITION[i])
+            total_y = np.append(total_y, Y_ref[i] + YPOSITION[i])
+            total_z = np.append(total_z, Z_ref[i] + ZPOSITION[i])
     #* Plot Velocity
     fig = plt.figure(figsize=(20, 10), tight_layout=True)
     plt.plot(VELOCITY)
@@ -150,21 +155,25 @@ def load_positions():
     plt.show()
 
 
-    #* Plot tolal z
-    fig = plt.figure(figsize=(20, 10), tight_layout=True)
-    plt.plot(total_z)
-    plt.grid()
-    plt.xlabel('Record number', fontsize=20)
-    plt.ylabel('Z [m]', fontsize=20)
-    plt.tick_params(labelsize=18)
+    #* Plot x_ref, y_ref, z_ref
+    plot_list = [total_x, total_y, total_z]
+    y_label = ['x [m]', 'y [m]', 'z [m]']
+    fig, ax = plt.subplots(3, 1, figsize=(20, 15), tight_layout=True, sharex=True)
+    for i in range(len(plot_list)):
+        ax[i].plot(plot_list[i])
+        ax[i].grid()
+        ax[i].set_xlabel('Record number' , fontsize=20)
+        ax[i].set_ylabel(y_label[i], fontsize=20)
+        ax[i].tick_params(labelsize=18)
+    plt.suptitle('total_x, total_y, total_zf', fontsize=24)
 
-    plt.savefig(os.path.join(output_dir, 'total_z.png'))
+    plt.savefig(os.path.join(output_dir, 'plot_total.png'))
     plt.show()
 
 
     #* Plot track of CE-4
     fig = plt.figure(figsize=(20, 20), tight_layout=True)
-    plt.plot(total_y, total_x)
+    plt.plot(total_x, total_y)
     plt.grid()
     plt.xlabel('East-West', fontsize=20)
     plt.ylabel('North-South', fontsize=20)
@@ -254,9 +263,9 @@ def plot():
     axes[1].legend(loc='lower right', fontsize=fontsize_medium)
 
     #* plot reference X, Y, Z
-    axes[2].plot(np.abs(Reference_X), linestyle='-', label='Reference_X')
-    axes[2].plot(np.abs(Reference_Y), linestyle='--', label='Reference_Y')
-    axes[2].plot(np.abs(Reference_Z), linestyle='-.', label='Reference_Z')
+    axes[2].plot(Reference_X, linestyle='-', label='Reference_X')
+    axes[2].plot(Reference_Y, linestyle='--', label='Reference_Y')
+    axes[2].plot(Reference_Z, linestyle='-.', label='Reference_Z')
     axes[2].set_ylabel('Reference point posi [m]', fontsize=fontsize_large)
     axes[2].set_yscale('log')
     axes[2].legend(loc='upper right', fontsize=fontsize_medium)
