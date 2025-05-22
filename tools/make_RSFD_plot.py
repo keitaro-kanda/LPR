@@ -61,6 +61,8 @@ mask3_valid = (lab == 3) & (~np.isnan(time_top)) & (~np.isnan(time_bottom))
 er = 9.0
 c  = 299_792_458  # m/s
 sizes_group3 = (time_bottom[mask3_valid] - time_top[mask3_valid]) * 1e-9 * c / np.sqrt(er) * 0.5 * 100  # [cm]
+sizes_group3_max = (time_bottom[mask3_valid] - time_top[mask3_valid]) * 1e-9 * c / np.sqrt(6) * 0.5 * 100  # [cm] # grpup3のエラー範囲
+sizes_group3_min = (time_bottom[mask3_valid] - time_top[mask3_valid]) * 1e-9 * c / np.sqrt(15) * 0.5 * 100  # [cm] # group3のエラー範囲
 all_sizes_cm = np.concatenate([size_label1, size_label2, sizes_group3])
 #all_sizes_cm = sizes_group3 # Group3のみだとどうなる？の検証
 if all_sizes_cm.size == 0:
@@ -142,8 +144,14 @@ N_exp_fit = k_exp * np.exp(r_exp * D_fit)
 # 8.1 べき則
 plt.figure(figsize=(8, 6))
 plt.scatter(unique_sizes, cum_counts, marker='o', label='Data')
+# エラーバーつきのプロット↓
+# plt.errorbar(unique_sizes[0], cum_counts[0], xerr=[[0], [5]], fmt='o', color='black', capsize=5) # Group1
+# plt.errorbar(unique_sizes[1], cum_counts[1], xerr=[[0], [1]], fmt='o', color='black', capsize=5) # Group2
+# for i in range(2, len(unique_sizes)):
+#     plt.errorbar(unique_sizes[i], cum_counts[i], xerr=[[unique_sizes[i] -sizes_group3_min[i-2]], [sizes_group3_max[i-2] - unique_sizes[i]]], fmt='o', color='black', capsize=5) # Group3
+
 plt.plot(D_fit, N_pow_fit, linestyle='--', linewidth=1.5, color='red',
-         label=f'Power-law: k={k_pow:.2e}, r={r_pow:.3f}, R²={R2_pow:.4f}')
+            label=f'Power-law: k={k_pow:.2e}, r={r_pow:.3f}, R²={R2_pow:.4f}')
 plt.xlabel('Rock size [cm]', fontsize=20)
 plt.ylabel('Cumulative number of rocks', fontsize=20)
 plt.tick_params(labelsize=16)
@@ -160,7 +168,7 @@ print('べき則フィッティングプロット保存:', pow_png)
 plt.figure(figsize=(8, 6))
 plt.scatter(unique_sizes, cum_counts, marker='o', label='Data')
 plt.plot(D_fit, N_exp_fit, linestyle='--', linewidth=1.5, color='green',
-         label=f'Exponential: k={k_exp:.2e}, r={r_exp:.3f}, R²={R2_exp:.4f}')
+            label=f'Exponential: k={k_exp:.2e}, r={r_exp:.3f}, R²={R2_exp:.4f}')
 plt.xlabel('Rock size [cm]', fontsize=20)
 plt.ylabel('Cumulative number of rocks', fontsize=20)
 plt.tick_params(labelsize=16)
@@ -178,8 +186,10 @@ print('指数関数フィッティングプロット保存:', exp_png)
 # ------------------------------------------------------------------
 plt.figure(figsize=(8, 6))
 plt.scatter(unique_sizes, cum_counts, marker='o', label='Data')
-plt.plot(D_fit, N_pow_fit, linestyle='--', linewidth=1.5, color='red', label='Power-law fit')
-plt.plot(D_fit, N_exp_fit, linestyle='--', linewidth=1.5, color='green', label='Exponential fit')
+plt.plot(D_fit, N_pow_fit, linestyle='--', linewidth=1.5, color='red',
+            label=f'Power-law: k={k_pow:.2e}, r={r_pow:.3f}, R²={R2_pow:.4f}')
+plt.plot(D_fit, N_exp_fit, linestyle='--', linewidth=1.5, color='green',
+            label=f'Exponential: k={k_exp:.2e}, r={r_exp:.3f}, R²={R2_exp:.4f}')
 plt.xlabel('Rock size [cm]', fontsize=20)
 plt.ylabel('Cumulative number of rocks', fontsize=20)
 plt.tick_params(labelsize=16)
