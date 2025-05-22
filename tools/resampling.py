@@ -27,10 +27,10 @@ if args.path_type == 'local' or args.path_type == 'test':
 elif args.path_type == 'SSD':
     data_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B/ECHO'
 """
-data_folder_path = '/Volumes/SSD_Kanda_BUFFALO/LPR/LPR_2B/loaded_data_echo_position'
+data_folder_path = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/loaded_data_echo_position_xml'
 
 #* Define output folder path
-output_dir = os.path.join(os.path.dirname(data_folder_path), 'Resampled_Data')
+output_dir = os.path.join(os.path.dirname(data_folder_path), 'Resampled_Data_xml')
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 txt_output_dir = os.path.join(output_dir, 'txt')
