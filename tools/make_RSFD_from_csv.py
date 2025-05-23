@@ -51,7 +51,7 @@ valid = (~np.isnan(diam)) & (~np.isnan(cum_n)) & (diam > 0) & (cum_n > 0)
 if not np.any(valid):
     raise RuntimeError('有効なデータポイントがありません。diameter>0、cumulative number>0 の行を確認してください。')
 
-D = diam[valid]
+D = diam[valid] * 100 # m → cm
 N = cum_n[valid]
 
 # ------------------------------------------------------------------
@@ -108,7 +108,7 @@ plt.figure(figsize=(8,6))
 plt.scatter(D, N, marker='o', label='Data')
 plt.plot(D_fit, N_pow_fit, linestyle='--', linewidth=1.5, color='red',
          label=f'Power-law: k={k_pow:.2e}, r={r_pow:.3f}, R²={R2_pow:.4f}')
-plt.xlabel('Diameter', fontsize=16)
+plt.xlabel('Rock size (cm)', fontsize=16)
 plt.ylabel('Cumulative number', fontsize=16)
 plt.tick_params(labelsize=12)
 plt.grid(True, linestyle='--', alpha=0.5)
@@ -127,7 +127,7 @@ plt.figure(figsize=(8,6))
 plt.scatter(D, N, marker='o', label='Data')
 plt.plot(D_fit, N_exp_fit, linestyle='--', linewidth=1.5, color='green',
          label=f'Exponential: k={k_exp:.2e}, r={r_exp:.3f}, R²={R2_exp:.4f}')
-plt.xlabel('Diameter', fontsize=16)
+plt.xlabel('Rock size (cm)', fontsize=16)
 plt.ylabel('Cumulative number', fontsize=16)
 plt.tick_params(labelsize=12)
 plt.grid(True, linestyle='--', alpha=0.5)
@@ -146,7 +146,7 @@ plt.figure(figsize=(8,6))
 plt.scatter(D, N, marker='o', label='Data')
 plt.plot(D_fit, N_pow_fit, linestyle='--', linewidth=1.5, color='red', label='Power-law fit')
 plt.plot(D_fit, N_exp_fit, linestyle='--', linewidth=1.5, color='green', label='Exponential fit')
-plt.xlabel('Diameter', fontsize=16)
+plt.xlabel('Rock size (cm)', fontsize=16)
 plt.ylabel('Cumulative number', fontsize=16)
 #plt.xscale('log')
 #plt.yscale('log')
