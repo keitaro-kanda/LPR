@@ -1,4 +1,5 @@
 import numpy as np
+import os
 from scipy.spatial import KDTree
 from scipy.optimize import curve_fit
 from sklearn.metrics import r2_score
@@ -51,7 +52,7 @@ def detect_hyperbolic_points(data, neighborhood_radius, min_points, r2_threshold
         except: # フィッティングが失敗する場合の例外処理
             continue
 
-    # 連続点の連結 (簡易版: 近傍の候補点を連結)
+    #* 連続点の連結 (簡易版: 近傍の候補点を連結)
     connected_indices_list = []
     visited_indices = set()
 
@@ -81,7 +82,7 @@ def detect_hyperbolic_points(data, neighborhood_radius, min_points, r2_threshold
         if len(current_connected_indices) >= min_points:
             connected_indices_list.append(current_connected_indices)
 
-    # 重複を削除してインデックスをリストにまとめる
+    #* 重複を削除してインデックスをリストにまとめる
     detected_indices = []
     for indices in tqdm(connected_indices_list, desc='Merging Hyperbolic Points'):
         detected_indices.extend(indices)
@@ -111,22 +112,24 @@ if __name__ == '__main__':
     #dummy_intensity = np.random.rand(n_points) # 強度はランダム
     #dummy_data = np.column_stack([dummy_data_points, dummy_intensity])
 
-    # 双曲線状の点群を検出
+    #* 双曲線状の点群を検出
     #detected_indices = detect_hyperbolic_points(dummy_data, neighborhood_radius=0.5, min_points=10, r2_threshold=0.5)
     detected_indices = detect_hyperbolic_points(data, neighborhood_radius=0.5, min_points=10, r2_threshold=0.5)
     detected_data = data[detected_indices]
     print(f"検出された点の数: {len(detected_indices)}")
 
-
-    # 検出された双曲線データ点を保存
-    output_path = "/Volumes/SSD_Kanda_BUFFALO/LPR/LPR_2B/Processed_Data/4_Gain_function/detect_peak/detect_hyperbola"
-    np.savetxt(
-        output_path,
-        detected_data,
-        delimiter=' ',
-        fmt='%.3f'
+    #* ファイル名を指定して保存
+    output_path = os.path.join(
+        '/Volumes/SSD_Kanda_BUFFALO/LPR/LPR_2B/Processed_Data/4_Gain_function/detect_peak/detect_hyperbola',
+        'detected_hyperbola_points.txt'  # 具体的なファイル名を追加
     )
-    print(f"検出された双曲線データを {output_path} に保存しました")
+
+    #* ディレクトリが存在することを確認
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    #* データを保存
+    np.savetxt(output_path, data, delimiter=' ')
+
     plt.figure(figsize=(8, 6))
     plt.scatter(data[:, 0], data[:, 1], s=1, label='All Data') # 全データ
     plt.scatter(detected_data[:, 0], detected_data[:, 1], color='red', s=5, label='Detected Hyperbolic Points') # 検出された点
@@ -136,6 +139,7 @@ if __name__ == '__main__':
     plt.ylim(np.max(data[:, 1]), np.min(data[:, 1])) # y軸を反転
     plt.legend()
     plt.grid(True)
+
+    plt.savefig(os.path.join(output_path, 'detected_hyperbola.png'))
     plt.show()
 
-    
