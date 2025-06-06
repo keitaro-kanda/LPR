@@ -10,14 +10,17 @@ from scipy import ndimage
 
 
 #* input data folder path
-data_folder_path = input('Loaded_data_echo_position folder path: ').strip()
-if not os.path.exists(data_folder_path):
-    print('Error: The specified folder does not exist.')
-    exit(1)
-if not os.path.isdir(data_folder_path):
-    print('Error: The specified path is not a folder.')
-    exit(1)
-#data_folder_path = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/loaded_data_echo_position_xml'
+channel_name = input('Input channel name (1, 2A, 2B): ').strip()
+
+if channel_name == '1':
+    data_folder_path = "/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_1/loaded_data_echo_position"
+elif channel_name == '2A':
+    data_folder_path = "/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2A/loaded_data_echo_position"
+elif channel_name == '2B':
+    data_folder_path = "/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/loaded_data_echo_position"
+else:
+    raise ValueError('Invalid channel name. Please enter 1, 2A, or 2B.')
+
 
 #* Define output folder path
 output_dir = os.path.join(os.path.dirname(data_folder_path), 'Resampled_Data_xml')
