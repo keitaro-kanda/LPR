@@ -9,25 +9,15 @@ import cv2
 from scipy import ndimage
 
 
-#* Parse command line arguments
-"""
-parser = argparse.ArgumentParser(
-    prog='resampling.py',
-    description='Resampling ECHO data',
-    epilog='End of help message',
-    usage='python tools/resampling.py [path_type]',
-)
-parser.add_argument('path_type', choices = ['local', 'SSD'], help='Choose the path type')
-args = parser.parse_args()
-
-
-#* Define data folder path
-if args.path_type == 'local' or args.path_type == 'test':
-    data_folder_path = 'LPR_2B/ECHO'
-elif args.path_type == 'SSD':
-    data_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B/ECHO'
-"""
-data_folder_path = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/loaded_data_echo_position_xml'
+#* input data folder path
+data_folder_path = input('Loaded_data_echo_position folder path: ').strip()
+if not os.path.exists(data_folder_path):
+    print('Error: The specified folder does not exist.')
+    exit(1)
+if not os.path.isdir(data_folder_path):
+    print('Error: The specified path is not a folder.')
+    exit(1)
+#data_folder_path = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/loaded_data_echo_position_xml'
 
 #* Define output folder path
 output_dir = os.path.join(os.path.dirname(data_folder_path), 'Resampled_Data_xml')

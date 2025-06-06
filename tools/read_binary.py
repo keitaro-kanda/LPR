@@ -22,14 +22,16 @@ args = parser.parse_args()
 
 
 
-#* Set the data folder path
-# if args.path_type == 'local':
-#    data_folder_path = 'LPR_2B/original_data'
-# elif args.path_type == 'SSD':
-data_folder_path = '/Volumes/SSD_Kanda_BUFFALO/LPR/LPR_2B/original_binary'
-# else:
-#     print('Invalid path type, please choose either local or SSD')
-#     exit()
+#* Input data folder path
+data_folder_path = input('Binary data folder path: ').strip()
+if not os.path.exists(data_folder_path):
+    print('Error: The specified folder does not exist.')
+    exit(1)
+if not os.path.isdir(data_folder_path):
+    print('Error: The specified path is not a folder.')
+    exit(1)
+#data_folder_path = '/Volumes/SSD_Kanda_BUFFALO/LPR/LPR_2B/original_binary'
+
 
 
 
