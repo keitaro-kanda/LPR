@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-LPR バイナリデータを PDS4 XML ラベル情報から自動で読み込むスクリプト
-Usage:
-  python read_binary.py --path_type {local,SSD} [--label_folder LABEL_DIR]
-"""
 import os
 import sys
 import struct
@@ -13,29 +8,23 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from tqdm import tqdm
 from natsort import natsorted
-import argparse
 
-# --- コマンドライン引数 ---
-# parser = argparse.ArgumentParser(
-#     prog='read_binary.py',
-#     description='Read LPR binary files guided by PDS4 XML labels'
-# )
-# parser.add_argument(
-#     '--path_type', choices=['local','SSD'], default='SSD',
-#     help='データフォルダ: local or SSD'
-# )
-# parser.add_argument(
-#     '--label_folder', default=None,
-#     help='ラベル(XML)ファイルがあるフォルダ (省略時はデータフォルダと同じ)'
-# )
-# args = parser.parse_args()
 
-# # --- フォルダ設定 ---
-# if args.path_type == 'local':
-#     data_folder = 'LPR_2B/original_data'
-# else:
-data_folder = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/original_binary'
-label_folder = data_folder
+channel_name = input('Select channel name (1, 2A, 2B): ').strip()
+if channel_name not in ['1', '2A', '2B']:
+    print('Invalid channel name. Please enter 1, 2A, or 2B.')
+    sys.exit(1)
+
+# --- パスの設定 ---
+if channel_name == '1':
+    data_folder = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_1/original_binary'
+    label_folder = data_folder
+elif channel_name == '2A':  # 2A チャンネル
+    data_folder = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2A/original_binary'
+    label_folder = data_folder  # ラベルフォルダは同じ
+elif channel_name == '2B':  # 2B チャンネル
+    data_folder = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/original_binary'
+    label_folder = data_folder
 
 for path in (data_folder, label_folder):
     if not os.path.isdir(path):
@@ -88,8 +77,8 @@ def parse_label(label_path):
 
 # --- 出力ディレクトリ ---
 base        = os.path.dirname(data_folder)
-loaded_dir  = os.path.join(base, 'loaded_data_xml')
-echo_dir    = os.path.join(base, 'loaded_data_echo_position_xml')
+loaded_dir  = os.path.join(base, 'loaded_data')
+echo_dir    = os.path.join(base, 'loaded_data_echo_position')
 os.makedirs(loaded_dir, exist_ok=True)
 os.makedirs(echo_dir, exist_ok=True)
 
