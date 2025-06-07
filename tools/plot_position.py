@@ -29,7 +29,7 @@ elif args.path_type == 'SSD':
 """
 
 #* Data folder path
-position_folder_path = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Resampled_Data_xml/position'
+position_folder_path = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Resampled_Data/position'
 
 #* Output folder path
 output_dir = os.path.join(os.path.dirname(position_folder_path), 'position_plot')
