@@ -6,24 +6,26 @@ from tqdm import tqdm
 from scipy import signal
 
 #* Get input parameters
-print('パスタイプを選択してください（local または SSD）:')
+print('Select channel (2A or 2B):')
 path_type = input().strip().lower()
-if path_type not in ['local', 'ssd']:
-    print('エラー: パスタイプは local または SSD を指定してください')
+if path_type not in ['2A', '2B']:
+    print('Error: Channel must be 2A or 2B')
     exit(1)
 
-print('機能タイプを選択してください（calc または plot）:')
+print('Select function type (calc or plot):')
 function_type = input().strip().lower()
 if function_type not in ['calc', 'plot']:
-    print('エラー: 機能タイプは calc または plot を指定してください')
+    print('Error: Function type must be calc or plot')
     exit(1)
 
 #* Define data folder path
-if path_type == 'local':
-    data_path = 'LPR_2B/Resampled_ECHO/Bscan.txt'
-elif path_type == 'ssd':
-    data_path = '/Volumes/SSD_Kanda_BUFFALO/LPR/LPR_2B/Resampled_Data/Bscan.txt'
-    print('Data path:', data_path)
+if path_type == '2A':
+    data_path = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2A/Resampled_Data/txt'
+elif path_type == '2B':
+    data_path = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Resampled_Data/txt'
+if not os.path.exists(data_path):
+        print('Error: Data path does not exist:', data_path)
+        exit(1)
 
 
 
