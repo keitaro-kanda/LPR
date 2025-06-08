@@ -251,8 +251,11 @@ for ECHO_data in tqdm(natsorted(os.listdir(data_folder_path))):
         idx = np.loadtxt(idx_file_path, delimiter=' ')
         
         #* Make window data for plotting
-        medf = np.zeros(raw_data.shape[1])
-        medf[idx.astype(int)] = 1
+        if idx.ndim == 0:
+            continue  # Skip if idx is empty
+        else:
+            medf = np.zeros(raw_data.shape[1])
+            medf[idx.astype(int)] = 1
 
         #* Filter the data with the idx
         data_filtered = signals[:, idx.astype(int)]
