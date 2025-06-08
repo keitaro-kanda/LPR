@@ -45,8 +45,8 @@ dir_3 = os.path.join(output_dir, '3_Background_removal')
 os.makedirs(dir_3, exist_ok=True)
 dir_4 = os.path.join(output_dir, '4_Gain_function')
 os.makedirs(dir_4, exist_ok=True)
-# dir_5 = os.path.join(output_dir, 'Process_flow_plot')
-# os.makedirs(dir_5, exist_ok=True)
+dir_5 = os.path.join(output_dir, '5_Terrain_correction')
+os.makedirs(dir_5, exist_ok=True)
 print('Output dir:', output_dir)
 print('   ')
 
@@ -248,6 +248,35 @@ def gain(data, er, tan_delta, freq):
     return output
 
 
+
+def terrain_correction(data, z_profile):
+    """
+    Apply terrain correction to the B-scan data based on the given z-profile.
+    The z-profile is a 1D array representing the terrain elevation at each trace.
+    z=0 is set to the ground level of the starting point
+    """
+    #* Prepare empty array for corrected data
+    z_max = np.max(z_profile) # Maximum elevation in the z-profile
+    z_min = np.min(z_profile) # Minimum elevation in the z-profile
+    t_expand_min = np.abs(int(z_max / c / sample_interval)) # index number
+    t_expand_max = np.abs(int(z_min / c / sample_interval)) # index number
+    corrected_data = np.zeros((data.shape[0] + t_expand_min + t_expand_max, data.shape[1]))
+    corrected_data[:, :] = np.nan  # Initialize with NaN to avoid artifacts
+    print('Expanded time range: ', -t_expand_min*sample_interval/1e-9, 'to', (data.shape[0]+t_expand_max)*sample_interval/1e-9, ' ns')
+    print('Data shape after terrain correction: ', corrected_data.shape)
+
+    #* Apply terrain correction
+    for i in tqdm(range(data.shape[1]), desc='Applying terrain correction'):
+        # Calculate the depth based on the z-profile
+        equivalent_time = z_profile[i] / c  # Convert depth to time [s]
+        # Apply the correction to each trace
+        start_index = int(equivalent_time / sample_interval)
+        start_row = np.abs(t_expand_min) - start_index
+        end_row = start_row + data.shape[0]
+        corrected_data[start_row:end_row, i] = data[:, i]
+    return corrected_data, -t_expand_min*sample_interval, (data.shape[0] + t_expand_max)*sample_interval #, data, -OO [s], (data.shape[0] + OO) [s]
+
+
 #* Processing pipeline
 if function_type == 'calc':
     #* 0. Prepare raw Bscan data
@@ -302,8 +331,22 @@ if function_type == 'calc':
     np.savetxt(dir_4 + '/4_Bscan_gain.txt', gained_Bscan, delimiter=' ')
     print('Finished gain function')
     print(' ')
+
+
+
+    #* 5. Terrain correction
+    print('Applying terrain correction')
+    #* Load z-profile data
+    position_profile_path = "/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Resampled_Data/position_plot/total_position.txt"
+    z_profile = np.loadtxt(position_profile_path, delimiter=' ', skiprows=1)[:, 2]
+    terrain_corrected_Bscan, time_min, time_max = terrain_correction(gained_Bscan, z_profile)
+    np.savetxt(dir_5 + '/5_Terrain_correction.txt', terrain_corrected_Bscan, delimiter=' ')
+    print('Finished terrain correction')
+    print(' ')
+
     print('----- Finished data processing -----')
     print(' ')
+
 
 
 elif function_type == 'plot':
@@ -324,15 +367,23 @@ elif function_type == 'plot':
     #* 4. Gain function
     gained_Bscan = np.loadtxt(dir_4 + '/4_Bscan_gain.txt', delimiter=' ')
 
+    #* 5. Terrain correction
+    terrain_corrected_Bscan = np.loadtxt(dir_5 + '/5_Terrain_correction.txt', delimiter=' ')
+    position_profile_path = "/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Resampled_Data/position_plot/total_position.txt"
+    z_profile = np.loadtxt(position_profile_path, delimiter=' ', skiprows=1)[:, 2]
+    time_min = - np.amax(z_profile) / c  # Convert depth to time [s]
+    time_max = Raw_Bscan.shape[0] * sample_interval - np.amin(z_profile) / c  # Convert depth to time [s]
+    yticks_list = np.arange(0, terrain_corrected_Bscan.shape[0] * sample_interval / 1e-9, 100)
+
     print("Bscan shape:", Raw_Bscan.shape)
     print('Finished data loading')
     print(' ')
 
 
 
-plot_data = [Raw_Bscan, filtered_Bscan, time_corrected_Bscan, background_removed_Bscan, gained_Bscan]
-title = ['Raw B-scan', 'Bandpass filter', 'Time-zero correction', 'Background removal', 'Gain function']
-dir_list = [dir_0, dir_1, dir_2, dir_3, dir_4]
+plot_data = [Raw_Bscan, filtered_Bscan, time_corrected_Bscan, background_removed_Bscan, gained_Bscan, terrain_corrected_Bscan]
+title = ['Raw B-scan', 'Bandpass filter', 'Time-zero correction', 'Background removal', 'Gain function', 'Terrain correction']
+dir_list = [dir_0, dir_1, dir_2, dir_3, dir_4, dir_5]
 
 
 #* Plot
@@ -352,6 +403,12 @@ for i in range(len(plot_data)):
                 extent=[0, plot_data[i].shape[1]*trace_interval, plot_data[i].shape[0]*sample_interval*1e9, 0],
                 vmin=-np.amax(np.abs(plot_data[i]))/15, vmax=np.amax(np.abs(plot_data[i]))/15
                 )
+    elif i == 5:
+        im = ax.imshow(plot_data[i], aspect='auto', cmap='viridis',
+                extent=[0, plot_data[i].shape[1]*trace_interval, time_max*1e9, time_min*1e9],
+                vmin=-np.nanmax(np.abs(plot_data[i]))/15, vmax=np.nanmax(np.abs(plot_data[i]))/15
+                )
+        ax.set_yticks(np.arange(0, plot_data[i].shape[0] * sample_interval / 1e-9, 100))
     else:
         im = ax.imshow(plot_data[i], aspect='auto', cmap='viridis',
                     extent=[0, plot_data[i].shape[1]*trace_interval, plot_data[i].shape[0]*sample_interval*1e9, 0],
