@@ -4,13 +4,19 @@ import os
 import mpl_toolkits.axes_grid1 as axgrid1
 from tqdm import tqdm
 from scipy import signal
+from natsort import natsorted
+
 
 #* Get input parameters
-print('Select channel (2A or 2B):')
-path_type = input().strip().lower()
-if path_type not in ['2A', '2B']:
-    print('Error: Channel must be 2A or 2B')
-    exit(1)
+path_type = input('Input channel name (2A, 2B): ').strip()
+#* Define data folder path
+if path_type == '2A':
+    resampled_data_dir = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2A/Resampled_Data/txt'
+elif path_type == '2B':
+    resampled_data_dir = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Resampled_Data/txt'
+if not os.path.exists(resampled_data_dir):
+        print('Error: Data path does not exist:', resampled_data_dir)
+        exit(1)
 
 print('Select function type (calc or plot):')
 function_type = input().strip().lower()
@@ -18,19 +24,15 @@ if function_type not in ['calc', 'plot']:
     print('Error: Function type must be calc or plot')
     exit(1)
 
-#* Define data folder path
-if path_type == '2A':
-    data_path = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2A/Resampled_Data/txt'
-elif path_type == '2B':
-    data_path = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Resampled_Data/txt'
-if not os.path.exists(data_path):
-        print('Error: Data path does not exist:', data_path)
-        exit(1)
+
 
 
 
 #* Define output folder path
-output_dir = os.path.join(os.path.dirname(os.path.dirname(data_path)), 'Processed_Data')
+if path_type == '2A':
+    output_dir = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2A/Processed_Data'
+elif path_type == '2B':
+    output_dir = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Processed_Data'
 os.makedirs(output_dir, exist_ok=True)
 
 dir_0 = os.path.join(output_dir, '0_Raw_data')
@@ -43,8 +45,8 @@ dir_3 = os.path.join(output_dir, '3_Background_removal')
 os.makedirs(dir_3, exist_ok=True)
 dir_4 = os.path.join(output_dir, '4_Gain_function')
 os.makedirs(dir_4, exist_ok=True)
-dir_5 = os.path.join(output_dir, 'Merged_plot')
-os.makedirs(dir_5, exist_ok=True)
+# dir_5 = os.path.join(output_dir, 'Process_flow_plot')
+# os.makedirs(dir_5, exist_ok=True)
 print('Output dir:', output_dir)
 print('   ')
 
@@ -57,10 +59,49 @@ trace_interval = 3.6e-2 # [m], [Li et al. (2020), Sci. Adv.]
 epsilon_0 = 8.854187817e-12  # [F/m]
 c = 299792458  # [m/s]
 reciever_time_delay = 28.203e-9  # [s], [Su et al., 2014]
+epsilon_r = 4.5 # Relative permittivity of the medium [Zhang et al., 2025, ApJL]
 
 
 
 #* Define functions
+
+#* Integrate resampled data
+def integrate_resampled_data():
+    Raw_Bscan = np.zeros((0, 0))  # Placeholder for raw B-scan data
+    for file in tqdm(natsorted(os.listdir(resampled_data_dir)), desc='Integrating resampled data'):
+        if file.startswith('.'):
+            continue
+
+        # Path to the resampled data file
+        file_path = os.path.join(resampled_data_dir, file)
+        # Load resampled data
+        try:
+            # まずはShift-JISで読み込みを試行
+            resampled_data = np.loadtxt(file_path, delimiter=' ', encoding='shift-jis')
+        except UnicodeDecodeError:
+            # Shift-JISで失敗した場合、UTF-16で再試行
+            try:
+                resampled_data = np.loadtxt(file_path, delimiter=' ', encoding='utf-16')
+            except Exception as e:
+                # どちらのエンコーディングでも読み込めなかった場合
+                print(f"\nエラー: ファイル '{file}' の読み込みに失敗しました。")
+                print(f"詳細: {e}")
+                # エラーが発生した場合はプログラムを停止
+                raise
+        except Exception as e:
+            # その他の予期せぬエラー
+            print(f"\n予期せぬエラーがファイル '{file}' で発生しました。")
+            print(f"詳細: {e}")
+            raise
+        # Integrate data
+        if Raw_Bscan.size == 0:
+            Raw_Bscan = resampled_data
+        else:
+            Raw_Bscan = np.hstack((Raw_Bscan, resampled_data))
+    return Raw_Bscan
+
+
+
 #* Bandpass filter
 def bandpass_filter(input_data, lowcut, highcut, order): # Ascandata is 1D array
     #* Filter specifications
@@ -210,15 +251,19 @@ def gain(data, er, tan_delta, freq):
 #* Processing pipeline
 if function_type == 'calc':
     #* 0. Prepare raw Bscan data
-    Raw_Bscan = np.loadtxt(data_path, delimiter=' ')
-
+    #Raw_Bscan = np.loadtxt(data_path, delimiter=' ')
+    Raw_Bscan = integrate_resampled_data()
+    print('Integrated resampled data shape:', Raw_Bscan.shape)
     #* time delayを考慮して、データをスライス
     Raw_Bscan = Raw_Bscan[int(reciever_time_delay/sample_interval):, :]
-    print("Bscan shape:", Raw_Bscan.shape)
+    print("Bscan shape (after data slice):", Raw_Bscan.shape)
     print('')
-
-    #* test
-    #time_corrected_Bscan = time_correction(Raw_Bscan)
+    np.savetxt(dir_0 + '/0_Raw_Bscan.txt', Raw_Bscan, delimiter=' ')
+    print('Finished bandpass filtering')
+    print(' ')
+    #* Save B-scan shape as a text file
+    with open(dir_0 + '/Bscan_shape.txt', 'w') as f:
+        f.write(f'Bscan shape: {Raw_Bscan.shape[0]} x {Raw_Bscan.shape[1]}\n')
 
 
     #* 1. Bandpass filtering
@@ -257,11 +302,14 @@ if function_type == 'calc':
     np.savetxt(dir_4 + '/4_Bscan_gain.txt', gained_Bscan, delimiter=' ')
     print('Finished gain function')
     print(' ')
+    print('----- Finished data processing -----')
+    print(' ')
+
 
 elif function_type == 'plot':
+    print('----- Start loading data -----')
     #* 0. Prepare raw Bscan data
-    Raw_Bscan = np.loadtxt(data_path, delimiter=' ')
-    print("Bscan shape:", Raw_Bscan.shape)
+    Raw_Bscan = np.loadtxt(dir_0 + '/0_Raw_Bscan.txt', delimiter=' ')
 
 
     #* 1. Bandpass filtering
@@ -276,7 +324,9 @@ elif function_type == 'plot':
     #* 4. Gain function
     gained_Bscan = np.loadtxt(dir_4 + '/4_Bscan_gain.txt', delimiter=' ')
 
+    print("Bscan shape:", Raw_Bscan.shape)
     print('Finished data loading')
+    print(' ')
 
 
 
@@ -291,16 +341,16 @@ font_medium = 18
 font_small = 16
 
 #* Plot single panel figure x
-print('   ')
+print('----- Start plotting -----')
 print('Plotting single panel figure x 5')
 for i in range(len(plot_data)):
-    fig = plt.figure(figsize=(18, 6), tight_layout=True)
+    fig = plt.figure(figsize=(18, 6))
     ax = fig.add_subplot(111)
     #fig, ax = plt.subplots(1, 1, figsize=(18, 6), tight_layout=True)
     if i == 4:
         im = ax.imshow(plot_data[i], aspect='auto', cmap='viridis',
                 extent=[0, plot_data[i].shape[1]*trace_interval, plot_data[i].shape[0]*sample_interval*1e9, 0],
-                vmin=-np.amax(np.abs(plot_data[i]))/10, vmax=np.amax(np.abs(plot_data[i]))/10
+                vmin=-np.amax(np.abs(plot_data[i]))/15, vmax=np.amax(np.abs(plot_data[i]))/15
                 )
     else:
         im = ax.imshow(plot_data[i], aspect='auto', cmap='viridis',
@@ -313,50 +363,91 @@ for i in range(len(plot_data)):
     ax.set_xlabel('Moving distance [m]', fontsize=font_medium)
     ax.set_ylabel('Time [ns]', fontsize=font_medium)
 
-    delvider = axgrid1.make_axes_locatable(ax)
-    cax = delvider.append_axes('right', size='3%', pad=0.1)
-    plt.colorbar(im, cax=cax, orientation = 'vertical').set_label('Amplitude', fontsize=font_large)
-    cax.tick_params(labelsize=font_small)
+    #* Add the second Y-axis
+    ax2 = ax.twinx()
+    # Get the range of the original Y-axis (time)
+    t_min, t_max = ax.get_ylim()
+    # Calculate the corresponding depth range
+    # depth [m] = (time [ns] * 1e-9) * v_gpr [m/s] / 2
+    depth_min = (t_min * 1e-9) * c / np.sqrt(epsilon_r) / 2
+    depth_max = (t_max * 1e-9) * c / np.sqrt(epsilon_r) / 2
+    # 新しいY軸に深さの範囲とラベルを設定
+    ax2.set_ylim(depth_min, depth_max)
+    ax2.set_ylabel('Depth [m]', fontsize=font_medium)
+    ax2.tick_params(axis='y', which='major', labelsize=font_small)
 
+    # #* Add colorbar
+    # delvider = axgrid1.make_axes_locatable(ax)
+    # cax = delvider.append_axes('right', size='3%', pad=0.1)
+    # cax.set_position(cax.get_position().translated(0.08, 0)) # 右に少しずらす
+    # plt.colorbar(im, cax=cax, orientation = 'vertical').set_label('Amplitude', fontsize=font_large)
+    # cax.tick_params(labelsize=font_small)
+
+    # * Adjust layout for colorbar layout
+    fig.subplots_adjust(bottom=0.18, right=0.9)
+    ### カラーバーを右下に横向きで追加 ###
+    # Figureのサイズを基準とした位置とサイズ [left, bottom, width, height]
+    cbar_ax = fig.add_axes([0.65, 0.05, 0.2, 0.05]) # [x, y, 幅, 高さ]
+    cbar = plt.colorbar(im, cax=cbar_ax, orientation='horizontal')
+    cbar.ax.tick_params(labelsize=font_small)
+    ### ここまで ###
+
+    #* Saving
     plt.savefig(dir_list[i] + '/' + str(i) + '_' + title[i] + '.png', format='png', dpi=120)
     plt.savefig(dir_list[i] + '/' + str(i) + '_' + title[i] + '.pdf', format='pdf', dpi=600)
     print('Finished plotting', title[i])
     plt.close()
 
 
-#* plot 5 panel figure
-print('   ')
-print('Plotting 5 panel figure')
-fig, ax = plt.subplots(len(plot_data), 1, figsize=(18, 20), tight_layout=True, sharex=True)
+# #* plot 5 panel figure
+# print('   ')
+# print('Plotting 5 panel figure')
+# fig, ax = plt.subplots(len(plot_data), 1, figsize=(18, 20), tight_layout=False, sharex=True)
+# ax2_list = []
+
+# for i in range(len(plot_data)):
+#     if i == 4:
+#         im = ax[i].imshow(plot_data[i], aspect='auto', cmap='viridis',
+#                 extent=[0, plot_data[i].shape[1]*trace_interval, plot_data[i].shape[0]*sample_interval*1e9, 0],
+#                 vmin=-np.amax(np.abs(plot_data[i]))/15, vmax=np.amax(np.abs(plot_data[i]))/15
+#                 )
+#     else:
+#         im = ax[i].imshow(plot_data[i], aspect='auto', cmap='viridis',
+#                     extent=[0, plot_data[i].shape[1]*trace_interval, plot_data[i].shape[0]*sample_interval*1e9, 0],
+#                     vmin=-10, vmax=10
+#                     )
+#     ax[i].tick_params(axis='both', which='major', labelsize=font_small)
+#     ax[i].set_title(title[i], fontsize=font_large)
+
+#     current_ax2 = ax[i].twinx()
+#     ax2_list.append(current_ax2)
+
+#     t_min, t_max = ax[i].get_ylim()
+#     depth_min = (t_min * 1e-9) * c / np.sqrt(epsilon_r) / 2
+#     depth_max = (t_max * 1e-9) * c / np.sqrt(epsilon_r) / 2
+#     # 新しいY軸に深さの範囲とラベルを設定
+#     current_ax2.set_ylim(depth_min, depth_max)
+#     current_ax2.tick_params(axis='y', which='major', labelsize=font_small)
 
 
-for i in range(len(plot_data)):
-    if i == 4:
-        im = ax[i].imshow(plot_data[i], aspect='auto', cmap='viridis',
-                extent=[0, plot_data[i].shape[1]*trace_interval, plot_data[i].shape[0]*sample_interval*1e9, 0],
-                vmin=-np.amax(np.abs(plot_data[i]))/10, vmax=np.amax(np.abs(plot_data[i]))/10
-                )
-    else:
-        im = ax[i].imshow(plot_data[i], aspect='auto', cmap='viridis',
-                    extent=[0, plot_data[i].shape[1]*trace_interval, plot_data[i].shape[0]*sample_interval*1e9, 0],
-                    vmin=-10, vmax=10
-                    )
-    ax[i].tick_params(axis='both', which='major', labelsize=font_small)
-    ax[i].set_title(title[i], fontsize=font_large)
+#     ### ★★★ 修正点: 各サブプロットの下にカラーバーを配置 ★★★ ###
+#     # fig.add_axes() の代わりに make_axes_locatable を使用します
+#     divider = axgrid1.make_axes_locatable(ax[i])
+#     # ax[i] の下 ("bottom") に、高さが5%の新しい軸 cax を作成します
+#     # pad はプロットとカラーバーの間の余白です
+#     cax = divider.append_axes("bottom", size="3%", pad=0.5)
+#     cbar = plt.colorbar(im, cax=cax, orientation='horizontal')
+#     cbar.ax.tick_params(labelsize=font_small)
+#     ### ここまで ###
 
-    delvider = axgrid1.make_axes_locatable(ax[i])
-    cax = delvider.append_axes('right', size='3%', pad=0.1)
-    plt.colorbar(im, cax=cax, orientation = 'vertical').set_label('Amplitude', fontsize=font_large)
-    cax.tick_params(labelsize=font_small)
-
-fig.supxlabel('Moving distance [m]', fontsize=font_medium)
-fig.supylabel('Time [ns]', fontsize=font_medium)
+# fig.supxlabel('Moving distance [m]', fontsize=font_medium)
+# fig.supylabel('Time [ns]', fontsize=font_medium)
 
 
 
-#* save plot
-plt.savefig(dir_5 + '/Merged.png', format='png', dpi=120)
-plt.savefig(dir_5 + '/Merged.pdf', format='pdf', dpi=600)
-print('Finished plotting 5 panel figure')
+# #* save plot
+# plt.savefig(dir_5 + '/Merged.png', format='png', dpi=120)
+# plt.savefig(dir_5 + '/Merged.pdf', format='pdf', dpi=600)
+# print('Finished plotting 5 panel figure')
 
-plt.show()
+# plt.show()
