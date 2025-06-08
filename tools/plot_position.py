@@ -7,29 +7,18 @@ from natsort import natsorted
 import argparse
 
 
-"""
-#* Parse command line arguments
-parser = argparse.ArgumentParser(
-    prog='plot_position.py',
-    description='Plot position of observation site from ECHO data',
-    epilog='End of help message',
-    usage='python tools/plot_position.py [path_type] [function type]',
-)
-parser.add_argument('path_type', choices = ['local', 'SSD'], help='Choose the path type')
-parser.add_argument('function_type', choices = ['load', 'plot', 'both'], help='Choose the function type')
-args = parser.parse_args()
-
-
-#* Define data folder path
-if args.path_type == 'local':
-    #data_folder_path = 'LPR_2B/ECHO'
-    position_folder_path = 'LPR_2B/Resampled_Data/position'
-elif args.path_type == 'SSD':
-    #data_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B/ECHO'
-"""
+#* input data folder path
+channel_name = input('Input channel name (1, 2A, 2B): ').strip()
 
 #* Data folder path
-position_folder_path = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Resampled_Data/position'
+if channel_name == '1':
+    position_folder_path = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_1/Resampled_Data/position'
+elif channel_name == '2A':
+    position_folder_path = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2A/Resampled_Data/position'
+elif channel_name == '2B':
+    position_folder_path = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Resampled_Data/position'
+else:
+    raise ValueError("Invalid channel name. Please enter 1, 2A, or 2B.")
 
 #* Output folder path
 output_dir = os.path.join(os.path.dirname(position_folder_path), 'position_plot')
