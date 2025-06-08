@@ -373,7 +373,7 @@ for i in range(len(plot_data)):
     depth_max = (t_max * 1e-9) * c / np.sqrt(epsilon_r) / 2
     # 新しいY軸に深さの範囲とラベルを設定
     ax2.set_ylim(depth_min, depth_max)
-    ax2.set_ylabel('Depth [m]', fontsize=font_medium)
+    ax2.set_ylabel(r'Depth [m] ($\varepsilon_r = 4.5$)', fontsize=font_medium)
     ax2.tick_params(axis='y', which='major', labelsize=font_small)
 
     # #* Add colorbar
