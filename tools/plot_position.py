@@ -101,6 +101,10 @@ def load_positions():
             total_x = np.append(total_x, X_ref[i] + XPOSITION[i])
             total_y = np.append(total_y, Y_ref[i] + YPOSITION[i])
             total_z = np.append(total_z, Z_ref[i] + ZPOSITION[i])
+    #* Save total position
+    total_positions_data = np.column_stack([total_x, total_y, total_z])
+    np.savetxt(os.path.join(output_dir, 'total_position.txt'), total_positions_data,
+                fmt='%.18e %.18e %.18e', delimiter=' ', header='total_x total_y total_z', comments='')
     #* Plot Velocity
     fig = plt.figure(figsize=(20, 10), tight_layout=True)
     plt.plot(VELOCITY)
