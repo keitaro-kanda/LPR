@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.ndimage import gaussian_filter
-from PyHHT.emd import EMD # EMDの実装にPyHHTを使用
+import emd # emd (EMD-signal) ライブラリを使用
 
 # --- 1. テストデータの作成 ---
 def create_synthetic_lpr_data(
@@ -50,19 +50,16 @@ def create_synthetic_lpr_data(
 
     return data_A, data_B, rock_locations_true
 
+
 # --- 2. データ前処理 (論文のPipelineの一部を模倣) ---
 def preprocess_lpr_data(data):
     """
     LPRデータの前処理パイプラインの簡略化された実装。
     ここでは、バンドパスフィルターと背景除去を模倣する。
     """
-    # 実際のLPRデータ処理は複雑なため、ここでは簡単なノイズ除去と平滑化のみを適用
-    # 例: ガウシアンフィルターで軽く平滑化
     processed_data = gaussian_filter(data, sigma=0.5) 
-    
-    # 背景除去 (ここでは簡単な平均値除去を模倣)
-    # processed_data = processed_data - np.mean(processed_data, axis=1, keepdims=True)
     return processed_data
+
 
 # --- 3. f-x EMD Dip Filter ---
 def fx_emd_dip_filter(data, p=2):
@@ -72,50 +69,63 @@ def fx_emd_dip_filter(data, p=2):
     p: 除去するIMFの数（p=2はIMF1とIMF2を除去）
     """
     num_time_samples, num_distance_traces = data.shape
-    filtered_data = np.zeros_like(data, dtype=float) # float型で初期化
-
-    emd = EMD()
+    filtered_data = np.zeros_like(data, dtype=float)
 
     for i in range(num_distance_traces):
         trace = data[:, i]
 
         # 1Dフーリエ変換（時間方向）
-        # RFFTは実数入力のための最適化されたFFT
-        freq_spectrum = np.fft.rfft(trace) 
+        freq_spectrum = np.fft.rfft(trace) # real FFT
         
-        # 各周波数スライス（ここでは周波数成分）を実数部と虚数部に分離
-        # PyHHTのEMDは実数入力を前提とする
         real_part = freq_spectrum.real
         imag_part = freq_spectrum.imag
 
-        # 実数部に対するEMD
-        imfs_real = emd.sift(real_part)
-        
-        # 虚数部に対するEMD
-        imfs_imag = emd.sift(imag_part)
+        # IMFの計算
+        imfs_real = emd.sift.sift(real_part)
+        imfs_imag = emd.sift.sift(imag_part)
 
         # フィルター処理された信号の再構築: IMF1とIMF2を除去 (p=2)
-        # imfs_realとimfs_imagはリストであり、各要素がIMFのndarray
-        # 最初のp個のIMFを除去し、残りを合計
+        # IMFが元の信号長と異なる場合があるため、明示的に長さを合わせる
         
-        filtered_real = np.zeros_like(real_part)
-        if len(imfs_real) > p:
-            # imfs_real[p:] はp番目以降のIMF（インデックスは0から始まる）
-            for imf_comp in imfs_real[p:]:
-                filtered_real += imf_comp
-        # else: 全てのIMFがp以下の場合、全て除去されるため filtered_real は0のまま
+        filtered_real = np.zeros_like(real_part, dtype=float)
+        if imfs_real.shape[0] > p:
+            # imfs_real[p:, :] は、p番目以降のIMF全てを指す。
+            # これらのIMFを合計し、元の real_part の長さに合わせて切り詰めるか、ゼロパディングする。
+            # ここでは、sum後の形状が元のreal_partの形状と同じになることを期待するが、
+            # IMFの長さが異なる可能性を考慮して、より安全な方法をとる。
+            
+            # 各IMFが元の信号と同じ長さを持つと仮定して合計
+            # もしemd.sift.siftが異なる長さのIMFを返す場合、ここが問題になる。
+            # しかし、通常は同じ長さで返されるべき。
+            summed_imfs_real = np.sum(imfs_real[p:, :], axis=0)
+            
+            # 長さが異なる場合を考慮して、最も短い長さに合わせるか、元の長さに合わせてクリップ
+            min_len_real = min(len(real_part), len(summed_imfs_real))
+            filtered_real[:min_len_real] = summed_imfs_real[:min_len_real]
 
-        filtered_imag = np.zeros_like(imag_part)
-        if len(imfs_imag) > p:
-            for imf_comp in imfs_imag[p:]:
-                filtered_imag += imf_comp
-        # else: 全てのIMFがp以下の場合、全て除去されるため filtered_imag は0のまま
+
+        filtered_imag = np.zeros_like(imag_part, dtype=float)
+        if imfs_imag.shape[0] > p:
+            summed_imfs_imag = np.sum(imfs_imag[p:, :], axis=0)
+            min_len_imag = min(len(imag_part), len(summed_imfs_imag))
+            filtered_imag[:min_len_imag] = summed_imfs_imag[:min_len_imag]
 
         # フィルター処理された周波数スライスの合成
-        filtered_freq_spectrum = filtered_real + 1j * filtered_imag
+        # ここでValueErrorが出ていたので、形状が一致することを確認
+        # filtered_real と filtered_imag は np.zeros_like で初期化されているため、
+        # ここでは同じ長さになっているはず
+        if filtered_real.shape != filtered_imag.shape:
+             # 万が一異なる場合のエラーハンドリング（デバッグ用）
+             print(f"Warning: filtered_real shape {filtered_real.shape} and filtered_imag shape {filtered_imag.shape} are different.")
+             # 短い方に合わせてクリップするなど、さらに処理が必要になる可能性がある
+             min_len = min(filtered_real.shape[0], filtered_imag.shape[0])
+             filtered_freq_spectrum = filtered_real[:min_len] + 1j * filtered_imag[:min_len]
+        else:
+             filtered_freq_spectrum = filtered_real + 1j * filtered_imag
         
         # 1D逆フーリエ変換（時間方向）
         # irfftは実数出力のための最適化されたIFFT
+        # 出力長さをnum_time_samplesに指定
         filtered_trace = np.fft.irfft(filtered_freq_spectrum, n=num_time_samples) 
         
         filtered_data[:, i] = filtered_trace
