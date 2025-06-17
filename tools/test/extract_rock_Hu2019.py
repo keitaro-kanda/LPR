@@ -2,51 +2,63 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.ndimage import gaussian_filter
 import emd # emd (EMD-signal) ライブラリを使用
+import os
+from tqdm import tqdm
 
 # --- 1. テストデータの作成 ---
 def create_synthetic_lpr_data(
-    num_time_samples=150, num_distance_traces=90, 
+    time=300e-9, distance=50, delta_t=3e-10, delta_x=0.05, # time [s], distance [m]
     rock_locations_true=None, noise_level_A=0.1, noise_level_B=0.03
 ):
     """
     合成LPRデータ（CH-2A, CH-2B）を生成する。
     岩石（回折ハイパーボラ）とノイズを含む。
     """
-    time = np.arange(num_time_samples)
-    distance = np.arange(num_distance_traces)
-    data_A = np.zeros((num_time_samples, num_distance_traces))
-    data_B = np.zeros((num_time_samples, num_distance_traces))
+    time = np.arange(0, time, delta_t) # [s]
+    distance = np.arange(0, distance, delta_x) # [m]
+    data_A = np.zeros((time.size, distance.size))
+    data_B = np.zeros((time.size, distance.size))
 
     # 背景ノイズ (ガウシアンランダムノイズ)
-    data_A += np.random.normal(0, noise_level_A, size=(num_time_samples, num_distance_traces))
-    data_B += np.random.normal(0, noise_level_B, size=(num_time_samples, num_distance_traces))
+    data_A += np.random.normal(0, noise_level_A, size=(time.size, distance.size))
+    data_B += np.random.normal(0, noise_level_B, size=(time.size, distance.size))
 
     # シンプルな水平反射 (低ディップ成分)
-    # 反射位置を時間50nsあたりに設定
-    reflection_time = 50
-    for d in range(num_distance_traces):
-        if 0 <= reflection_time < num_time_samples:
-            data_A[reflection_time, d] += 5.0
-            data_B[reflection_time, d] += 5.0
+    reflection_time_top = 150e-9 # [s]
+    echo_time_width = 5e-9 # [s] 反射の時間幅
+    lambda_t = echo_time_width * 2 / 3 # 反射の時間幅を1.5波長とする
+    for d in range(distance.size):
+        if 0 <= int(reflection_time_top/delta_t) < time.size:
+            reflection_time_width = np.arange(reflection_time_top , reflection_time_top + echo_time_width, delta_t)
+            for reflection_time in reflection_time_width:
+                if 0 <= int(reflection_time/delta_t) < time.size:
+                    data_A[int(reflection_time/delta_t), d] += 5.0 * np.sin(2 * np.pi * (reflection_time_top - reflection_time) / lambda_t)
+                    data_B[int(reflection_time/delta_t), d] += 5.0 * np.sin(2 * np.pi * (reflection_time_top - reflection_time) / lambda_t)
 
     # 岩石（回折ハイパーボラ）を追加
     if rock_locations_true is None:
-        # デフォルトの岩石位置 (時間, 距離, 強度)
+        # デフォルトの岩石位置 (t0 [s], x0 [m], amp)
         rock_locations_true = [
-            (20, 10, 1.0), (35, 30, 1.2), (60, 50, 1.5), (80, 70, 1.0)
+            (50e-9, 30, 1.0), (35e-9, 10, 1.2), (130e-9, 40, 1.5), (250e-9, 35, 1.0)
         ]
+    rock_locations_true = np.array(rock_locations_true)
+    offset_range = 5 # [m]
 
-    for t_rock, d_rock, amp in rock_locations_true:
-        for d_offset in range(num_distance_traces):
-            # ハイパーボラの式: t = sqrt(t0^2 + (x/v)^2)
-            # ここでは簡略化のため、頂点からの距離に比例して時間が遅延するモデル
-            # LPRの波速度は真空中の光速 c / sqrt(誘電率)。ここでは仮の値を使用。
-            velocity_factor = 0.5 # 仮の速度係数、小さいほどハイパーボラが急になる
-            time_delay = int(np.sqrt((d_offset - d_rock)**2 * velocity_factor + t_rock**2))
-            
-            if 0 <= time_delay < num_time_samples:
-                data_A[time_delay, d_offset] += amp * np.exp(-((d_offset - d_rock)**2 / (2 * 5**2))) # ガウシアン的な減衰
-                data_B[time_delay, d_offset] += amp * np.exp(-((d_offset - d_rock)**2 / (2 * 5**2)))
+    for t0, x0, amp in rock_locations_true:
+        for x1 in np.arange(x0 - offset_range , x0 + offset_range, delta_x):
+            epsiron_r = 4.5
+            v = 3e8 / np.sqrt(epsiron_r) # 波速度
+            time_delay_top = t0 * np.sqrt(1 + ((x1 - x0) / (v * t0 / 2))**2) # [s]
+            time_delays = np.arange(time_delay_top, time_delay_top + echo_time_width, delta_t) # [s]
+
+            if 0 <= int(time_delay_top/delta_t) < time.size and 0 <= int(x1/delta_x) < distance.size:
+                for time_delay in time_delays:
+                    data_A[int(time_delay/delta_t), int(x1/delta_x)] += amp * np.exp(-((x1 - x0)**2 / (2 * 5**2)))\
+                                * np.sin(2 * np.pi * (time_delay_top - time_delay) / lambda_t) # ガウシアン的な減衰
+                    data_B[int(time_delay/delta_t), int(x1/delta_x)] += amp * np.exp(-((x1 - x0)**2 / (2 * 5**2)))\
+                                * np.sin(2 * np.pi * (time_delay_top - time_delay) / lambda_t) # ガウシアン的な減衰
+            else:
+                continue
 
     return data_A, data_B, rock_locations_true
 
@@ -57,7 +69,7 @@ def preprocess_lpr_data(data):
     LPRデータの前処理パイプラインの簡略化された実装。
     ここでは、バンドパスフィルターと背景除去を模倣する。
     """
-    processed_data = gaussian_filter(data, sigma=0.5) 
+    processed_data = gaussian_filter(data, sigma=0.5)
     return processed_data
 
 
@@ -71,7 +83,7 @@ def fx_emd_dip_filter(data, p=2):
     num_time_samples, num_distance_traces = data.shape
     filtered_data = np.zeros_like(data, dtype=float)
 
-    for i in range(num_distance_traces):
+    for i in tqdm(range(num_distance_traces), desc="Applying f-x EMD Dip Filter"):
         trace = data[:, i]
 
         # 1Dフーリエ変換（時間方向）
@@ -164,7 +176,7 @@ def calculate_local_similarity_spectrum(data_A, data_B, window_size_local=(5, 5)
     h_win, w_win = window_size_local
     half_h_win, half_w_win = h_win // 2, w_win // 2
 
-    for i in range(num_time_samples):
+    for i in tqdm(range(num_time_samples), desc="Calculating Local Similarity Spectrum"):
         for j in range(num_distance_traces):
             # ローカル窓を切り出す
             t_start = max(0, i - half_h_win)
@@ -208,9 +220,14 @@ def apply_soft_thresholding(spectrum, threshold_value):
 
 # --- 7. メイン処理フロー ---
 if __name__ == "__main__":
+    # 出力フォルダの設定
+    output_dir = "/Volumes/SSD_Kanda_SAMSUNG/LPR/rock_extraction_Hu2019"
+
     # パラメータ設定
-    NUM_TIME_SAMPLES = 150
-    NUM_DISTANCE_TRACES = 90
+    TIME_MAX = 300e-9 # 300ns
+    X_MAX = 50.0 # 50m
+    DELTA_T = 3e-10 # 3ns
+    DELTA_X = 0.05 # 5cm
     IMF_REMOVE_COUNT = 2 # p=2, IMF1とIMF2を除去
     LOCAL_SIM_WINDOW_SIZE = (7, 7) # ローカル類似性計算のための窓サイズ
     SMOOTHNESS_SIGMA = 1.5 # スムーズネス促進のためのガウシアンフィルターのsigma
@@ -219,21 +236,30 @@ if __name__ == "__main__":
     # 1. テストデータの作成
     print("1. 合成LPRデータの作成...")
     data_A, data_B, true_rock_locs = create_synthetic_lpr_data(
-        num_time_samples=NUM_TIME_SAMPLES,
-        num_distance_traces=NUM_DISTANCE_TRACES
+        time=TIME_MAX,
+        distance=X_MAX,
+        delta_t=DELTA_T,
+        delta_x=DELTA_X
     )
 
-    plt.figure(figsize=(12, 8))
-    plt.subplot(2, 2, 1)
-    plt.imshow(data_A, aspect='auto', cmap='gray', vmin=-1, vmax=1)
+    plt.figure(figsize=(12, 4))
+    plt.subplot(1, 2, 1)
+    plt.imshow(data_A, aspect='auto', cmap='gray', vmin=-1, vmax=1,
+                extent=[0, X_MAX, TIME_MAX * 1e9, 0]) # 時間をns単位で表示
+    plt.xlabel('Distance (m)')
+    plt.ylabel('Time (ns)')
     plt.title('Synthetic CH-2A Data (Raw)')
     plt.colorbar()
 
-    plt.subplot(2, 2, 2)
-    plt.imshow(data_B, aspect='auto', cmap='gray', vmin=-1, vmax=1)
+    plt.subplot(1, 2, 2)
+    plt.imshow(data_B, aspect='auto', cmap='gray', vmin=-1, vmax=1,
+               extent=[0, X_MAX, TIME_MAX * 1e9, 0]) # 時間をns単位で表示
+    plt.xlabel('Distance (m)')
+    plt.ylabel('Time (ns)')
     plt.title('Synthetic CH-2B Data (Raw)')
     plt.colorbar()
     plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, '1_synthetic_data.png'))
     plt.show()
 
     # 2. データ前処理
@@ -245,50 +271,62 @@ if __name__ == "__main__":
     print(f"3. f-x EMD Dip Filterの適用 (IMF {IMF_REMOVE_COUNT}個除去)...")
     filtered_data_A = fx_emd_dip_filter(processed_data_A, p=IMF_REMOVE_COUNT)
     filtered_data_B = fx_emd_dip_filter(processed_data_B, p=IMF_REMOVE_COUNT)
-    
+
     plt.figure(figsize=(12, 4))
     plt.subplot(1, 2, 1)
-    plt.imshow(filtered_data_A, aspect='auto', cmap='gray', vmin=-0.5, vmax=0.5)
+    plt.imshow(filtered_data_A, aspect='auto', cmap='gray', vmin=-0.5, vmax=0.5,
+                extent=[0, X_MAX, TIME_MAX * 1e9, 0]) # 時間をns単位で表示
+    plt.xlabel('Distance (m)')
+    plt.ylabel('Time (ns)')
     plt.title(f'CH-2A Data after f-x EMD Dip Filter (p={IMF_REMOVE_COUNT})')
     plt.colorbar()
     plt.subplot(1, 2, 2)
-    plt.imshow(filtered_data_B, aspect='auto', cmap='gray', vmin=-0.5, vmax=0.5)
+    plt.imshow(filtered_data_B, aspect='auto', cmap='gray', vmin=-0.5, vmax=0.5,
+               extent=[0, X_MAX, TIME_MAX * 1e9, 0]) # 時間をns単位で表示
+    plt.xlabel('Distance (m)')
+    plt.ylabel('Time (ns)')
     plt.title(f'CH-2B Data after f-x EMD Dip Filter (p={IMF_REMOVE_COUNT})')
     plt.colorbar()
     plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, '2_filtered_data.png'))
     plt.show()
 
     # 4. Local Similarity Spectrumの計算
     print("4. Local Similarity Spectrumの計算...")
     similarity_spectrum = calculate_local_similarity_spectrum(filtered_data_A, filtered_data_B, window_size_local=LOCAL_SIM_WINDOW_SIZE)
 
-    plt.figure(figsize=(6, 5))
-    plt.imshow(similarity_spectrum, aspect='auto', cmap='jet', vmin=0, vmax=1)
+    plt.figure(figsize=(6, 4))
+    plt.imshow(similarity_spectrum, aspect='auto', cmap='turbo', vmin=0, vmax=1,
+               extent=[0, X_MAX, TIME_MAX * 1e9, 0]) # 時間をns単位で表示
     plt.title(f'Local Similarity Spectrum (Window: {LOCAL_SIM_WINDOW_SIZE})')
     plt.colorbar()
     plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, '3_similarity_spectrum.png'))
     plt.show()
 
     # 5. スムーズネス促進 (ガウシアンフィルター)
     print(f"5. スムーズネス促進の適用 (sigma={SMOOTHNESS_SIGMA})...")
     smoothed_spectrum = apply_smoothness_promotion(similarity_spectrum, sigma=SMOOTHNESS_SIGMA)
 
-    plt.figure(figsize=(6, 5))
-    plt.imshow(smoothed_spectrum, aspect='auto', cmap='jet', vmin=0, vmax=1)
+    plt.figure(figsize=(6, 4))
+    plt.imshow(smoothed_spectrum, aspect='auto', cmap='turbo', vmin=0, vmax=1,
+               extent=[0, X_MAX, TIME_MAX * 1e9, 0]) # 時間をns単位で表示
     plt.title(f'Smoothed Local Similarity Spectrum (Sigma: {SMOOTHNESS_SIGMA})')
     plt.colorbar()
     plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, '4_smoothed_spectrum.png'))
     plt.show()
 
     # 6. ソフト閾値関数の適用
     print(f"6. ソフト閾値関数の適用 (Threshold: {SOFT_THRESHOLD_VALUE})...")
     final_spectrum = apply_soft_thresholding(smoothed_spectrum, threshold_value=SOFT_THRESHOLD_VALUE)
 
-    plt.figure(figsize=(6, 5))
-    plt.imshow(final_spectrum, aspect='auto', cmap='jet', vmin=0, vmax=1)
+    plt.figure(figsize=(6, 4))
+    plt.imshow(final_spectrum, aspect='auto', cmap='turbo', vmin=0, vmax=1)
     plt.title(f'Final Local Similarity Spectrum (Threshold: {SOFT_THRESHOLD_VALUE})')
     plt.colorbar()
     plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, '5_final_spectrum.png'))
     plt.show()
     
     # 7. Local Maximumの抽出 (岩石位置特定 - 論文の最後のステップ)
@@ -301,7 +339,7 @@ if __name__ == "__main__":
     # 局所最大値を検出するための最小距離を設定
     # min_distance は隣接する最大値間の最小距離。これを大きくすると検出される岩石の数が減る。
     # 適切な min_distance はデータと岩石のサイズによる
-    min_distance_for_rock = 10 
+    min_distance_for_rock = 10
     
     rock_locations_detected = []
     # 各列（距離）でピークを検出
@@ -316,8 +354,8 @@ if __name__ == "__main__":
 
     print(f"検出された岩石の数: {len(rock_locations_detected)}")
 
-    plt.figure(figsize=(8, 6))
-    plt.imshow(final_spectrum, aspect='auto', cmap='jet', vmin=0, vmax=1)
+    plt.figure(figsize=(6, 4))
+    plt.imshow(final_spectrum, aspect='auto', cmap='turbo', vmin=0, vmax=1)
     plt.title('Detected Rock Locations on Final Similarity Spectrum')
     plt.colorbar()
     
@@ -333,6 +371,7 @@ if __name__ == "__main__":
     plt.ylabel('Time (Samples)')
     plt.grid(True)
     plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, '6_detected_rocks.png'))
     plt.show()
 
     print("\n--- 処理完了 ---")
