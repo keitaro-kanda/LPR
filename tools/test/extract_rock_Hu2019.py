@@ -12,7 +12,7 @@ def create_synthetic_lpr_data(
 ):
     """
     合成LPRデータ（CH-2A, CH-2B）を生成する。
-    岩石（回折ハイパーボラ）とノイズを含む。
+    岩石（回折ハイパーボラ）、水平反射、傾斜反射、およびノイズを含む。
     """
     time = np.arange(0, time, delta_t) # [s]
     distance = np.arange(0, distance, delta_x) # [m]
@@ -35,6 +35,29 @@ def create_synthetic_lpr_data(
                     data_A[int(reflection_time/delta_t), d] += 5.0 * np.sin(2 * np.pi * (reflection_time_top - reflection_time) / lambda_t)
                     data_B[int(reflection_time/delta_t), d] += 5.0 * np.sin(2 * np.pi * (reflection_time_top - reflection_time) / lambda_t)
 
+    # 傾斜した反射成分 (中程度のディップ成分)
+    # 開始時間、開始距離、傾斜（時間/距離）、振幅を設定
+    inclined_reflection_params = [
+        (20e-9, 0, 1.5e-8, 4.0), # (開始時間 [s], 開始距離 [m], 傾斜 [s/m], 振幅)
+        (70e-9, 50, -1.0e-8, 3.5) # 逆方向の傾斜
+    ]
+    epsiron_r_inclined = 4.5
+    v_inclined = 3e8 / np.sqrt(epsiron_r_inclined) # 波速度
+    
+    for start_time, start_dist, slope_time_per_meter, amp in inclined_reflection_params:
+        for d_idx, d_val in enumerate(distance):
+            # 距離に応じた時間遅延を計算
+            time_at_dist = start_time + (d_val - start_dist) * slope_time_per_meter
+            
+            # 反射波形の時間幅を加味
+            reflection_times_inclined = np.arange(time_at_dist, time_at_dist + echo_time_width, delta_t)
+            
+            for current_time in reflection_times_inclined:
+                t_idx = int(current_time / delta_t)
+                if 0 <= t_idx < time.size:
+                    data_A[t_idx, d_idx] += amp * np.sin(2 * np.pi * (time_at_dist - current_time) / lambda_t)
+                    data_B[t_idx, d_idx] += amp * np.sin(2 * np.pi * (time_at_dist - current_time) / lambda_t)
+
     # 岩石（回折ハイパーボラ）を追加
     if rock_locations_true is None:
         # デフォルトの岩石位置 (t0 [s], x0 [m], amp)
@@ -45,18 +68,22 @@ def create_synthetic_lpr_data(
     offset_range = 10 # [m]
 
     for t0, x0, amp in rock_locations_true:
-        for x1 in np.arange(x0 - offset_range , x0 + offset_range, delta_x):
+        for x1_idx, x1 in enumerate(distance):
             epsiron_r = 4.5
             v = 3e8 / np.sqrt(epsiron_r) # 波速度
-            time_delay_top = t0 * np.sqrt(1 + ((x1 - x0) / (v * t0 / 2))**2) # [s]
+            # ハイパーボラの式を適用
+            # GPR/LPRでは、往復のパスが考慮されるため、sqrt内の分母は v*t0/2
+            time_delay_top = np.sqrt(t0**2 + ((x1 - x0) / (v / 2))**2) 
             time_delays = np.arange(time_delay_top, time_delay_top + echo_time_width, delta_t) # [s]
 
-            if 0 <= int(time_delay_top/delta_t) < time.size and 0 <= int(x1/delta_x) < distance.size:
+            if 0 <= int(time_delay_top/delta_t) < time.size and 0 <= x1_idx < distance.size:
                 for time_delay in time_delays:
-                    data_A[int(time_delay/delta_t), int(x1/delta_x)] += amp * np.exp(-((x1 - x0)**2 / (2 * 1**2)))\
-                                * np.sin(2 * np.pi * (time_delay_top - time_delay) / lambda_t) # ガウシアン的な減衰
-                    data_B[int(time_delay/delta_t), int(x1/delta_x)] += amp * np.exp(-((x1 - x0)**2 / (2 * 1**2)))\
-                                * np.sin(2 * np.pi * (time_delay_top - time_delay) / lambda_t) # ガウシアン的な減衰
+                    t_idx = int(time_delay / delta_t)
+                    if 0 <= t_idx < time.size:
+                        data_A[t_idx, x1_idx] += amp * np.exp(-((x1 - x0)**2 / (2 * 1**2)))\
+                                    * np.sin(2 * np.pi * (time_delay_top - time_delay) / lambda_t) # ガウシアン的な減衰
+                        data_B[t_idx, x1_idx] += amp * np.exp(-((x1 - x0)**2 / (2 * 1**2)))\
+                                    * np.sin(2 * np.pi * (time_delay_top - time_delay) / lambda_t) # ガウシアン的な減衰
             else:
                 continue
 
@@ -155,7 +182,7 @@ def fx_emd_dip_filter(data, p):
         reconstructed_imag = np.zeros_like(freq_slice_imag, dtype=float)
         if imfs_imag.shape[0] >= p:
             summed_imfs_imag = np.sum(imfs_imag[0:p, :], axis=0) # p個のIMFを保持
-            
+
             # 長さの不一致対策（念のため）
             min_len_imag = min(len(freq_slice_imag), len(summed_imfs_imag))
             reconstructed_imag[:min_len_imag] = summed_imfs_imag[:min_len_imag]
@@ -261,8 +288,8 @@ if __name__ == "__main__":
     DELTA_T = 3e-10 # 3ns
     DELTA_X = 0.05 # 5cm
     NOISE_LEVEL_A = 0.1 # CH-2Aのノイズレベル
-    NOISE_LEVEL_B = 0.03 # CH-2Bのノイズレ
-    IMF_RETAIN_COUNT = 2 # p=2, IMF1とIMF2を保持
+    NOISE_LEVEL_B = 0.03 # CH-2Bのノイズレベル
+    IMF_RETAIN_COUNT = int(input("IMFの保持数を入力してください (例: 2): ").strip()) # p=2, IMF1とIMF2を保持
     LOCAL_SIM_WINDOW_SIZE = (7, 7) # ローカル類似性計算のための窓サイズ
     SMOOTHNESS_SIGMA = 1.5 # スムーズネス促進のためのガウシアンフィルターのsigma
     SOFT_THRESHOLD_VALUE = 0.5 # ソフト閾値
@@ -350,7 +377,7 @@ if __name__ == "__main__":
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, '3_filtered_data.png'))
     plt.show()
-
+    """
     # 4. Local Similarity Spectrumの計算
     print("4. Local Similarity Spectrumの計算...")
     similarity_spectrum = calculate_local_similarity_spectrum(filtered_data_A, filtered_data_B, window_size_local=LOCAL_SIM_WINDOW_SIZE)
@@ -421,17 +448,17 @@ if __name__ == "__main__":
     
     # 検出された岩石位置をプロット
     for t, d, val in rock_locations_detected:
-        plt.plot(d, t, 'rx', markersize=8, markeredgewidth=2) # 赤いXで検出位置をプロット
+        plt.plot(d * DELTA_X, t * DELTA_T * 1e9, 'rx', markersize=8, markeredgewidth=2) # 赤いXで検出位置をプロット
     
     # 元の岩石位置をプロット (比較用)
     for t_true, d_true, _ in true_rock_locs:
-        plt.plot(d_true, t_true, 'wo', markersize=10, fillstyle='none', markeredgewidth=2) # 白い丸で真の岩石位置をプロット
+        plt.plot(d_true, t_true * 1e9, 'wo', markersize=10, fillstyle='none', markeredgewidth=2) # 白い丸で真の岩石位置をプロット
 
-    plt.xlabel('Distance (Traces)')
-    plt.ylabel('Time (Samples)')
+    plt.xlabel('Distance (m)')
+    plt.ylabel('Time (ns)')
     plt.grid(True)
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, '7_detected_rocks.png'))
     plt.show()
-
+    """
     print("\n--- 処理完了 ---")
