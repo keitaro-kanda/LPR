@@ -44,9 +44,9 @@ KK_shifted = np.fft.fftshift(KK_power_log)  # Shift zero frequency to center
 
 # Plotting the frequency-wavenumber data
 plt.figure(figsize=(18, 6))
-plt.imshow(KK_power_log, aspect='auto',
+plt.imshow(KK_shifted, aspect='auto',
             #extent=(K.min(), K.max(),f_MHz.min(), f_MHz.max()),
-            cmap='turbo', origin='lower', vmin=0, vmax=np.max(np.abs(KK_power_log))/3)
+            cmap='turbo', origin='lower', vmin=0, vmax=np.max(np.abs(KK_shifted))/3)
 plt.colorbar(label='Amplitude')
 plt.xlabel('Wavenumber (1/m)')
 plt.ylabel('Frequency (Hz)')
