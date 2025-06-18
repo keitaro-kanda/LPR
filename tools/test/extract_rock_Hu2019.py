@@ -5,87 +5,145 @@ import emd # emd (EMD-signal) ライブラリを使用
 import os
 from tqdm import tqdm
 
+
+# --- Ricker波形生成ヘルパー関数 ---
+def ricker_wavelet(t, central_frequency):
+    """
+    Ricker波形を生成する。
+    t: 時間配列 (s)
+    central_frequency: 中心周波数 (Hz)
+    """
+    # Ricker波形の通常は時間ゼロでピークが来るように定義されるが、
+    # 地中レーダーでは信号が伝播して戻ってくる時間を考慮するため、
+    # その時間スケールを調整する
+    
+    # ピークが0にくる時間軸
+    # Ricker波形の一般的な持続時間はおよそ 2 / central_frequency
+    # したがって、tの範囲を-1/fc から 1/fc くらいで定義することが多い
+    # ここでは、tをシフトしてピークを任意の位置に持っていく
+    
+    # 実際には、tは反射波形が生成される各点での時間であり、
+    # 波形自体の相対時間を表す必要がある。
+    # 通常、Ricker波形の引数 t はピークからの相対時間 t' = t - t_peak
+    # ここでは、t_peak を 0 として、波形の形状のみを定義。
+    
+    # ω = 2 * pi * central_frequency
+    # wavelet = (1 - 2 * (pi * central_frequency * t)**2) * np.exp(-(pi * central_frequency * t)**2)
+    # 上記は時間t=0でピークが来るRicker波形。
+    # GPRの波形としては、通常、正負のピークを持つ波形が使われる。
+    # これは二階微分ガウシアンに対応する。
+
+    # ここでは一般的なRicker波形（ピークが1つ）を生成
+    # よりGPRに近いのは二階微分ガウシアン（ピークが2つ）
+    # GPRの文脈では、"Ricker wavelet" という言葉が二階微分ガウシアンを指すことが多い。
+    # ここでは二階微分ガウシアンを実装する。
+    # 詳細は下記参照: https://en.wikipedia.org/wiki/Ricker_wavelet
+
+    f_c = central_frequency
+    t_prime = t # 時間シフトは適用側で行う
+
+    arg = (np.pi * f_c * t_prime)**2
+    # GPRで一般的な二階微分ガウシアン
+    wavelet = (1.0 - 2.0 * arg) * np.exp(-arg)
+    
+    # 必要に応じて、波形の中心を時間ゼロからシフトする（ピークを少し遅らせるなど）
+    # 例: wavelet = (1.0 - 2.0 * arg) * np.exp(-arg) * np.sin(2 * np.pi * f_c * t_prime) # これはRickerではないが、GPRで使うこともある
+    
+    return wavelet
+
+
 # --- 1. テストデータの作成 ---
 def create_synthetic_lpr_data(
-    time, distance, delta_t, delta_x, # time [s], distance [m]
+    time_max, distance_max, delta_t, delta_x, # time [s], distance [m]
     rock_locations_true, noise_level_A, noise_level_B
 ):
     """
     合成LPRデータ（CH-2A, CH-2B）を生成する。
     岩石（回折ハイパーボラ）、水平反射、傾斜反射、およびノイズを含む。
+    Ricker波形を使用。
     """
-    time = np.arange(0, time, delta_t) # [s]
-    distance = np.arange(0, distance, delta_x) # [m]
+    time = np.arange(0, time_max, delta_t) # [s]
+    distance = np.arange(0, distance_max, delta_x) # [m]
     data_A = np.zeros((time.size, distance.size))
     data_B = np.zeros((time.size, distance.size))
+
+    # Ricker波形パラメータ
+    CENTRAL_FREQUENCY = 500e6 # 500 MHz
+    
+    # Ricker波形が持つ時間幅の目安（中心周波数の約2倍の逆数）
+    # これは波形を生成する際の「相対時間t_ricker」の範囲を設定するのに使う
+    # 例えば、-1/f_c から 1/f_c
+    ricker_duration = 2.0 / CENTRAL_FREQUENCY # 秒
+    ricker_time_array = np.arange(-ricker_duration / 2, ricker_duration / 2, delta_t)
+    ricker_waveform = ricker_wavelet(ricker_time_array, CENTRAL_FREQUENCY)
 
     # 背景ノイズ (ガウシアンランダムノイズ)
     data_A += np.random.normal(0, noise_level_A, size=(time.size, distance.size))
     data_B += np.random.normal(0, noise_level_B, size=(time.size, distance.size))
 
+    # 共通の誘電率
+    epsiron_r = 4.5
+    v = 3e8 / np.sqrt(epsiron_r) # 波速度
+
     # シンプルな水平反射 (低ディップ成分)
     reflection_time_top = 150e-9 # [s]
-    echo_time_width = 10e-9 # [s] 反射の時間幅
-    lambda_t = echo_time_width * 2 / 3 # 反射の時間幅を1.5波長とする
-    for d in range(distance.size):
-        if 0 <= int(reflection_time_top/delta_t) < time.size:
-            reflection_time_width = np.arange(reflection_time_top , reflection_time_top + echo_time_width, delta_t)
-            for reflection_time in reflection_time_width:
-                if 0 <= int(reflection_time/delta_t) < time.size:
-                    data_A[int(reflection_time/delta_t), d] += 5.0 * np.sin(2 * np.pi * (reflection_time_top - reflection_time) / lambda_t)
-                    data_B[int(reflection_time/delta_t), d] += 5.0 * np.sin(2 * np.pi * (reflection_time_top - reflection_time) / lambda_t)
+    # 反射波形を重ねる
+    for d_idx in range(distance.size):
+        # 信号のピークがreflection_time_topに来るように、Ricker波形をシフトして加算
+        start_time_idx = int((reflection_time_top - ricker_duration / 2) / delta_t)
+        end_time_idx = int((reflection_time_top + ricker_duration / 2) / delta_t)
+
+        for i, ricker_val in enumerate(ricker_waveform):
+            current_t_idx = start_time_idx + i
+            if 0 <= current_t_idx < time.size:
+                data_A[current_t_idx, d_idx] += 1.0 * ricker_val
+                data_B[current_t_idx, d_idx] += 1.0 * ricker_val
+
 
     # 傾斜した反射成分 (中程度のディップ成分)
-    # 開始時間、開始距離、傾斜（時間/距離）、振幅を設定
     inclined_reflection_params = [
-        (20e-9, 0, 1.5e-8, 4.0), # (開始時間 [s], 開始距離 [m], 傾斜 [s/m], 振幅)
-        (70e-9, 50, -1.0e-8, 3.5) # 逆方向の傾斜
+        (20e-9, 0, 1.5e-8, 1.0), # (開始時間 [s], 開始距離 [m], 傾斜 [s/m], 振幅)
+        (70e-9, distance_max, -1.0e-8, 1.0) # 逆方向の傾斜 (distance_maxから始まる)
     ]
-    epsiron_r_inclined = 4.5
-    v_inclined = 3e8 / np.sqrt(epsiron_r_inclined) # 波速度
     
     for start_time, start_dist, slope_time_per_meter, amp in inclined_reflection_params:
         for d_idx, d_val in enumerate(distance):
             # 距離に応じた時間遅延を計算
             time_at_dist = start_time + (d_val - start_dist) * slope_time_per_meter
             
-            # 反射波形の時間幅を加味
-            reflection_times_inclined = np.arange(time_at_dist, time_at_dist + echo_time_width, delta_t)
-            
-            for current_time in reflection_times_inclined:
-                t_idx = int(current_time / delta_t)
-                if 0 <= t_idx < time.size:
-                    data_A[t_idx, d_idx] += amp * np.sin(2 * np.pi * (time_at_dist - current_time) / lambda_t)
-                    data_B[t_idx, d_idx] += amp * np.sin(2 * np.pi * (time_at_dist - current_time) / lambda_t)
+            # 反射波形を重ねる
+            start_time_idx = int((time_at_dist - ricker_duration / 2) / delta_t)
+            end_time_idx = int((time_at_dist + ricker_duration / 2) / delta_t)
+
+            for i, ricker_val in enumerate(ricker_waveform):
+                current_t_idx = start_time_idx + i
+                if 0 <= current_t_idx < time.size:
+                    data_A[current_t_idx, d_idx] += amp * ricker_val
+                    data_B[current_t_idx, d_idx] += amp * ricker_val
 
     # 岩石（回折ハイパーボラ）を追加
     if rock_locations_true is None:
-        # デフォルトの岩石位置 (t0 [s], x0 [m], amp)
         rock_locations_true = [
-            (50e-9, 30, 3.0), (35e-9, 10, 15), (130e-9, 40, 10), (250e-9, 35, 4.0)
+            (60e-9, 30, 1.0), (30e-9, 10, 1.0), (120e-9, 40, 1.0), (240e-9, 35, 1.0)
         ]
     rock_locations_true = np.array(rock_locations_true)
-    offset_range = 10 # [m]
 
     for t0, x0, amp in rock_locations_true:
         for x1_idx, x1 in enumerate(distance):
-            epsiron_r = 4.5
-            v = 3e8 / np.sqrt(epsiron_r) # 波速度
-            # ハイパーボラの式を適用
-            # GPR/LPRでは、往復のパスが考慮されるため、sqrt内の分母は v*t0/2
-            time_delay_top = np.sqrt(t0**2 + ((x1 - x0) / (v / 2))**2) 
-            time_delays = np.arange(time_delay_top, time_delay_top + echo_time_width, delta_t) # [s]
+            # ハイパーボラの式を適用 (GPRでは往復のパスが考慮される)
+            time_delay_at_x1 = np.sqrt(t0**2 + ((x1 - x0) / (v / 2))**2) 
+            
+            # 回折波形を重ねる
+            start_time_idx = int((time_delay_at_x1 - ricker_duration / 2) / delta_t)
+            end_time_idx = int((time_delay_at_x1 + ricker_duration / 2) / delta_t)
 
-            if 0 <= int(time_delay_top/delta_t) < time.size and 0 <= x1_idx < distance.size:
-                for time_delay in time_delays:
-                    t_idx = int(time_delay / delta_t)
-                    if 0 <= t_idx < time.size:
-                        data_A[t_idx, x1_idx] += amp * np.exp(-((x1 - x0)**2 / (2 * 1**2)))\
-                                    * np.sin(2 * np.pi * (time_delay_top - time_delay) / lambda_t) # ガウシアン的な減衰
-                        data_B[t_idx, x1_idx] += amp * np.exp(-((x1 - x0)**2 / (2 * 1**2)))\
-                                    * np.sin(2 * np.pi * (time_delay_top - time_delay) / lambda_t) # ガウシアン的な減衰
-            else:
-                continue
+            for i, ricker_val in enumerate(ricker_waveform):
+                current_t_idx = start_time_idx + i
+                if 0 <= current_t_idx < time.size and 0 <= x1_idx < distance.size:
+                    # Ricker波形にもガウシアン的な横方向の減衰を適用
+                    attenuation = np.exp(-((x1 - x0)**2 / (2 * 1**2))) # 1mの広がり
+                    data_A[current_t_idx, x1_idx] += amp * ricker_val * attenuation
+                    data_B[current_t_idx, x1_idx] += amp * ricker_val * attenuation
 
     return data_A, data_B, rock_locations_true
 
@@ -119,6 +177,12 @@ def fx_emd_dip_filter(data, p):
     if not os.path.exists(output_dir_EMD_imag):
         os.makedirs(output_dir_EMD_imag)
 
+    # 新しい波数スペクトル用の出力ディレクトリ
+    output_dir_wavenumber_spectrum = os.path.join(output_dir, 'wavenumber_spectrum')
+    if not os.path.exists(output_dir_wavenumber_spectrum):
+        os.makedirs(output_dir_wavenumber_spectrum)
+
+
     # 各時間サンプル（行）について、距離軸方向にFFTを適用
     data_fk_domain = np.fft.rfft(data, axis=1) # 距離軸 (axis=1) に対してFFT
 
@@ -127,47 +191,73 @@ def fx_emd_dip_filter(data, p):
         freq_slice_real = data_fk_domain[time_idx, :].real
         freq_slice_imag = data_fk_domain[time_idx, :].imag
 
-        # ==== デバッグ用: IMFの可視化 ==== (この部分はそのまま有効で良いです)
-        if time_idx % 50 == 0:
-            try:
-                imfs_real_debug = emd.sift.sift(freq_slice_real)
-                imfs_imag_debug = emd.sift.sift(freq_slice_imag)
-
-                max_imfs_to_plot = min(imfs_real_debug.shape[0], 10)
-                plt.figure(figsize=(12, 2 * max_imfs_to_plot))
-                plt.suptitle(f'IMF Decomposition for Time Freq Slice {time_idx} (Real Part)')
-                for imf_n in range(max_imfs_to_plot):
-                    plt.subplot(max_imfs_to_plot, 1, imf_n + 1)
-                    plt.plot(imfs_real_debug[imf_n, :])
-                    plt.title(f'IMF{imf_n} (High Dip/Frequency to Low Dip/Frequency)')
-                    plt.ylabel('Amplitude')
-                plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-                plt.savefig(os.path.join(output_dir_EMD_real, f'imf_decomposition_real_{time_idx}.png'))
-                plt.close()
-
-                max_imfs_to_plot_imag = min(imfs_imag_debug.shape[0], 5)
-                plt.figure(figsize=(12, 2 * max_imfs_to_plot_imag))
-                plt.suptitle(f'IMF Decomposition for Time Freq Slice {time_idx} (Imag Part)')
-                for imf_n in range(max_imfs_to_plot_imag):
-                    plt.subplot(max_imfs_to_plot_imag, 1, imf_n + 1)
-                    plt.plot(imfs_imag_debug[imf_n, :])
-                    plt.title(f'IMF{imf_n} (High Dip/Frequency to Low Dip/Frequency)')
-                    plt.ylabel('Amplitude')
-                plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-                plt.savefig(os.path.join(output_dir_EMD_imag, f'imf_decomposition_imag_{time_idx}.png'))
-                plt.close()
-
-            except Exception as e:
-                print(f"Error plotting IMFs at time_idx {time_idx}: {e}")
-
         # 実数部に対するEMD (空間周波数成分を分離)
         imfs_real = emd.sift.sift(freq_slice_real)
         # 虚数部に対するEMD (空間周波数成分を分離)
         imfs_imag = emd.sift.sift(freq_slice_imag)
 
+        if time_idx == 0:
+            print("IMF shapes (Real):", imfs_real.shape)
+            print("IMF shapes (Imag):", imfs_imag.shape)
         # フィルター処理された信号の再構築: p個のIMFを保持
         # ここでのIMFは空間的な波数成分に対応し、IMF0, IMF1...が高ディップ成分
-        
+
+        # ==== デバッグ用: IMFの可視化 ==== (この部分はそのまま有効で良いです)
+        if time_idx % 100 == 0:
+            try:
+                max_imfs_to_plot = min(imfs_real.shape[0], 10)
+                plt.figure(figsize=(12, 2 * max_imfs_to_plot))
+                plt.suptitle(f'IMF Decomposition for Time Freq Slice {time_idx} (Real Part)')
+                for imf_n in range(max_imfs_to_plot):
+                    plt.subplot(max_imfs_to_plot, 1, imf_n + 1)
+                    plt.plot(imfs_real[imf_n * 10, :])
+                    plt.title(f'IMF{imf_n * 10} (High Dip/Frequency to Low Dip/Frequency)')
+                    plt.ylabel('Amplitude')
+                plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+                plt.savefig(os.path.join(output_dir_EMD_real, f'imf_decomposition_real_{time_idx}.png'))
+                plt.close()
+
+                max_imfs_to_plot_imag = min(imfs_imag.shape[0], 10)
+                plt.figure(figsize=(12, 2 * max_imfs_to_plot_imag))
+                plt.suptitle(f'IMF Decomposition for Time Freq Slice {time_idx} (Imag Part)')
+                for imf_n in range(max_imfs_to_plot_imag):
+                    plt.subplot(max_imfs_to_plot_imag, 1, imf_n + 1)
+                    plt.plot(imfs_imag[imf_n * 10, :])
+                    plt.title(f'IMF{imf_n * 10} (High Dip/Frequency to Low Dip/Frequency)')
+                    plt.ylabel('Amplitude')
+                plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+                plt.savefig(os.path.join(output_dir_EMD_imag, f'imf_decomposition_imag_{time_idx}.png'))
+                plt.close()
+
+                # ==== 各IMFの波数スペクトルをプロット ====
+                plt.figure(figsize=(12, 2 * max_imfs_to_plot))
+                plt.suptitle(f'Wavenumber Spectrum of IMFs for Time Freq Slice {time_idx} (Real Part)')
+                
+                # 波数軸の計算 (rfftfreqは正の波数のみを返す)
+                # kxは空間軸の波数
+                # len(freq_slice_real) は、FFTによって生成された波数スライスの実際の長さに対応
+                kx = np.fft.rfftfreq(len(freq_slice_real), d=DELTA_X) 
+
+                for imf_n in range(max_imfs_to_plot):
+                    plt.subplot(max_imfs_to_plot, 1, imf_n + 1)
+                    
+                    # IMFと波数軸の長さを比較し、短い方に合わせてプロット範囲を調整
+                    current_imf = imfs_real[imf_n, :]
+                    min_len = min(len(kx), len(current_imf))
+                    
+                    # IMF自体は波数ドメインの成分なので、その振幅をプロット
+                    plt.plot(kx[:min_len], np.abs(current_imf[:min_len])) # ここを修正
+                    plt.title(f'IMF{imf_n} Wavenumber Spectrum')
+                    plt.xlabel('Wavenumber (cycles/m)')
+                    plt.ylabel('Amplitude')
+                plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+                plt.savefig(os.path.join(output_dir_wavenumber_spectrum, f'imf_wavenumber_spectrum_real_{time_idx}.png'))
+                plt.close()
+
+            except Exception as e:
+                print(f"Error plotting IMFs at time_idx {time_idx}: {e}")
+
+
         reconstructed_real = np.zeros_like(freq_slice_real, dtype=float)
         # IMFがp個以上存在する場合にのみ、p個のIMFを合計して保持
         if imfs_real.shape[0] >= p:
@@ -301,8 +391,8 @@ if __name__ == "__main__":
     # 1. テストデータの作成
     print("1. 合成LPRデータの作成...")
     data_A, data_B, true_rock_locs = create_synthetic_lpr_data(
-        time=TIME_MAX,
-        distance=X_MAX,
+        time_max=TIME_MAX,
+        distance_max=X_MAX,
         delta_t=DELTA_T,
         delta_x=DELTA_X,
         rock_locations_true=None, # Noneを指定するとデフォルトの岩石位置を使用
