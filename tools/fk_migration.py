@@ -9,19 +9,13 @@ from scipy.interpolate import RectBivariateSpline
 import json
 
 
-#* Parse command line arguments
-parser = argparse.ArgumentParser(
-    prog='fk_migration.py',
-    description='Calculate f-k migration',
-    epilog='End of help message',
-    usage='python tools/fk_migration.py [data_path] [function_type] ',
-)
-parser.add_argument('data_path', help='Path to the txt file of data. \
-                    If function_type is plot, this should be the path to the fk_migration.txt. \
-                    If function_type is calc, this should be the path to the B-scan data')
-parser.add_argument('function_type', choices=['calc', 'plot'], help='Choose the function type')
-args = parser.parse_args()
-
+# Input arguments
+data_path = input("Enter the path to the data file: ").strip()
+if not os.path.exists(data_path):
+    raise FileNotFoundError(f"The file {data_path} does not exist.")
+function_type = input("Enter the function type (calc or plot): ").strip()
+if function_type not in ['calc', 'plot']:
+    raise ValueError("Invalid function type. Choose either 'calc' or 'plot'.")
 
 
 #* Define the function to calculate the f-k migration
@@ -91,8 +85,7 @@ def fk_migration(data, epsilon_r):
 
 
 #* Data path
-data_path = args.data_path
-if args.function_type == 'plot':
+if function_type == 'plot':
     pamameter_path = os.path.join(os.path.dirname(data_path), 'fk_migration/parameters.json')
 output_dir = os.path.join(os.path.dirname(data_path), 'fk_migration')
 os.makedirs(output_dir, exist_ok=True)
@@ -105,7 +98,7 @@ trace_interval = 3.6e-2 # [m], [Li et al. (2020), Sci. Adv.]
 
 
 #* Main part
-if args.function_type == 'calc':
+if function_type == 'calc':
     #* Load data
     print('Loading data...')
     Bscan_data = np.loadtxt(data_path, delimiter=' ')
@@ -113,7 +106,7 @@ if args.function_type == 'calc':
     print('Data shape:', Bscan_data.shape)
 
     #* Calculate the f-k migration
-    er = 3.4 # Feng et al. (2024)
+    er = 4.5 # Feng et al. (2024)
     fk_data, v = fk_migration(Bscan_data, er)
     #* Save the data
     np.savetxt(os.path.join(output_dir, 'fk_migration.txt'), np.abs(fk_data), delimiter=' ')
@@ -129,7 +122,7 @@ if args.function_type == 'calc':
         json.dump(params, f)
 
 
-elif args.function_type == 'plot':
+elif function_type == 'plot':
     #* Load data
     print('Loading data...')
     fk_data_path = os.path.join(os.path.dirname(data_path), 'fk_migration/fk_migration.txt')
@@ -150,7 +143,7 @@ elif args.function_type == 'plot':
 #* Plot
 print('Plotting...')
 plt.figure(figsize=(18, 6), facecolor='w', edgecolor='w', tight_layout=True)
-im = plt.imshow(fk_data, cmap='viridis', aspect='auto',
+im = plt.imshow(np.abs(fk_data), cmap='viridis', aspect='auto',
                 extent=[0, fk_data.shape[1] * trace_interval,
                 fk_data.shape[0] * sample_interval * v, 0],
                 vmin=0, vmax=np.amax(fk_data)/3
