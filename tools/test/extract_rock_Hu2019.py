@@ -73,7 +73,7 @@ def create_synthetic_lpr_data(
     # Ricker波形が持つ時間幅の目安（中心周波数の約2倍の逆数）
     # これは波形を生成する際の「相対時間t_ricker」の範囲を設定するのに使う
     # 例えば、-1/f_c から 1/f_c
-    ricker_duration = 2.0 / CENTRAL_FREQUENCY # 秒
+    ricker_duration = 5.0 / CENTRAL_FREQUENCY # 秒
     ricker_time_array = np.arange(-ricker_duration / 2, ricker_duration / 2, delta_t)
     ricker_waveform = ricker_wavelet(ricker_time_array, CENTRAL_FREQUENCY)
 
@@ -86,7 +86,7 @@ def create_synthetic_lpr_data(
     v = 3e8 / np.sqrt(epsiron_r) # 波速度
 
     # シンプルな水平反射 (低ディップ成分)
-    reflection_time_top = 150e-9 # [s]
+    reflection_time_top = 50e-9 # [s]
     # 反射波形を重ねる
     for d_idx in range(distance.size):
         # 信号のピークがreflection_time_topに来るように、Ricker波形をシフトして加算
@@ -96,14 +96,14 @@ def create_synthetic_lpr_data(
         for i, ricker_val in enumerate(ricker_waveform):
             current_t_idx = start_time_idx + i
             if 0 <= current_t_idx < time.size:
-                data_A[current_t_idx, d_idx] += 1.0 * ricker_val
-                data_B[current_t_idx, d_idx] += 1.0 * ricker_val
+                data_A[current_t_idx, d_idx] += 1.5 * ricker_val
+                data_B[current_t_idx, d_idx] += 1.5 * ricker_val
 
 
     # 傾斜した反射成分 (中程度のディップ成分)
     inclined_reflection_params = [
-        (20e-9, 0, 1.5e-8, 1.0), # (開始時間 [s], 開始距離 [m], 傾斜 [s/m], 振幅)
-        (70e-9, distance_max, -1.0e-8, 1.0) # 逆方向の傾斜 (distance_maxから始まる)
+        (20e-9, 0, 1.5e-8, 1.5), # (開始時間 [s], 開始距離 [m], 傾斜 [s/m], 振幅)
+        (70e-9, distance_max, -1.0e-8, 1.5) # 逆方向の傾斜 (distance_maxから始まる)
     ]
     
     for start_time, start_dist, slope_time_per_meter, amp in inclined_reflection_params:
@@ -124,7 +124,8 @@ def create_synthetic_lpr_data(
     # 岩石（回折ハイパーボラ）を追加
     if rock_locations_true is None:
         rock_locations_true = [
-            (60e-9, 30, 1.0), (30e-9, 10, 1.0), (120e-9, 40, 1.0), (240e-9, 35, 1.0)
+            (20e-9, 3.0, 1.5), (30e-9, 7.5, 1.5),
+            (70e-9, 5.0, 1.5), (65e-9, 6.5, 1.5)
         ]
     rock_locations_true = np.array(rock_locations_true)
 
@@ -373,10 +374,10 @@ if __name__ == "__main__":
     output_dir = "/Volumes/SSD_Kanda_SAMSUNG/LPR/rock_extraction_Hu2019"
 
     # パラメータ設定
-    TIME_MAX = 300e-9 # 300ns
-    X_MAX = 50.0 # 50m
-    DELTA_T = 3e-10 # 3ns
-    DELTA_X = 0.05 # 5cm
+    TIME_MAX = 100e-9 # 100ns
+    X_MAX = 10.0 # 10m
+    DELTA_T = 2e-10 # 2ns
+    DELTA_X = 0.02 # 2cm
     NOISE_LEVEL_A = 0.1 # CH-2Aのノイズレベル
     NOISE_LEVEL_B = 0.03 # CH-2Bのノイズレベル
     IMF_RETAIN_COUNT = int(input("IMFの保持数を入力してください (例: 2): ").strip()) # p=2, IMF1とIMF2を保持
@@ -418,6 +419,40 @@ if __name__ == "__main__":
     plt.colorbar()
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, '1_synthetic_data.png'))
+    plt.show()
+
+    # テストデータのf-kドメイン変換
+    fk_data_A = np.fft.fft2(data_A) # 時間と距離の両方に対してFFT
+    fk_data_B = np.fft.fft2(data_B)
+    fk_data_A = np.fft.fftshift(fk_data_A) # ゼロ周波数を中心に移動
+    fk_data_B = np.fft.fftshift(fk_data_B)
+    fk_data_A_power = 20 * np.log(np.abs(fk_data_A)) # ゼロ除算を避けるために小さな値を加える
+    fk_data_B_power = 20 * np.log(np.abs(fk_data_B))
+    # fkドメインの周波数軸と距離軸を計算
+    time = np.arange(0, TIME_MAX, DELTA_T)
+    freq_axis = np.fft.fftfreq(len(time), d=DELTA_T) # 時間軸の周波数
+    freq_axis = np.fft.fftshift(freq_axis) # ゼロ周波数を中心に移動
+    x = np.arange(0, X_MAX, DELTA_X)
+    wavenumber_axis = np.fft.fftfreq(len(x), d=DELTA_X) # 距離軸の波数
+    wavenumber_axis = np.fft.fftshift(wavenumber_axis) #
+    # fkドメインの可視化
+    plt.figure(figsize=(12, 4))
+    plt.subplot(1, 2, 1)
+    plt.imshow(fk_data_A_power, aspect='auto', cmap='viridis',
+               extent=[wavenumber_axis.min(), wavenumber_axis.max(), freq_axis.min(), freq_axis.max()])
+    plt.xlabel('Wavenumber (/m)')
+    plt.ylabel('Frequency (Hz)')
+    plt.title('CH-2A Data in f-k Domain')
+    plt.colorbar()
+    plt.subplot(1, 2, 2)
+    plt.imshow(fk_data_B_power, aspect='auto', cmap='viridis',
+               extent=[wavenumber_axis.min(), wavenumber_axis.max(), freq_axis.min(), freq_axis.max()])
+    plt.xlabel('Wavenumber (/m)')
+    plt.ylabel('Frequency (Hz)')
+    plt.title('CH-2B Data in f-k Domain')
+    plt.colorbar()
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, '1_fk_data.png'))
     plt.show()
 
     # 2. データ前処理
@@ -466,6 +501,40 @@ if __name__ == "__main__":
     plt.colorbar()
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, '3_filtered_data.png'))
+    plt.show()
+
+    # f-kドメインでのフィルタリング結果の可視化
+    fk_filtered_data_A = np.fft.fft2(filtered_data_A) # 時間と距離の両方に対してFFT
+    fk_filtered_data_B = np.fft.fft2(filtered_data_B)
+    fk_filtered_data_A = np.fft.fftshift(fk_filtered_data_A) # ゼロ周波数を中心に移動
+    fk_filtered_data_B = np.fft.fftshift(fk_filtered_data_B)
+    fk_filtered_data_A_power = 20 * np.log(np.abs(fk_filtered_data_A)) # ゼロ除算を避けるために小さな値を加える
+    fk_filtered_data_B_power = 20 * np.log(np.abs(fk_filtered_data_B))
+    # fkドメインの周波数軸と距離軸を計算
+    time = np.arange(0, TIME_MAX, DELTA_T)
+    freq_axis = np.fft.fftfreq(len(time), d=DELTA_T) # 時間軸の周波数
+    freq_axis = np.fft.fftshift(freq_axis) # ゼロ周波数を中心に移動
+    x = np.arange(0, X_MAX, DELTA_X)
+    wavenumber_axis = np.fft.fftfreq(len(x), d=DELTA_X) # 距離軸の波数
+    wavenumber_axis = np.fft.fftshift(wavenumber_axis) #
+    # fkドメインの可視化
+    plt.figure(figsize=(12, 4))
+    plt.subplot(1, 2, 1)
+    plt.imshow(fk_filtered_data_A_power, aspect='auto', cmap='viridis',
+               extent=[wavenumber_axis.min(), wavenumber_axis.max(), freq_axis.min(), freq_axis.max()])
+    plt.xlabel('Wavenumber (/m)')
+    plt.ylabel('Frequency (Hz)')
+    plt.title(f'CH-2A Data in f-k Domain (Filtered, p={IMF_RETAIN_COUNT})')
+    plt.colorbar()
+    plt.subplot(1, 2, 2)
+    plt.imshow(fk_filtered_data_B_power, aspect='auto', cmap='viridis',
+               extent=[wavenumber_axis.min(), wavenumber_axis.max(), freq_axis.min(), freq_axis.max()])
+    plt.xlabel('Wavenumber (/m)')
+    plt.ylabel('Frequency (Hz)')
+    plt.title(f'CH-2B Data in f-k Domain (Filtered, p={ IMF_RETAIN_COUNT})')
+    plt.colorbar()
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, '3_fk_filtered_data.png'))
     plt.show()
     """
     # 4. Local Similarity Spectrumの計算
