@@ -2,9 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import mpl_toolkits.axes_grid1 as axgrid1
 import os
-from tqdm import tqdm
+# from tqdm import tqdm # Numba prange との相性を考慮し、ここでは使用しない
 from scipy.ndimage import gaussian_filter # ガウス平滑化用
-from scipy.linalg import pinv # 疑似逆行列用
+# from scipy.linalg import pinv # Numbaでは直接使わない
 from numba import jit, prange # prange は parallel=True のループで必要
 
 
@@ -23,280 +23,162 @@ def apply_gaussian_smoothing(data: np.ndarray, sigma: float) -> np.ndarray:
     return gaussian_filter(data, sigma=sigma, mode='nearest')
 
 
-@jit(nopython=True) # NumbaはNumPyのpinvを直接サポートしていない可能性があるので注意
-def _compute_local_similarity_element(sub_A_flat, sub_B_flat):
+@jit(nopython=True)
+def _compute_local_similarity_element(sub_A_flat, sub_B_flat, debug_mode=False):
     """
     Local Similarityの単一要素計算をNumbaで高速化するヘルパー関数。
-    この関数は calculate_local_similarity_spectrum から呼び出される。
+    この関数は calculate_local_similarity_spectrum_fast から呼び出される。
+    ゼロ除算回避を強化。
     """
     n = len(sub_A_flat)
     if n == 0:
         return 0.0
 
-    # A_diag, B_diag は対角行列だが、要素ごとの演算で処理する
-    # A^T A (対角行列) の対角要素は sub_A_flat の要素の二乗
-    # B^T B (対角行列) の対角要素は sub_B_flat の要素の二乗
-    
-    # lambda_1, lambda_2 の計算 (スペクトルノルム = 対角要素の絶対値の最大値)
-    # np.linalg.norm(A_diag, ord=2) の代わり
-    lambda1_val = 0.0
+    # Fomel (2007) の式 (13), (14) の lambda^2 I 項に対応する安定化項
+    # lambda_val_sq は A^T A のスペクトルノルム (対角要素の二乗の最大値)
+    # これを lambda^2 として使用
+    lambda_val_sq_A = 0.0
     for k in range(n):
-        abs_val = abs(sub_A_flat[k])
-        if abs_val > lambda1_val:
-            lambda1_val = abs_val
-    lambda1_val = lambda1_val ** 2 # A^T Aのノルムなので、要素の二乗の最大値
+        abs_val_sq_A = sub_A_flat[k]**2
+        if abs_val_sq_A > lambda_val_sq_A:
+            lambda_val_sq_A = abs_val_sq_A
 
-    lambda2_val = 0.0
+    lambda_val_sq_B = 0.0
     for k in range(n):
-        abs_val = abs(sub_B_flat[k])
-        if abs_val > lambda2_val:
-            lambda2_val = abs_val
-    lambda2_val = lambda2_val ** 2 # B^T Bのノルムなので、要素の二乗の最大値
+        abs_val_sq_B = sub_B_flat[k]**2
+        if abs_val_sq_B > lambda_val_sq_B:
+            lambda_val_sq_B = abs_val_sq_B
 
-    # A_diag.T @ sub_B_flat は要素ごとの積のベクトル
-    # B_diag.T @ sub_A_flat は要素ごとの積のベクトル
+    # A^T b と B^T a は要素ごとの積のベクトル
     AT_b = sub_A_flat * sub_B_flat
     BT_a = sub_B_flat * sub_A_flat
 
-    # term1_inv_c1 の計算: [lambda_1^2 I + (ATA_diag - lambda_1^2 I)]^-1
-    # これは ATA_diag の逆行列に等しい
-    # ATA_diag の対角要素は sub_A_flat の二乗
-    # その逆行列の対角要素は 1 / (sub_A_flat の二乗)
-    # ただし、ゼロ除算を避ける
+    # ATA_diag と BTB_diag の対角要素はそれぞれ sub_A_flat**2 と sub_B_flat**2
+    # inv(lambda^2 I + S(ATA - lambda^2 I)) の計算 (S=I の場合、inv(ATA))
+    # ゼロ除算と数値安定性を考慮した逆数計算
+    epsilon = 1e-12 # 数値安定性のための微小値
+
     inv_ATA_diag_elements = np.zeros(n)
-    epsilon = 1e-12 # 極めて小さな値を追加し、ゼロ除算を避ける
-
-    for k in range(n):
-        denom_A = sub_A_flat[k]**2 + epsilon # ここにepsilonを追加
-        inv_ATA_diag_elements[k] = 1.0 / denom_A
-
-        denom_B = sub_B_flat[k]**2 + epsilon # ここにepsilonを追加
-        inv_BTB_diag_elements[k] = 1.0 / denom_B
-
-    # term1_inv_c2 の計算: 同様
     inv_BTB_diag_elements = np.zeros(n)
+
     for k in range(n):
-        if sub_B_flat[k]**2 != 0:
-            inv_BTB_diag_elements[k] = 1.0 / (sub_B_flat[k]**2)
+        # 式(13)の分母に相当する部分 (S=I の場合)
+        # lambda^2 I + (ATA - lambda^2 I) = ATA
+        # なので、ATAの逆行列の対角要素は 1 / (sub_A_flat[k]**2)
+        denom_A_val = sub_A_flat[k]**2
+        if denom_A_val + epsilon != 0.0: # epsilonを加えた後にゼロでないことを確認
+            inv_ATA_diag_elements[k] = 1.0 / (denom_A_val + epsilon)
+        else:
+            inv_ATA_diag_elements[k] = 0.0 # ゼロ除算回避のため
+
+        denom_B_val = sub_B_flat[k]**2
+        if denom_B_val + epsilon != 0.0: # epsilonを加えた後にゼロでないことを確認
+            inv_BTB_diag_elements[k] = 1.0 / (denom_B_val + epsilon)
         else:
             inv_BTB_diag_elements[k] = 0.0
 
-    # c1 = inv(ATA_diag) @ AT_b  (S_m = I の場合)
+    # c1 = inv(ATA_diag) @ AT_b  (S=I の場合)
     c1 = np.zeros(n)
     for k in range(n):
         c1[k] = inv_ATA_diag_elements[k] * AT_b[k]
 
-    # c2 = inv(BTB_diag) @ BT_a (S_m = I の場合)
+    # c2 = inv(BTB_diag) @ BT_a (S=I の場合)
     c2 = np.zeros(n)
     for k in range(n):
         c2[k] = inv_BTB_diag_elements[k] * BT_a[k]
     
     # c = sqrt(c1^H c2) = sqrt(dot(c1, c2))
-    local_similarity = np.sqrt(np.dot(c1, c2))
+    dot_product = np.dot(c1, c2)
+    
+    # sqrtの引数が負になることを防ぐ (浮動小数点の誤差対策)
+    if dot_product < 0:
+        local_similarity = 0.0
+    else:
+        local_similarity = np.sqrt(dot_product)
+
+    # デバッグ情報出力 (Numba nopythonモードで動作するように修正)
+    if debug_mode:
+        print("  sub_A_flat stats: Min=", np.min(sub_A_flat), ", Max=", np.max(sub_A_flat), ", Mean=", np.mean(sub_A_flat), ", Std=", np.std(sub_A_flat))
+        print("  sub_B_flat stats: Min=", np.min(sub_B_flat), ", Max=", np.max(sub_B_flat), ", Mean=", np.mean(sub_B_flat), ", Std=", np.std(sub_B_flat))
+        print("  lambda_val_sq_A:", lambda_val_sq_A, ", lambda_val_sq_B:", lambda_val_sq_B)
+        # Numbaでnp.isinfやnp.isnanのsumは直接使えない可能性があるため、ループでカウント
+        inf_count_A = 0
+        nan_count_A = 0
+        for val in inv_ATA_diag_elements:
+            if np.isinf(val):
+                inf_count_A += 1
+            if np.isnan(val):
+                nan_count_A += 1
+        inf_count_B = 0
+        nan_count_B = 0
+        for val in inv_BTB_diag_elements:
+            if np.isinf(val):
+                inf_count_B += 1
+            if np.isnan(val):
+                nan_count_B += 1
+
+        print("  inv_ATA_diag_elements stats: Min=", np.min(inv_ATA_diag_elements), ", Max=", np.max(inv_ATA_diag_elements), ", Inf_count=", inf_count_A, ", NaN_count=", nan_count_A)
+        print("  inv_BTB_diag_elements stats: Min=", np.min(inv_BTB_diag_elements), ", Max=", np.max(inv_BTB_diag_elements), ", Inf_count=", inf_count_B, ", NaN_count=", nan_count_B)
+        print("  c1 stats: Min=", np.min(c1), ", Max=", np.max(c1))
+        print("  c2 stats: Min=", np.min(c2), ", Max=", np.max(c2))
+        print("  dot_product:", dot_product)
+        print("  local_similarity:", local_similarity)
 
     return local_similarity
 
 @jit(nopython=True, parallel=True)
 def calculate_local_similarity_spectrum_fast(data_A: np.ndarray, data_B: np.ndarray,
                                              dx: float, dz: float,
-                                             sigma_smoothing: float) -> np.ndarray:
+                                             debug_pixel_rows=None, debug_pixel_cols=None) -> np.ndarray:
     """
     高速化されたLocal Similarityスペクトル計算関数。
     Numbaと行列演算の最適化を適用。
+    debug_pixel_rows, debug_pixel_cols: デバッグ情報を表示する行と列のインデックス配列。
     """
     rows, cols = data_A.shape
     local_similarity_spectrum = np.zeros((rows, cols))
 
     time_win_pixels = max(1, int(1.0 / dz))
-    space_win_pixels = max(1, int(1.0 / dx))
+    space_win_pixels = max(2, int(2.0 / dx))
 
-    # Numbaの並列ループ (prange)
-    for i in prange(rows): # prange を使用して並列化
-        for j in prange(cols): # prange を使用して並列化
+    # Numba JITコンパイルされた関数内で Python のリストやセットを直接使うのは避ける。
+    # debug_pixels が指定された場合のみ、特定のピクセルでデバッグモードを有効にする。
+    # 呼び出し側でタプル (i,j) のリストを渡すのではなく、
+    # 行と列のインデックスをそれぞれ配列として渡す方が Numba にとって扱いやすい。
+    
+    # デバッグピクセルが存在するかどうかをチェックするフラグ
+    has_debug_pixels = debug_pixel_rows is not None and debug_pixel_cols is not None
+
+    for i in prange(rows):
+        for j in prange(cols):
+            current_debug_mode = False
+            if has_debug_pixels:
+                # Numbaで配列検索 (インデックス検索)
+                for dbg_idx in range(len(debug_pixel_rows)):
+                    if i == debug_pixel_rows[dbg_idx] and j == debug_pixel_cols[dbg_idx]:
+                        current_debug_mode = True
+                        break # 見つかったらループを抜ける
+
             r_start = max(0, i - time_win_pixels // 2)
             r_end = min(rows, i + time_win_pixels // 2 + (time_win_pixels % 2))
             c_start = max(0, j - space_win_pixels // 2)
             c_end = min(cols, j + space_win_pixels // 2 + (space_win_pixels % 2))
 
-            # NumPyのスライシングはNumbaでも効率的に動作する
             sub_A_flat = data_A[r_start:r_end, c_start:c_end].flatten()
             sub_B_flat = data_B[r_start:r_end, c_start:c_end].flatten()
 
-            local_similarity_spectrum[i, j] = _compute_local_similarity_element(sub_A_flat, sub_B_flat)
-
-    # Local Similarityスペクトル全体に平滑化を適用
-    # Numbaのjit関数内では、scipy.ndimage.gaussian_filterを直接呼び出すとエラーになる場合がある
-    # そのため、この部分はjit関数外で実行するか、Numbaで実装する。
-    # ここでは、呼び出し元で平滑化を行うように修正を推奨。
-    # 実際には、このsigma_smoothingは calculate_local_similarity_spectrum_fast の引数から削除し、
-    # main関数でこの関数の後に apply_gaussian_smoothing を呼び出す形に変更する。
-    # （後述の修正案に反映）
-    return local_similarity_spectrum
-
-
-def calculate_local_similarity_spectrum(data_A: np.ndarray, data_B: np.ndarray,
-                                       dx: float, dz: float,
-                                       sigma_smoothing: float) -> np.ndarray:
-    """
-    2つのマイグレーション済みデータセット間のLocal Similarityスペクトルを計算する。
-    論文のセクション2.3 および Appendix B に基づく。
-
-    Args:
-        data_A (np.ndarray): フィルター適用後のデータセットA (時間/深度 x 空間)。
-        data_B (np.ndarray): フィルター適用後のデータセットB (時間/深度 x 空間)。
-        dx (float): 空間方向のサンプリング間隔 (m)。
-        dz (float): 時間/深度方向のサンプリング間隔 (m)。
-        sigma_smoothing (float): S_m関数（ガウス平滑化）の標準偏差。
-
-    Returns:
-        np.ndarray: Local Similarityスペクトル。
-    """
-    rows, cols = data_A.shape
-    local_similarity_spectrum = np.zeros((rows, cols))
-
-    # ウィンドウサイズを1m x 1mに設定
-    # ピクセル単位に変換
-    time_win_pixels = max(1, int(1.0 / dz)) # 深度1mに対応するピクセル数
-    space_win_pixels = max(1, int(1.0 / dx)) # 距離1mに対応するピクセル数
-
-    # ウィンドウの中心を基準にループ
-    for i in range(rows):
-        for j in tqdm(range(cols), desc = f"Calculating Local Similarity at Row {i+1}/{rows}"):
-            # 現在のピクセルを中心としたウィンドウを定義
-            # 境界処理は'reflect'や'wrap'なども検討可能だが、ここでは単純に切り詰める
-            r_start = max(0, i - time_win_pixels // 2)
-            r_end = min(rows, i + time_win_pixels // 2 + (time_win_pixels % 2)) # 奇数ウィンドウサイズに対応
-            c_start = max(0, j - space_win_pixels // 2)
-            c_end = min(cols, j + space_win_pixels // 2 + (space_win_pixels % 2)) # 奇数ウィンドウサイズに対応
-
-            # ウィンドウ内のデータ抽出とフラット化
-            sub_A_flat = data_A[r_start:r_end, c_start:c_end].flatten()
-            sub_B_flat = data_B[r_start:r_end, c_start:c_end].flatten()
-
-            if len(sub_A_flat) == 0 or len(sub_B_flat) == 0:
-                local_similarity_spectrum[i, j] = 0.0
-                continue
-
-            # Local Similarityの計算 (式 A1-A7)
-            # sub_A_flat と sub_B_flat をそれぞれ論文のベクトルaとbと解釈する。
-            # A, Bはa, bを主対角要素とする対角行列
-
-            # 対角行列 A_diag, B_diag の作成
-            # NumPyのnp.diagは1D配列から対角行列を作成できる
-            A_diag = np.diag(sub_A_flat)
-            B_diag = np.diag(sub_B_flat)
-
-            # S_m の適用
-            # S_mは平滑化を促進する関数
-            # ここではガウスカーネルを適用した結果をS_mの作用として解釈する。
-            # 厳密には、S_mは行列形式であるべきだが、ここではA^T AやB^T Bに直接平滑化を適用する形で実装。
-            # この解釈は論文の不明瞭な点を補完するための仮定である点に注意。
-            # 論文の式(A4)と(A5)のS_mは、行列の要素に作用する関数というよりは、行列そのものにかかる係数のような表現。
-            # ここでは、S_mを局所的な平滑化フィルタリング作用として解釈し、計算対象の行列に適用する。
-            # これも論文の厳密な定義ではない可能性があるため、注意が必要。
-
-            # 論文の式 (A4), (A5) のS_m (smoothing promotion) の解釈には複数の可能性があり、
-            # 最も一般的な解釈は、S_mがペナルティ項を導入するような役割を果たすことです。
-            # ここでは、S_mを外に出して、計算後に平滑化を行う。あるいは、A^T AとB^T Bを直接平滑化する。
-            # A^T A と B^T B はそれぞれ対角行列の積なので、要素はベクトルa, bの要素の二乗になる。
-
-            # 論文の式(A4)(A5)の構造から、S_mはA^T AとB^T Bにかかる演算子である。
-            # しかし、詳細がないため、ここではA^T A (対角行列) の要素に平滑化を適用するという仮定を置く。
-            # これは、通常の画像処理における「局所平滑化」をS_mの意図として解釈している。
-
-            # しかし、A^T A が対角行列であるという定義を維持すると、
-            # S_m (A^T A - lambda_1^2 I) の計算は、対角要素に対して行われる。
-            # S_mを関数として定義し、行列の各要素に作用させることを想定すると、
-            # gaussian_filter を直接的に行列に適用するのは自然。
-
-            # 最も素直な実装は、S_mをガウスカーネルとして定義し、行列A^T AとB^T Bに作用させること。
-            # しかし、A^T A, B^T Bはもはやシンプルなベクトルではなく、ウィンドウ内のデータから作られた行列。
-            # 論文の記述は非常に抽象的であるため、最も妥当な解釈を試みる。
-            # S_mを要素ごとの乗算や、畳み込みとして実装する。
-
-            # 暫定的なS_mの解釈:
-            # S_mは平滑化を「促進する」関数なので、逆問題の解法において正則化項として現れることが多い。
-            # 式 (A4) と (A5) の形は、Tikhonov正則化に似ている。
-            # S_mが単位行列であれば、単純な正則化になる。
-
-            # ここでは、S_mの具体的な実装として、A^T AとB^T Bの計算結果の対角要素にガウス平滑化を適用すると仮定する。
-            # これは論文の厳密な定義ではないが、平滑化の意図を汲むための現実的なアプローチ。
-
-            # A^T A と B^T B の計算 (対角行列の積なので、対角要素は要素の二乗)
-            ATA_diag = np.diag(sub_A_flat ** 2)
-            BTB_diag = np.diag(sub_B_flat ** 2)
-
-            # S_m の適用 (ここでは、平滑化をA^T AとB^T Bの要素に適用すると解釈)
-            # ガウス平滑化は主に空間的な平滑化なので、1D配列に適用する場合は注意が必要。
-            # ここではS_mを要素ごとの重み付けとして解釈し、
-            # apply_gaussian_smoothing関数を呼び出す形式はここでは不自然なので、
-            # S_mを一時的な行列として扱う。
-            # S_mが単位行列でない場合、ピン逆行列の計算が複雑になる。
-
-            # 論文の式 (A4) と (A5) は、S_mが正則化行列（例えば、勾配のノルムを最小化するような行列）
-            # または要素ごとの重み付け行列であることを示唆している。
-            # 「S_m is a function for smoothness promotion」
-
-            # 論文の意図を最もシンプルに解釈すると、S_mは平滑化係数（スカラー）か、
-            # 局所的な平滑化フィルタリングを適用する操作と考えるのが妥当。
-            # S_mが行列である場合、そのサイズはA^T AやB^T Bと同じ。
-
-            # ここでは、S_mを単純なスカラー乗算因子として扱い、平滑化は後で適用すると解釈を変更します。
-            # 論文の図5 (c) (d) のように、Local similarity spectrum自体を平滑化することを示唆している可能性もある。
-            # しかし、式の $S_m (A^T A - \lambda_1^2 I)$ の位置は、行列演算の一部。
-            # この曖昧さがあるため、実装が複雑になります。
-
-            # **暫定的な対応**:
-            # 論文の式 (A4) と (A5) はそのままに、S_mを単位行列として実装します。
-            # これは「平滑化を促進する関数」という記述とは異なりますが、具体的なS_mの定義がないため、
-            # 最初の実装としてはこのアプローチが最も安全です。
-            # 平滑化は、Local Similarityスペクトル計算後に`apply_gaussian_smoothing`関数で別途行うことを推奨します。
-            # これにより、論文の図5(c)から(d)への変換（ソフト閾値適用後の平滑化）をシミュレートできます。
-
-            # $\lambda_1, \lambda_2$ の計算 (A6, A7)
-            # ||A^T A||_2 はFrobeniusノルムかスペクトルノルムか不明。ここではFrobeniusノルムとする。
-            # Aが対角行列なので、A^T Aも対角行列。その対角要素は sub_A_flat の各要素の二乗。
-            # 対角行列のFrobeniusノルムは、対角要素の二乗和の平方根。
-            # 対角行列のスペクトルノルムは、対角要素の絶対値の最大値。
-
-            # 論文の図 (Figure 5) の例を見ると、0〜2の範囲のスペクトル値。
-            # これは相関係数に近い値を示唆している可能性もあるが、ノルムの計算方法によって異なる。
-            # ここでは、スペクトルノルム（最大特異値）として計算します。
-            # 対角行列の場合、スペクトルノルムは対角要素の絶対値の最大値。
-            lambda1_val = np.linalg.norm(A_diag, ord=2) # スペクトルノルム
-            lambda2_val = np.linalg.norm(B_diag, ord=2) # スペクトルノルム
-
-            # 式 (A4) c1 = [lambda_1^2 I + S_m (A^T A - lambda_1^2 I)]^-1 S_m A^T b
-            # S_m を単位行列 I と仮定
-            if len(sub_A_flat) == 0: # ゼロ除算回避
-                c1 = np.zeros_like(sub_A_flat)
-            else:
-                term1_inv_c1 = pinv(lambda1_val**2 * np.eye(len(sub_A_flat)) + (ATA_diag - lambda1_val**2 * np.eye(len(sub_A_flat))))
-                c1 = term1_inv_c1 @ A_diag.T @ sub_B_flat
-
-            # 式 (A5) c2 = [lambda_2^2 I + S_m (B^T B - lambda_2^2 I)]^-1 S_m B^T a
-            if len(sub_B_flat) == 0: # ゼロ除算回避
-                c2 = np.zeros_like(sub_B_flat)
-            else:
-                term1_inv_c2 = pinv(lambda2_val**2 * np.eye(len(sub_B_flat)) + (BTB_diag - lambda2_val**2 * np.eye(len(sub_B_flat))))
-                c2 = term1_inv_c2 @ B_diag.T @ sub_A_flat
-
-            # 式 (A1) c = sqrt(c1^H c2)
-            # c1^H は c1 の共役転置。c1が実数の場合、ただの転置 (内積)。
-            # 論文の図を見ると実数値なので、内積でOK。
-            if c1.size == 0 or c2.size == 0:
-                local_similarity = 0.0
-            else:
-                local_similarity = np.sqrt(np.dot(c1, c2))
-
-            local_similarity_spectrum[i, j] = local_similarity
-
-    # Local Similarityスペクトル全体に平滑化を適用（S_mの意図を補完）
-    # 論文の図5 (d) に類似度スペクトルがソフト閾値後に平滑化されているように見えるため、ここで適用。
-    if sigma_smoothing > 0:
-        local_similarity_spectrum = apply_gaussian_smoothing(local_similarity_spectrum, sigma=sigma_smoothing)
+            if current_debug_mode:
+                print(f"\n--- Debugging pixel ({i}, {j}) ---")
+            
+            local_similarity_spectrum[i, j] = _compute_local_similarity_element(sub_A_flat, sub_B_flat, debug_mode=current_debug_mode)
+            
+            if current_debug_mode:
+                print(f"--- End debugging pixel ({i}, {j}) ---\n")
 
     return local_similarity_spectrum
+
+
+# --- 使われていない関数 calculate_local_similarity_spectrum は削除 ---
 
 
 def apply_soft_threshold(similarity_spectrum: np.ndarray, threshold: float) -> np.ndarray:
@@ -304,9 +186,6 @@ def apply_soft_threshold(similarity_spectrum: np.ndarray, threshold: float) -> n
     Local Similarityスペクトルにソフト閾値関数を適用する 。
     論文の式(8) に基づく 。
     """
-    # 論文の式 (8):
-    # c_ij'(D_A, D_B) = c_ij(D_A, D_B) if c_ij(D_A, D_B) > epsilon
-    #                  = 0          if c_ij(D_A, D_B) <= epsilon
     thresholded_spectrum = np.where(similarity_spectrum > threshold, similarity_spectrum, 0)
     return thresholded_spectrum
 
@@ -333,67 +212,76 @@ def extract_local_maximums(spectrum: np.ndarray, neighborhood_size: int = 3) -> 
     """
     Local Similarityスペクトルから局所最大値を抽出し、岩石の位置を特定する 。
     """
-    # 局所最大値を検出するためのフィルターを適用
-    # neighborhood_sizeは、ピークを検出するための近傍サイズ。
-    # マイグレーション後のデータはシャープなので、小さめの値が適切。
     local_max = (spectrum == maximum_filter(spectrum, size=neighborhood_size))
-
-    # 閾値0以上の点のみを対象とする (ソフト閾値処理後なので、ほとんどのノイズは0になっているはず)
     rock_locations = np.argwhere(local_max & (spectrum > 0)).tolist()
-
     return rock_locations
 
 
-def plot(data, x_axis: np.ndarray, z_axis: np.ndarray, output_dir: str, output_name: str):
+def plot_spectrum_with_rocks(data: np.ndarray, x_axis: np.ndarray, z_axis: np.ndarray,
+                             output_dir: str, output_name: str, rock_locations: list = None,
+                             downsample_factor: int = 1, x_range_plot: tuple = None):
+    """
+    スペクトルデータと岩石位置をプロットする関数。
+    ダウンサンプリングとX軸範囲指定のオプションを追加。
+    """
+    # データのダウンサンプリング
+    if downsample_factor > 1:
+        data_display = data[::downsample_factor, ::downsample_factor]
+        x_axis_display = x_axis[::downsample_factor]
+        z_axis_display = z_axis[::downsample_factor]
+    else:
+        data_display = data
+        x_axis_display = x_axis
+        z_axis_display = z_axis
+
     fig, ax = plt.subplots(figsize=(18, 6))
-    im = ax.imshow(data, aspect='auto', cmap='turbo',
-                        extent=[x_axis.min(), x_axis.max(), z_axis.max(), z_axis.min()],
+
+    # X軸範囲の調整
+    if x_range_plot is not None:
+        x_min_plot, x_max_plot = x_range_plot
+        # プロット範囲に対応するデータインデックスを計算
+        col_idx_min = np.searchsorted(x_axis_display, x_min_plot, side='left')
+        col_idx_max = np.searchsorted(x_axis_display, x_max_plot, side='right')
+        
+        data_display = data_display[:, col_idx_min:col_idx_max]
+        x_axis_display = x_axis_display[col_idx_min:col_idx_max]
+        
+        # extentもX軸範囲に合わせて調整
+        extent = [x_axis_display.min(), x_axis_display.max(), z_axis_display.max(), z_axis_display.min()]
+    else:
+        extent = [x_axis_display.min(), x_axis_display.max(), z_axis_display.max(), z_axis_display.min()]
+
+    im = ax.imshow(data_display, aspect='auto', cmap='turbo',
+                        extent=extent,
                         origin='lower')
-    ax.set_xlabel('Distance (m)', fontsize=20)
-    ax.set_ylabel('Depth (m)', fontsize=20)
-    ax.tick_params(labelsize=18)
-
-    # カラーバーの追加
-    delvider = axgrid1.make_axes_locatable(plt.gca())
-    cax = delvider.append_axes('right', size='5%', pad=0.1)
-    cbar = plt.colorbar(im, cax=cax)
-    cbar.set_label('Amplitude', fontsize=20)
-    cbar.ax.tick_params(labelsize=18)
-
-    plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, output_name + '.pdf'), dpi=300)
-    plt.show()
-
-
-def plot_rock_locations_on_spectrum(data, x_axis: np.ndarray, z_axis: np.ndarray, output_dir: str, output_name: str, rock_locations: list):
-    fig, ax = plt.subplots(figsize=(18, 6))
-    im = ax.imshow(data, aspect='auto', cmap='turbo',
-                        extent=[x_axis.min(), x_axis.max(), z_axis.max(), z_axis.min()],
-                        origin='lower') # origin='lower'でZ軸が下向きになるよう調整
 
     ax.set_xlabel('Distance (m)', fontsize=20)
     ax.set_ylabel('Depth (m)', fontsize=20)
     ax.tick_params(labelsize=18)
 
     # 岩石の位置をオーバーレイ
-    if rock_locations: # リストが空でない場合のみプロット
-        # rock_locationsは (row_idx, col_idx) なので、x_plotはcol_idx*dx, z_plotはrow_idx*dz
-        # しかしimshowのextentとorigin='lower'の関係で、z_axisは最大値から最小値の順になるので
-        # プロットするz座標はそのままdz * row_idxで良い。
-        rock_x_coords = [loc[1] * x_axis[1] for loc in rock_locations] # col_idx * dx
-        rock_z_coords = [loc[0] * z_axis[1] for loc in rock_locations] # row_idx * dz
-        ax.plot(rock_x_coords, rock_z_coords, 'ro', markersize=5, alpha=0.7) # 赤い点でオーバーレイ
+    if rock_locations:
+        rock_x_coords = []
+        rock_z_coords = []
+        for loc in rock_locations:
+            current_x = loc[1] * x_axis[1] # col_idx * dx
+            if x_range_plot is not None and (current_x < x_min_plot or current_x > x_max_plot):
+                continue
+            rock_x_coords.append(current_x)
+            rock_z_coords.append(loc[0] * z_axis[1]) # row_idx * dz
+        
+        if rock_x_coords:
+            ax.plot(rock_x_coords, rock_z_coords, 'ro', markersize=5, alpha=0.7)
 
-    # カラーバーの追加
-    divider = axgrid1.make_axes_locatable(ax) # plt.gca() -> ax
+    divider = axgrid1.make_axes_locatable(ax)
     cax = divider.append_axes('right', size='5%', pad=0.1)
     cbar = plt.colorbar(im, cax=cax)
-    cbar.set_label('Amplitude', fontsize=20)
+    cbar.set_label('Similarity', fontsize=20)
     cbar.ax.tick_params(labelsize=18)
 
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, output_name + '.pdf'), dpi=300)
-    plt.show()
+    plt.close(fig)
 
 
 def main():
@@ -403,10 +291,21 @@ def main():
     c = 299792458  # Speed of light in m/s
     epsilon_r = 4.5  # Relative permittivity, from Feng et al. (2024)
     dz = dt * c / np.sqrt(epsilon_r) / 2  # Depth interval in meters
-    sigma_smoothing = 0.5  # ガウス平滑化の標準偏差
-    soft_threshold_value = 0.1  # ソフト閾値の値
+    sigma_smoothing = 0.5  # ガウス平滑化の標準偏差 (Local Similarityスペクトル全体に適用)
+    soft_threshold_value = 0.05 # 仮の閾値。統計情報を見て調整する
     reflection_mask = None  # 反射領域のマスク (必要に応t場合はリストで指定)
-    local_max_neighborhood = 3  # 局所最大値を検出するための近傍サイズ
+    local_max_neighborhood = 5  # 局所最大値を検出するための近傍サイズ
+
+    # Debugging pixels (row, col)
+    # Numbaの型推論に対応するため、int型のnp.ndarrayとして渡す
+    # debug_pixels = [(100, 100), (500, 5000), (1000, 10000), (1500, 20000)]
+    debug_pixel_rows = np.array([100, 500, 1000, 1500], dtype=np.int64)
+    debug_pixel_cols = np.array([100, 5000, 10000, 20000], dtype=np.int64)
+    
+    # Numba prange と print が混在すると出力順序が保証されないため、
+    # デバッグ情報を収集する際は prange を一時的に外して (parallel=False) 実行するか、
+    # 非常に限られたピクセル数でのみデバッグ出力を有効にしてください。
+
 
     # Input paths
     data_paths = [
@@ -441,8 +340,8 @@ def main():
     print(" ")
 
     # Set axis
-    x_axis = np.arange(data1.shape[1]) * dx  # x-axis in meters
-    z_axis = np.arange(data1.shape[0]) * dz # z-axis in meters
+    x_axis = np.arange(data1.shape[1]) * dx
+    z_axis = np.arange(data1.shape[0]) * dz
 
     # Output directory
     base_dir = "/Volumes/SSD_Kanda_SAMSUNG/LPR/Local_similarity/local_similarity"
@@ -452,27 +351,44 @@ def main():
         output_dir = os.path.join(base_dir, '5_Terrain_correction')
     os.makedirs(output_dir, exist_ok=True)
 
-    """
-    マイグレーション済みLPRデータから岩石の位置を特定するエンドツーエンドの処理パイプライン。
-    """
     # Local Similarityスペクトルの計算
-    # S_mの平滑化はcalculate_local_similarity_spectrum内で実行
-    print("Calculating Local Similarity Spectrum...")
-    similarity_spectrum = calculate_local_similarity_spectrum_fast(data1, data2, dx, dz, sigma_smoothing) # sigma_smoothing はここでは0に
+    print("Calculating Local Similarity Spectrum (fast version)...")
+    # sigma_smoothing は calculate_local_similarity_spectrum_fast から削除されたので注意
+    # debug_pixels を渡す
+    similarity_spectrum = calculate_local_similarity_spectrum_fast(
+        data1, data2, dx, dz, 
+        debug_pixel_rows=debug_pixel_rows, 
+        debug_pixel_cols=debug_pixel_cols
+    )
     np.savetxt(os.path.join(output_dir, 'local_similarity_spectrum_raw.txt'), similarity_spectrum, fmt='%.6f')
     print("Finished")
     print(" ")
+    
+    # Local Similarityスペクトルの統計情報を表示 (閾値調整の参考に)
+    print("Similarity Spectrum Statistics:")
+    print(f"  Min: {np.min(similarity_spectrum):.6f}")
+    print(f"  Max: {np.max(similarity_spectrum):.6f}")
+    print(f"  Mean: {np.mean(similarity_spectrum):.6f}")
+    print(f"  Std Dev: {np.std(similarity_spectrum):.6f}")
+    print("Please examine the 'local_similarity_raw.pdf' plot to determine an appropriate soft_threshold_value.")
+    print(" ")
 
-    # ソフト閾値関数の適用
     # Local Similarityスペクトル全体に平滑化を適用
     if sigma_smoothing > 0:
         print("Applying Gaussian smoothing to similarity spectrum...")
-        thresholded_spectrum = apply_gaussian_smoothing(similarity_spectrum, sigma=sigma_smoothing)
-        np.savetxt(os.path.join(output_dir, 'local_similarity_spectrum_smoothed.txt'), similarity_spectrum, fmt='%.6f')
+        similarity_spectrum_smoothed = apply_gaussian_smoothing(similarity_spectrum, sigma=sigma_smoothing)
+        np.savetxt(os.path.join(output_dir, 'local_similarity_spectrum_smoothed.txt'), similarity_spectrum_smoothed, fmt='%.6f')
         print("Finished")
         print(" ")
     else:
-        thresholded_spectrum = similarity_spectrum
+        similarity_spectrum_smoothed = similarity_spectrum # 平滑化しない場合はそのまま次のステップへ
+
+    # ソフト閾値関数の適用
+    print(f"Applying soft threshold with value: {soft_threshold_value}...")
+    thresholded_spectrum = apply_soft_threshold(similarity_spectrum_smoothed, soft_threshold_value)
+    np.savetxt(os.path.join(output_dir, 'local_similarity_spectrum_thresholded.txt'), thresholded_spectrum, fmt='%.6f')
+    print("Finished")
+    print(" ")
 
     # 反射領域のミュート (オプション)
     print("Muting reflection area...")
@@ -495,13 +411,31 @@ def main():
     print("Finished")
     print(" ")
 
-    # Plot
+    # Plotting results
     print("Plotting results...")
-    plot(similarity_spectrum, x_axis, z_axis, output_dir, 'local_similarity')
-    plot(thresholded_spectrum, x_axis, z_axis, output_dir, 'local_similarity_thresholded')
+    plot_downsample_factor = 10 
+    plot_x_range = (0, 100) # 例: 距離0mから100mの範囲をプロット
+
+    plot_spectrum_with_rocks(similarity_spectrum, x_axis, z_axis, output_dir, 'local_similarity_raw',
+                             rock_locations=None, downsample_factor=plot_downsample_factor, x_range_plot=plot_x_range)
+    
+    plot_spectrum_with_rocks(similarity_spectrum, x_axis, z_axis, output_dir, 'local_similarity_raw_with_rocks',
+                             rock_locations=rock_locations, downsample_factor=plot_downsample_factor, x_range_plot=plot_x_range)
+
+    if sigma_smoothing > 0:
+        plot_spectrum_with_rocks(similarity_spectrum_smoothed, x_axis, z_axis, output_dir, 'local_similarity_smoothed',
+                                 rock_locations=None, downsample_factor=plot_downsample_factor, x_range_plot=plot_x_range)
+        plot_spectrum_with_rocks(similarity_spectrum_smoothed, x_axis, z_axis, output_dir, 'local_similarity_smoothed_with_rocks',
+                                 rock_locations=rock_locations, downsample_factor=plot_downsample_factor, x_range_plot=plot_x_range)
+
+
+    plot_spectrum_with_rocks(thresholded_spectrum, x_axis, z_axis, output_dir, 'local_similarity_thresholded',
+                             rock_locations=rock_locations, downsample_factor=plot_downsample_factor, x_range_plot=plot_x_range)
+
     if reflection_mask is not None:
-        plot(muted_spectrum, x_axis, z_axis, output_dir, 'local_similarity_muted')
-    plot_rock_locations_on_spectrum(rock_locations, x_axis, z_axis, output_dir, 'rock_locations', rock_locations)
+        plot_spectrum_with_rocks(muted_spectrum, x_axis, z_axis, output_dir, 'local_similarity_muted',
+                                 rock_locations=rock_locations, downsample_factor=plot_downsample_factor, x_range_plot=plot_x_range)
+    print("Plotting finished.")
 
 if __name__ == "__main__":
     main()
