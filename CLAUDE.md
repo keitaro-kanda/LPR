@@ -121,3 +121,89 @@ The codebase handles multiple text encodings for data files:
 - Primary: Shift-JIS encoding
 - Fallback: UTF-16 encoding
 - This is handled automatically in the data loading functions
+
+## External SSD Data Storage
+
+### SSD Mount Point
+All LPR data is stored on an external Samsung SSD mounted at:
+```
+/Volumes/SSD_Kanda_SAMSUNG/LPR/
+```
+
+### Directory Structure
+
+#### Main Channels
+- **LPR_1/**: High-frequency channel (60 MHz) data
+- **LPR_2A/**: Low-frequency channel A (5 MHz) data  
+- **LPR_2B/**: Low-frequency channel B (5 MHz) data
+
+#### Data Organization per Channel
+
+##### LPR_1 Structure
+```
+LPR_1/
+├── Ascan/                          # A-scan echo data files (.txt)
+├── CE4_GRAS_LPR-1_*.2B            # Raw binary data files
+└── CE4_GRAS_LPR-1_*.2BL           # Binary metadata files
+```
+
+##### LPR_2A Structure  
+```
+LPR_2A/
+├── original_binary/               # Raw .2B and .2BL files
+├── loaded_data/                   # Parsed binary data by sequence ID
+├── loaded_data_echo_position/     # Echo data with position info
+├── Processed_Data/               # Pipeline output data
+└── Resampled_Data/              # Resampled and filtered data
+    ├── txt/                     # Resampled echo data
+    ├── position/                # Position data files
+    ├── position_plot/           # Position visualization
+    └── plot/                    # Processing flow plots
+```
+
+##### LPR_2B Structure (Most Complete)
+```
+LPR_2B/
+├── original_binary/              # Raw .2B and .2BL files (380+ sequences)
+├── loaded_data/                  # Individual sequence data (0001-0337)
+├── loaded_data_echo_position/    # Combined echo and position data
+├── Ascan/                        # A-scan processed files
+├── Processed_Data/              # Complete processing pipeline output
+│   ├── 0_Raw_data/
+│   ├── 1_Bandpass_filter/
+│   ├── 2_Time_zero_correction/
+│   ├── 3_Background_removal/
+│   ├── 4_Gain_function/
+│   └── 5_Terrain_correction/
+├── Resampled_Data/              # Quality-filtered data
+│   ├── txt/                     # Resampled echo data
+│   ├── position/                # Position data files  
+│   ├── position_plot/           # Position analysis
+│   ├── plot/                    # Resampling flow visualization
+│   └── idx/                     # Interest point indices
+└── test/                        # Analysis results
+    ├── autocorrelation/
+    ├── envelope/
+    ├── gradient/
+    └── sobel/
+```
+
+#### Additional Data
+- **Local_similarity/**: Local similarity analysis results
+- **previous_study_data/**: Reference datasets
+- **rock_extraction_Hu2019/**: Rock detection analysis
+
+### File Formats
+- **`.2B`**: Binary radar echo data files
+- **`.2BL`**: Binary metadata/label files  
+- **`data_XXXX.txt`**: Echo data with position info (7 header rows + 2048 echo samples)
+- **`XXXX_resampled.txt`**: Quality-filtered echo data
+- **`XXXX_resampled_position.txt`**: Corresponding position data
+
+### Sequence Numbering
+Data is organized by sequence ID (e.g., 0001, 0262, 0316) representing different time periods of CE-4 rover operations. LPR_2B has the most complete dataset with 180+ sequences from 2019-2023.
+
+### Important Paths for Tools
+When updating processing tools, these SSD paths are frequently referenced:
+- Base data path: `/Volumes/SSD_Kanda_SAMSUNG/LPR/`
+- Position data: `/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Resampled_Data/position_plot/total_position.txt`
