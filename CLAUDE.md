@@ -207,3 +207,13 @@ Data is organized by sequence ID (e.g., 0001, 0262, 0316) representing different
 When updating processing tools, these SSD paths are frequently referenced:
 - Base data path: `/Volumes/SSD_Kanda_SAMSUNG/LPR/`
 - Position data: `/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Resampled_Data/position_plot/total_position.txt`
+
+## 絶対禁止事項
+
+以下の行為は絶対に禁止されています:
+
+- **テストエラーや型エラー解消のための条件緩和**: テストや型チェックを通すために、本来必要な条件を緩める
+- **テストのスキップや不適切なモック化による回避**: 正当な理由なくテストをスキップしたり、不適切なモック化でテストを無効化する
+- **出力やレスポンスのハードコード**: 動的に生成されるべき値を固定値でハードコードする
+- **エラーメッセージの無視や隠蔽**: エラーを適切に処理せず、無視したり隠蔽したりする
+- **一時的な修正による問題の先送り**: 根本的な解決を避け、一時的な回避策で問題を先送りする
