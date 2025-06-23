@@ -2,27 +2,27 @@ import numpy as np
 import matplotlib.pyplot as plt
 import mpl_toolkits.axes_grid1 as axgrid1
 import os
-import argparse
+# import argparse
 from tqdm import tqdm
 
 
-#* Parse command line arguments
-parser = argparse.ArgumentParser(
-    prog='pulse_compression.py',
-    description='Apply matched filter to the data',
-    epilog='End of help message',
-    usage='python tools/pulse_compression.py [data_path] [func_type]',
-)
-parser.add_argument('data_path', help='Path to the txt file of thedata')
-parser.add_argument('func_type', choices=['matched', 'wiener'], help='Type of the filter to apply')
-args = parser.parse_args()
+#* Get input parameters
+print('データファイルのパスを入力してください:')
+data_path = input().strip()
+if not os.path.exists(data_path):
+    print('エラー: 指定されたファイルが存在しません')
+    exit(1)
 
+print('フィルタの種類を選択してください (matched, wiener):')
+func_type = input().strip()
+if func_type not in ['matched', 'wiener']:
+    print('エラー: 無効なフィルタ種類です')
+    exit(1)
 
 #* Data path
-data_path = args.data_path
-if args.func_type == 'matched':
+if func_type == 'matched':
     output_dir = os.path.join(os.path.dirname(data_path), 'Matched_filter')
-elif args.func_type == 'wiener':
+elif func_type == 'wiener':
     output_dir = os.path.join(os.path.dirname(data_path), 'Wiener_filter')
 else:
     raise ValueError('Invalid function type')
@@ -86,16 +86,16 @@ fft = 10 * np.log10(np.abs(fft) / np.max(np.abs(fft)))
 #* Apply the matched filter to the data
 data_compressed = np.zeros(data.shape)
 for i in tqdm(range(data.shape[1]), desc='Calculating pulse compression'):
-    if args.func_type == 'matched':
+    if func_type == 'matched':
         data_compressed[:, i] = mached_filter(data[:, i], refer)
-    elif args.func_type == 'wiener':
+    elif func_type == 'wiener':
         wiener_beta = 1e-2
         data_compressed[:, i] = wiener_filter(data[:, i], wiener_beta, refer)
 
 
-if args.func_type == 'matched':
+if func_type == 'matched':
     np.savetxt(os.path.join(output_dir, 'matched_filter.txt'), data_compressed, delimiter=' ')
-elif args.func_type == 'wiener':
+elif func_type == 'wiener':
     output_dir = os.path.join(output_dir, f'beta_{wiener_beta}')
     os.makedirs(output_dir, exist_ok=True)
     np.savetxt(os.path.join(output_dir, 'wiener_filter.txt'), data_compressed, delimiter=' ')
@@ -125,10 +125,10 @@ cbar.set_label('Amplitude', fontsize=20)
 cbar.ax.tick_params(labelsize=18)
 
 
-if args.func_type == 'matched':
+if func_type == 'matched':
     plt.savefig(os.path.join(output_dir, 'matched_filter.png'), format='png', dpi=120)
     plt.savefig(os.path.join(output_dir, 'matched_filter.pdf'), format='pdf', dpi=600)
-elif args.func_type == 'wiener':
+elif func_type == 'wiener':
     plt.savefig(os.path.join(output_dir, 'wiener_filter.png'), format='png', dpi=120)
     plt.savefig(os.path.join(output_dir, 'wiener_filter.pdf'), format='pdf', dpi=600)
 plt.show()

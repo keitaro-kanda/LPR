@@ -3,27 +3,23 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from natsort import natsorted
-import argparse
+# import argparse
 from matplotlib.colors import LogNorm
 from scipy.fft import fft
 from scipy.signal import windows
 
 
-#* Parse command line arguments
-parser = argparse.ArgumentParser(
-    prog='plot_spectrum.py',
-    description='Calculate and plot spectrum from ECHO data',
-    epilog='End of help message',
-    usage='python tools/plot_spectrum.py [path_type]',
-)
-parser.add_argument('path_type', choices = ['local', 'SSD'], help='Choose the path type')
-args = parser.parse_args()
-
+#* Get input parameters
+print('パスの種類を選択してください (local, SSD):')
+path_type = input().strip()
+if path_type not in ['local', 'SSD']:
+    print('エラー: 無効なパス種類です')
+    exit(1)
 
 #* Define data folder path
-if args.path_type == 'local':
+if path_type == 'local':
     data_folder_path = 'LPR_2B/ECHO'
-elif args.path_type == 'SSD':
+elif path_type == 'SSD':
     data_folder_path = '/Volumes/SSD_kanda/LPR/LPR_2B/ECHO'
 output_dir = os.path.join(os.path.dirname(data_folder_path), 'Resampled_ECHO')
 if not os.path.exists(output_dir):

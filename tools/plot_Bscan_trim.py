@@ -3,26 +3,25 @@ import matplotlib.pyplot as plt
 import mpl_toolkits.axes_grid1 as axgrid1
 import os
 from tqdm import tqdm
-import argparse
+# import argparse
 import gc
 
 
 
-#* Parse command line arguments
-parser = argparse.ArgumentParser(
-    prog='plot_Bscan.py',
-    description='Plot trimmed B-scan',
-    epilog='End of help message',
-    usage='python tools/plot_Bscan.py [data_path] [data_type]',
-)
-parser.add_argument('data_path', help='Path to the txt file of thedata')
-parser.add_argument('data_type', choices=['Bscan', 'pulse_compression', 'fk_migration'], help='Type of the data')
-args = parser.parse_args()
+#* Get input parameters
+print('データファイルのパスを入力してください:')
+data_path = input().strip()
+if not os.path.exists(data_path):
+    print('エラー: 指定されたファイルが存在しません')
+    exit(1)
 
-
+print('データの種類を選択してください (Bscan, pulse_compression, fk_migration):')
+data_type = input().strip()
+if data_type not in ['Bscan', 'pulse_compression', 'fk_migration']:
+    print('エラー: 無効なデータ種類です')
+    exit(1)
 
 #* Define the data path
-data_path = args.data_path
 output_dir = os.path.join(os.path.dirname(data_path), 'Trimmed_plot')
 os.makedirs(output_dir, exist_ok=True)
 output_dir_png = os.path.join(output_dir, 'png')
@@ -118,7 +117,7 @@ def plot(data_array, x1, x2, y1, y2, data_type):
 #* Trim the data
 
 #* Define the first point of the trimmed data
-if args.data_type == 'fk_migration':
+if data_type == 'fk_migration':
     v = 299792458 / np.sqrt(3.4)  # [m/s]
     x_first_list = np.arange(0, data.shape[1] * trace_interval, 100) # [m]
     y_first_list = np.arange(0, data.shape[0] * sample_interval * v, 100e-9 * v / 2) # [m]
@@ -130,7 +129,7 @@ else:
 for x_first in tqdm(x_first_list):
     for y_first in y_first_list:
         #* Define the last point of the trimmed data
-        if args.data_type == 'fk_migration':
+        if data_type == 'fk_migration':
             x_last = min(data.shape[1] * trace_interval, x_first + 100)
             y_last = min(data.shape[0] * sample_interval * v, y_first + 100e-9 * v /2)
         else:
@@ -140,7 +139,7 @@ for x_first in tqdm(x_first_list):
         #* Define trimming area in index
         x_first_idx = int(x_first / trace_interval) # [index]
         x_last_idx = int(x_last / trace_interval) # [index]
-        if args.data_type == 'fk_migration':
+        if data_type == 'fk_migration':
             y_first_idx = int(y_first / (sample_interval * v)) # [index]
             y_last_idx = int(y_last / (sample_interval * v)) # [index]
         else:
@@ -151,4 +150,4 @@ for x_first in tqdm(x_first_list):
         trimmed_data = data[y_first_idx:y_last_idx, x_first_idx:x_last_idx]
 
         #* Plot the trimmed data
-        plot(trimmed_data, x_first, x_last, y_first, y_last, args.data_type)
+        plot(trimmed_data, x_first, x_last, y_first, y_last, data_type)

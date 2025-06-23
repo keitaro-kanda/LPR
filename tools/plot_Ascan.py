@@ -2,29 +2,32 @@ import numpy as np
 import matplotlib.pyplot as plt
 import mpl_toolkits.axes_grid1 as axgrid1
 import os
-import argparse
+# import argparse
 from scipy import signal
 from tqdm import tqdm
 
 
-#* Parse command line arguments
-parser = argparse.ArgumentParser(
-    prog='plot_Ascan.py',
-    description='Plot A-scan from B-scan data',
-    epilog='End of help message',
-    usage='python tools/fk_migration.py [data_path] [x] [t_first] [t_last] [-auto]',
-)
-parser.add_argument('data_path', help='Path to the txt file of data.')
-parser.add_argument('x', type=float, help='x position [m] of the A-scan')
-parser.add_argument('t_first', type=float, help='Start time of the A-scan [ns]')
-parser.add_argument('t_last', type=float, help='Last time of the A-scan [ns]')
-parser.add_argument('-auto', action='store_true', help='Select plot area automatically from setting list')
-args = parser.parse_args()
+#* Get input parameters
+print('データファイルのパスを入力してください:')
+data_path = input().strip()
+if not os.path.exists(data_path):
+    print('エラー: 指定されたファイルが存在しません')
+    exit(1)
 
+print('x位置 [m] を入力してください:')
+x = float(input().strip())
 
+print('開始時間 [ns] を入力してください:')
+t_first = float(input().strip())
+
+print('終了時間 [ns] を入力してください:')
+t_last = float(input().strip())
+
+print('自動プロットモードを使用しますか？ (y/n、デフォルト: n):')
+auto_mode = input().strip().lower()
+use_auto = auto_mode.startswith('y') if auto_mode else False
 
 #* Define the data path
-data_path = args.data_path
 output_dir = os.path.join(os.path.dirname(data_path), 'A_scan')
 os.makedirs(output_dir, exist_ok=True)
 
@@ -171,13 +174,13 @@ def plot(Ascan_data, t_array, envelope_data, background_value, t_first, t_last, 
     plt.savefig(os.path.join(output_dir_fig, f'{x}_t{t_first}_{t_last}.png'), dpi=120)
     plt.savefig(os.path.join(output_dir_fig, f'{x}_t{t_first}_{t_last}.pdf'), dpi=300)
 
-    if args.auto:
+    if use_auto:
         plt.close()
     else:
         plt.show()
 
 
-if args.auto:
+if use_auto:
     plot_list = np.loadtxt(os.path.join(output_dir, 'plot_list.txt'), delimiter=' ')
     for i in tqdm(range(plot_list.shape[0]), desc='Plot A-scan'):
         #* Set the output directory
@@ -189,18 +192,18 @@ if args.auto:
 
 else:
     #* Make directory to save the plot
-    output_dir_fig = os.path.join(output_dir, f'x={int(args.x/100)*100}_{int(args.x/100)*100+100}')
+    output_dir_fig = os.path.join(output_dir, f'x={int(x/100)*100}_{int(x/100)*100+100}')
     os.makedirs(output_dir_fig, exist_ok=True)
 
 
     #* Save x, t_first, t_last to txt file
-    plot_params = [args.x, args.t_first, args.t_last]
+    plot_params = [x, t_first, t_last]
     plot_params = np.array(plot_params).reshape(1, 3)
 
 
     #* Make plot
-    Ascan, envelope, background, t_array, peak_idx, peak_value, Bscan_trim, scatter_trim, x_first_idx, x_last_idx = make_plot_data(Bscan, args.x, args.t_first, args.t_last)
-    plot(Ascan, t_array, envelope, background, args.t_first, args.t_last,peak_idx, peak_value,  Bscan_trim, scatter_trim, args.x, x_first_idx, x_last_idx)
+    Ascan, envelope, background, t_array, peak_idx, peak_value, Bscan_trim, scatter_trim, x_first_idx, x_last_idx = make_plot_data(Bscan, x, t_first, t_last)
+    plot(Ascan, t_array, envelope, background, t_first, t_last,peak_idx, peak_value,  Bscan_trim, scatter_trim, x, x_first_idx, x_last_idx)
 
 
     #* Save the plot parameters

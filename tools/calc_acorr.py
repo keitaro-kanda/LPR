@@ -4,25 +4,23 @@ import matplotlib.pyplot as plt
 import mpl_toolkits.axes_grid1 as axgrid1
 import os
 from tqdm import tqdm
-import argparse
+# import argparse
 import scipy.signal as signal
 
 
 
-#* Parse command line arguments
-parser = argparse.ArgumentParser(
-    prog='calc_acorr.py',
-    description='Calculate autocorrelation of B-scan data',
-    epilog='End of help message',
-    usage='python tools/calc_acorr.py [x_first] [x_last] [y_first] [y_last]',
-)
-parser.add_argument('x_first', type=int, help='Start position of x-axis [m]')
-parser.add_argument('x_last', type=int, help='End position of x-axis [m]')
-parser.add_argument('y_first', type=int, help='Start time of y-axis [ns]')
-parser.add_argument('y_last', type=int, help='End time of y-axis [ns]')
-args = parser.parse_args()
+#* Get input parameters
+print('x軸開始位置 [m] を入力してください:')
+x_first = int(input().strip())
 
+print('x軸終了位置 [m] を入力してください:')
+x_last = int(input().strip())
 
+print('y軸開始時間 [ns] を入力してください:')
+y_first = int(input().strip())
+
+print('y軸終了時間 [ns] を入力してください:')
+y_last = int(input().strip())
 
 #* Define the data path
 #data_path = '/Volumes/SSD_kanda/LPR/LPR_2B/Processed_Bscan/txt/3_background_removed_Bscan.txt'
@@ -41,10 +39,7 @@ trace_interval = 3.6e-2 # [m], [Li et al. (2020), Sci. Adv.]
 
 
 #* Trim the data
-x_first = args.x_first # [m]
-x_last = args.x_last # [m]
-y_first = args.y_first # [ns]
-y_last = args.y_last  # [ns]
+# x_first, x_last, y_first, y_last are already defined above
 
 x_first_idx = int(x_first / trace_interval)
 x_last_idx = int(x_last / trace_interval)
