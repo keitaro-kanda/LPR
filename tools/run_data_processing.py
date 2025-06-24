@@ -257,8 +257,8 @@ def terrain_correction(data, z_profile):
     #* Prepare empty array for corrected data
     z_max = np.max(z_profile) # Maximum elevation in the z-profile
     z_min = np.min(z_profile) # Minimum elevation in the z-profile
-    t_expand_min = np.abs(int(z_max / c / sample_interval)) # index number
-    t_expand_max = np.abs(int(z_min / c / sample_interval)) # index number
+    t_expand_min = np.abs(int(z_max / (c / np.sqrt(epsilon_r)) / sample_interval)) # index number
+    t_expand_max = np.abs(int(z_min / (c / np.sqrt(epsilon_r)) / sample_interval)) # index number
     corrected_data = np.zeros((data.shape[0] + t_expand_min + t_expand_max, data.shape[1]))
     corrected_data[:, :] = np.nan  # Initialize with NaN to avoid artifacts
     print('Expanded time range: ', -t_expand_min*sample_interval/1e-9, 'to', (data.shape[0]+t_expand_max)*sample_interval/1e-9, ' ns')
@@ -267,7 +267,7 @@ def terrain_correction(data, z_profile):
     #* Apply terrain correction
     for i in tqdm(range(data.shape[1]), desc='Applying terrain correction'):
         # Calculate the depth based on the z-profile
-        equivalent_time = z_profile[i] / c  # Convert depth to time [s]
+        equivalent_time = z_profile[i] / (c / np.sqrt(epsilon_r))  # Convert depth to time [s] with considering subsurface velocity
         # Apply the correction to each trace
         start_index = int(equivalent_time / sample_interval)
         start_row = np.abs(t_expand_min) - start_index
