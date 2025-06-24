@@ -103,15 +103,27 @@ def envelope_based_hyperbola_edge_detection(bscan_data, v_hough_pix_per_pix, amp
     # 双曲線特有の対称性を検出
     direction_mask = np.zeros_like(abs_bscan_data, dtype=bool)
     
-    # 双曲線の対称的な勾配パターンを検出
+    # 断裂・段差双曲線に対応した緩い方向性検出
     for i in range(2, num_samples-2):
         for j in range(2, num_traces-2):
             if amplitude_mask[i, j]:
-                # 周辺の勾配パターンをチェック
+                # より広範囲の勾配パターンをチェック（断裂対応）
                 left_grad = sobel_x[i, j-1]
                 right_grad = sobel_x[i, j+1]
-                # 左右対称的な勾配（双曲線の特徴）
-                if left_grad * right_grad < 0 and abs(left_grad + right_grad) < abs(left_grad - right_grad) * 0.5:
+                center_grad_x = sobel_x[i, j]
+                center_grad_y = sobel_y[i, j]
+                
+                # 条件1: 従来の対称性（理想的双曲線）
+                symmetric_condition = (left_grad * right_grad < 0 and 
+                                     abs(left_grad + right_grad) < abs(left_grad - right_grad) * 0.7)  # 0.5→0.7に緩和
+                
+                # 条件2: 強い水平勾配変化（断裂双曲線対応）
+                strong_gradient_condition = abs(center_grad_x) > abs(center_grad_y) * 0.5
+                
+                # 条件3: 周辺のエッジ密度（段差双曲線対応）
+                local_edge_density = np.sum(gradient_mask[i-1:i+2, j-1:j+2]) >= 3
+                
+                if symmetric_condition or strong_gradient_condition or local_edge_density:
                     direction_mask[i, j] = True
     
     # 4. エンベロープベースマルチスケール検出
@@ -123,9 +135,12 @@ def envelope_based_hyperbola_edge_detection(bscan_data, v_hough_pix_per_pix, amp
         scale_mask = smoothed > scale_threshold
         multiscale_mask |= scale_mask
     
-    # 5. 統合フィルタ
-    # 複数の条件を組み合わせ
-    combined_mask = amplitude_mask & (gradient_mask | direction_mask | multiscale_mask)
+    # 5. 柔軟な統合フィルタ（断裂・段差双曲線対応）
+    # 基本振幅条件 + より柔軟な複合条件
+    # 方向性フィルタは断裂双曲線で問題となるため重みを下げる
+    flexible_mask = (gradient_mask | multiscale_mask |  # 主要検出条件
+                     (amplitude_mask & direction_mask))  # 方向性は補助的に使用
+    combined_mask = amplitude_mask & flexible_mask
     
     # 6. モルフォロジー処理でノイズ除去
     # 小さな孤立点を除去
@@ -231,15 +246,15 @@ def find_peaks_in_accumulator(accumulator, min_votes_threshold=None, neighborhoo
     max_votes = np.max(accumulator)
     print(f"アキュムレータ統計: 最大投票数={max_votes}, 平均={np.mean(accumulator):.2f}, 標準偏差={np.std(accumulator):.2f}")
     
-    # 偽陰性重視：厳格な適応的閾値設定
+    # 断裂・段差双曲線対応：大幅に緩和した適応的閾値設定
     if min_votes_threshold is None:
-        # 全データ処理に対応した適応的閾値（偽陰性重視だが実用的）
+        # 断裂双曲線の分散投票を考慮した閾値（大幅緩和）
         vote_std = np.std(accumulator)
         vote_mean = np.mean(accumulator)
-        adaptive_threshold = max(10, int(vote_mean + 3 * vote_std))  # 4σ→3σに緩和
-        max_based_threshold = max(20, max_votes // 5)  # 最大値の1/5に緩和
+        adaptive_threshold = max(8, int(vote_mean + 2 * vote_std))  # 3σ→2σに緩和
+        max_based_threshold = max(12, max_votes // 10)  # 最大値の1/5→1/10に大幅緩和
         min_votes_threshold = min(adaptive_threshold, max_based_threshold)
-        print(f"厳格な適応的閾値を設定: {min_votes_threshold} (統計ベース: {adaptive_threshold}, 最大値ベース: {max_based_threshold})")
+        print(f"断裂双曲線対応の緩和閾値を設定: {min_votes_threshold} (統計ベース: {adaptive_threshold}, 最大値ベース: {max_based_threshold})")
     else:
         print(f"指定された最小投票数閾値: {min_votes_threshold}")
     
@@ -262,8 +277,8 @@ def find_peaks_in_accumulator(accumulator, min_votes_threshold=None, neighborhoo
         if time_ns < 10 or time_ns > 500:  # 10-500nsの範囲
             continue
         
-        # 適度な最低投票数（偽陰性重視だが極端すぎない）
-        if score < max(8, max_votes // 15):  # 最低8票、または最大値の1/15に緩和
+        # 断裂双曲線対応：大幅緩和した最低投票数
+        if score < max(6, max_votes // 20):  # 最低6票、または最大値の1/20に大幅緩和
             continue
             
         # 双曲線の品質チェック：周辺のアキュムレータ値との比較
