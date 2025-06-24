@@ -105,16 +105,15 @@ def integrate_resampled_data():
 #* Bandpass filter
 def bandpass_filter(input_data, lowcut, highcut, order): # Ascandata is 1D array
     #* Filter specifications
-    #* Design the Butterworth band-pass filter
-    #order = 4
+    #* Design the Butterworth band-pass filter using SOS format
     nyquist = 0.5 * fs
     low = lowcut / nyquist
     high = highcut / nyquist
 
-    b, a = signal.butter(order, [low, high], btype='band')
+    sos = signal.butter(order, [low, high], btype='band', output='sos')
 
-    #* Apply bandpass filter
-    filtered_data = signal.filtfilt(b, a, input_data)
+    #* Apply bandpass filter using sosfiltfilt for better numerical stability
+    filtered_data = signal.sosfiltfilt(sos, input_data)
 
     return filtered_data
 
