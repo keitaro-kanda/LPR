@@ -270,7 +270,7 @@ def main():
     vline.sigPositionChanged.connect(update_ascan)
     update_ascan()
 
-    colorbar = pg.ColorBarItem(values=(-abs(data).max()/8, abs(data).max()/8), colorMap=cpg)
+    colorbar = pg.ColorBarItem(values=(-abs(data).max()/15, abs(data).max()/15), colorMap=cpg)
     colorbar.setImageItem(img)
 
     win.addItem(plot, 0, 0)
