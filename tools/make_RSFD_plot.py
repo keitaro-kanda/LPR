@@ -22,7 +22,9 @@ if not (os.path.exists(data_path) and data_path.lower().endswith('.json')):
     raise FileNotFoundError('正しい .json ファイルを指定してください。')
 
 # 出力フォルダ
-output_dir = os.path.join(os.path.dirname(data_path), 'RSFD')
+base_dir = os.path.join(os.path.dirname(os.path.dirname(data_path)), 'RSFD')
+file_name = os.path.splitext(os.path.basename(data_path))[0]
+output_dir = os.path.join(base_dir, file_name)
 os.makedirs(output_dir, exist_ok=True)
 # プロット用サブフォルダ
 output_dir_plot = os.path.join(output_dir, 'plots')
