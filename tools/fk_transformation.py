@@ -45,7 +45,7 @@ KK_power_log = 20 * np.log(np.abs(KK_shifted))  # Logarithm of the absolute valu
 plt.figure(figsize=(18, 6))
 plt.imshow(KK_power_log, aspect='auto',
             extent=(K.min(), K.max(), f_MHz.min(), f_MHz.max()),
-            cmap='turbo', origin='lower', vmin=0, vmax=np.max(np.abs(KK_power_log))/3)
+            cmap='turbo', origin='lower', vmin=0, vmax=np.max(np.abs(KK_power_log))/2)
 plt.colorbar(label='Amplitude')
 plt.xlabel('Wavenumber (1/m)')
 plt.ylabel('Frequency (Hz)')
