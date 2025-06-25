@@ -42,27 +42,27 @@ class HyperbolaVisualization:
         """検出結果概要プロット"""
         
         fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-        fig.suptitle('ロバスト双曲線検出結果', fontsize=16)
+        fig.suptitle('Robust Hyperbola Detection Results', fontsize=16)
         
         # B-scanデータ
         ax1 = axes[0, 0]
         self._plot_bscan_with_detections(ax1, bscan_data, results, hough_peaks)
-        ax1.set_title('B-scan + 検出結果')
+        ax1.set_title('B-scan + Detection Results')
         
         # フィッティング品質分布
         ax2 = axes[0, 1]
         self._plot_quality_distribution(ax2, results)
-        ax2.set_title('フィッティング品質分布')
+        ax2.set_title('Fitting Quality Distribution')
         
         # 深度-位置分布
         ax3 = axes[1, 0]
         self._plot_depth_position_distribution(ax3, results)
-        ax3.set_title('深度-位置分布')
+        ax3.set_title('Depth-Position Distribution')
         
         # 残差解析
         ax4 = axes[1, 1]
         self._plot_residual_analysis(ax4, results)
-        ax4.set_title('残差解析')
+        ax4.set_title('Residual Analysis')
         
         plt.tight_layout()
         plt.savefig(os.path.join(output_dir, "robust_detection_overview.png"), dpi=150)
@@ -97,20 +97,27 @@ class HyperbolaVisualization:
                                label=f'Fitted hyperbolas ({len(results)})')
             plt.colorbar(scatter, ax=ax, label='Quality Score')
             
-            # 双曲線描画
-            for result in results[:5]:  # 上位5個のみ
+            # 双曲線描画（小さなスケール用フィルタ）
+            for result in results[:10]:  # 上位10個
                 if result.quality_score > 0.6:
-                    self._draw_hyperbola(ax, result.params, width, height, 
-                                       alpha=0.6, color=plt.cm.Reds(result.quality_score))
+                    # 小さな双曲線のみ描画（サイズフィルタ）
+                    hyperbola_width = self._estimate_hyperbola_width(result.params, height)
+                    if hyperbola_width <= 80:  # 約2.8m相当以下
+                        self._draw_hyperbola(ax, result.params, width, height, 
+                                           alpha=0.8, color=plt.cm.Reds(result.quality_score))
         
-        ax.set_xlabel('距離 (m)')
-        ax.set_ylabel('時間 (ns)')
+        ax.set_xlabel('Distance (m)')
+        ax.set_ylabel('Time (ns)')
         ax.legend()
     
     def _draw_hyperbola(self, ax, params: HyperbolaParams, width: int, height: int,
                        alpha: float = 0.6, color: str = 'red'):
-        """双曲線描画"""
-        x_range = np.linspace(0, width, 200)
+        """双曲線描画（小さなスケール用）"""
+        # 小さな双曲線用に描画範囲を制限
+        x_start = max(0, params.x0 - 80)  # 約2.8m範囲
+        x_end = min(width, params.x0 + 80)
+        x_range = np.linspace(x_start, x_end, 100)
+        
         try:
             t_curve = np.sqrt(params.t0**2 + (x_range - params.x0)**2 / params.v**2)
             
@@ -118,13 +125,28 @@ class HyperbolaVisualization:
             x_physical = x_range * self.dx_m
             t_physical = t_curve * self.dt_ns
             
-            # 有効範囲内のみプロット
-            valid_mask = (t_curve < height) & (t_curve > 0)
+            # 有効範囲内のみプロット（小さな時間範囲）
+            time_range = params.t0 * self.dt_ns + 30  # 頂点から30ns範囲
+            valid_mask = (t_curve < height) & (t_curve > 0) & (t_physical <= time_range)
             if np.any(valid_mask):
                 ax.plot(x_physical[valid_mask], t_physical[valid_mask], 
-                       color=color, alpha=alpha, linewidth=2)
+                       color=color, alpha=alpha, linewidth=3)  # 線を太く
         except Exception:
             pass
+    
+    def _estimate_hyperbola_width(self, params: HyperbolaParams, height: int) -> float:
+        """双曲線の推定幅を計算"""
+        try:
+            # 頂点から30ns下での幅を推定
+            t_target = params.t0 + 30 / self.dt_ns  # 30ns下
+            if t_target >= height:
+                return float('inf')
+            
+            # x方向の幅計算
+            x_width = 2 * params.v * np.sqrt(t_target**2 - params.t0**2)
+            return x_width
+        except:
+            return float('inf')
     
     def _plot_quality_distribution(self, ax, results):
         """品質分布プロット"""
@@ -136,9 +158,9 @@ class HyperbolaVisualization:
         
         ax.hist(qualities, bins=20, alpha=0.7, edgecolor='black')
         ax.axvline(np.mean(qualities), color='red', linestyle='--', 
-                  label=f'平均: {np.mean(qualities):.3f}')
-        ax.set_xlabel('品質スコア')
-        ax.set_ylabel('度数')
+                  label=f'Mean: {np.mean(qualities):.3f}')
+        ax.set_xlabel('Quality Score')
+        ax.set_ylabel('Frequency')
         ax.legend()
     
     def _plot_depth_position_distribution(self, ax, results):
@@ -155,8 +177,8 @@ class HyperbolaVisualization:
                            s=60, alpha=0.7, edgecolors='black')
         plt.colorbar(scatter, ax=ax, label='Quality Score')
         
-        ax.set_xlabel('位置 (m)')
-        ax.set_ylabel('深度 (m)')
+        ax.set_xlabel('Position (m)')
+        ax.set_ylabel('Depth (m)')
         ax.invert_yaxis()
     
     def _plot_residual_analysis(self, ax, results):
@@ -172,11 +194,11 @@ class HyperbolaVisualization:
         
         if all_residuals:
             ax.hist(all_residuals, bins=30, alpha=0.7, density=True, edgecolor='black')
-            ax.axvline(0, color='red', linestyle='--', label='理想値')
+            ax.axvline(0, color='red', linestyle='--', label='Ideal')
             ax.axvline(np.mean(all_residuals), color='orange', linestyle='--', 
-                      label=f'平均: {np.mean(all_residuals):.3f}')
-            ax.set_xlabel('残差 (samples)')
-            ax.set_ylabel('密度')
+                      label=f'Mean: {np.mean(all_residuals):.3f}')
+            ax.set_xlabel('Residuals (samples)')
+            ax.set_ylabel('Density')
             ax.legend()
     
     def plot_detailed_fitting(self, bscan_data: np.ndarray, 
@@ -185,27 +207,27 @@ class HyperbolaVisualization:
         """詳細フィッティング結果"""
         
         fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-        fig.suptitle(f'詳細フィッティング結果 (品質: {result.quality_score:.3f})', fontsize=14)
+        fig.suptitle(f'Detailed Fitting Results (Quality: {result.quality_score:.3f})', fontsize=14)
         
         # 元データ + フィット
         ax1 = axes[0, 0]
         self._plot_fit_on_bscan(ax1, bscan_data, result)
-        ax1.set_title('B-scan + フィット結果')
+        ax1.set_title('B-scan + Fitting Results')
         
         # セグメント分析
         ax2 = axes[0, 1]
         self._plot_segment_analysis(ax2, result)
-        ax2.set_title('セグメント分析')
+        ax2.set_title('Segment Analysis')
         
         # 残差分布
         ax3 = axes[1, 0]
         self._plot_residual_distribution(ax3, result)
-        ax3.set_title('残差分布')
+        ax3.set_title('Residual Distribution')
         
         # パラメータ情報
         ax4 = axes[1, 1]
         self._plot_parameter_info(ax4, result)
-        ax4.set_title('パラメータ情報')
+        ax4.set_title('Parameter Information')
         
         plt.tight_layout()
         
@@ -235,8 +257,8 @@ class HyperbolaVisualization:
                 ax.scatter(seg_x, seg_t, c=[colors[i]], s=20, alpha=0.7,
                           label=f'Segment {i+1} ({segment["size"]} pts)')
         
-        ax.set_xlabel('距離 (m)')
-        ax.set_ylabel('時間 (ns)')
+        ax.set_xlabel('Distance (m)')
+        ax.set_ylabel('Time (ns)')
         ax.legend()
     
     def _plot_segment_analysis(self, ax, result):
@@ -249,8 +271,8 @@ class HyperbolaVisualization:
         segment_labels = [f'Seg {i+1}' for i in range(len(result.segments))]
         
         bars = ax.bar(segment_labels, segment_sizes, alpha=0.7)
-        ax.set_ylabel('点数')
-        ax.set_title('セグメント別点数')
+        ax.set_ylabel('Number of Points')
+        ax.set_title('Points per Segment')
         
         # 値をバーの上に表示
         for bar, size in zip(bars, segment_sizes):
@@ -268,7 +290,7 @@ class HyperbolaVisualization:
         ax.hist(residuals, bins=20, alpha=0.7, density=True, edgecolor='black')
         ax.axvline(0, color='red', linestyle='--', label='理想値')
         ax.axvline(np.mean(residuals), color='orange', linestyle='--',
-                  label=f'平均: {np.mean(residuals):.3f}')
+                  label=f'Mean: {np.mean(residuals):.3f}')
         
         # 統計情報
         std_res = np.std(residuals)
@@ -386,24 +408,25 @@ def main():
     output_dir = os.path.join(os.path.dirname(bscan_file), "robust_hyperbola_detection")
     os.makedirs(output_dir, exist_ok=True)
     
-    # データ読み込み
+    # データ読み込み（小さな双曲線検出のため範囲を制限）
     print("データを読み込み中...")
     try:
         if HOUGH_AVAILABLE:
-            bscan_data = load_bscan_data(bscan_file, 500.0, 500.0, DT_NS, DX_M)  # 水平方向も制限
+            # 小さな双曲線検出のため、より小さな範囲に制限
+            bscan_data = load_bscan_data(bscan_file, 100.0, 50.0, DT_NS, DX_M)  # 時間100ns、距離50m
         else:
             bscan_data = np.loadtxt(bscan_file)
-            max_samples = int(500.0 / DT_NS)
-            max_traces = int(500.0 / DX_M)
+            max_samples = int(100.0 / DT_NS)  # 100ns -> 320 samples
+            max_traces = int(50.0 / DX_M)     # 50m -> 1389 traces
             bscan_data = bscan_data[:max_samples, :max_traces]
         
         if bscan_data is None or bscan_data.size == 0:
             print("データ読み込みエラー")
             return
         
-        # さらにサブサンプリング（高速化のため）
-        if bscan_data.shape[1] > 5000:
-            subsample_factor = max(1, bscan_data.shape[1] // 5000)
+        # 小さな双曲線検出のため、サブサンプリングは控えめに
+        if bscan_data.shape[1] > 2000:
+            subsample_factor = max(1, bscan_data.shape[1] // 2000)
             print(f"データサイズが大きいため、サブサンプリング（factor={subsample_factor}）を実行...")
             bscan_data = bscan_data[:, ::subsample_factor]
             
@@ -419,25 +442,28 @@ def main():
         print("Hough変換を実行中...")
         try:
             _, v_hough = calculate_velocity_params(EPSILON_R, DT_NS, DX_M)
-            accumulator = perform_hough_transform(bscan_data, v_hough, 95)
-            hough_peaks = find_peaks_in_accumulator(accumulator, None, 7)
+            # 小さな双曲線検出のため、より厳格な閾値
+            accumulator = perform_hough_transform(bscan_data, v_hough, 99)  # 99パーセンタイル
+            hough_peaks = find_peaks_in_accumulator(accumulator, None, 15)  # より高い閾値
             print(f"Hough変換で検出されたピーク数: {len(hough_peaks)}")
         except Exception as e:
             print(f"Hough変換エラー: {e}")
     
     # ロバストフィッティング
     print("ロバストフィッティングを実行中...")
+    # 小さな双曲線検出用パラメータ
     detector = RobustHyperbolaDetector(
         dt_ns=DT_NS, 
         dx_m=DX_M, 
         epsilon_r=EPSILON_R,
-        max_gap_samples=10,     # 高速化のため縮小
-        min_segment_points=6,   # 高速化のため縮小
-        snr_threshold=3.0       # ノイズ除去を厳格化
+        max_gap_samples=5,      # 小さな双曲線用に縮小
+        min_segment_points=8,   # より厳格に
+        snr_threshold=4.0       # より厳格なノイズ除去
     )
     
     start_time = time.time()
-    results = detector.detect_hyperbolas(bscan_data, hough_peaks, max_hyperbolas=10)
+    # 小さな双曲線に特化した検出
+    results = detector.detect_hyperbolas(bscan_data, hough_peaks, max_hyperbolas=50)
     end_time = time.time()
     
     print(f"処理時間: {end_time - start_time:.2f}秒")
@@ -458,10 +484,15 @@ def main():
     # 概要プロット
     viz.plot_detection_overview(bscan_data, results, hough_peaks, output_dir)
     
-    # 詳細プロット（上位3個）
-    for result in results[:3]:
-        if result.quality_score > 0.6:
-            viz.plot_detailed_fitting(bscan_data, result, output_dir)
+    # 詳細プロット（小さな双曲線のみ、上位5個）
+    plotted_count = 0
+    for result in results:
+        if result.quality_score > 0.7 and plotted_count < 5:
+            # 小さな双曲線のみプロット
+            hyperbola_width = viz._estimate_hyperbola_width(result.params, bscan_data.shape[0])
+            if hyperbola_width <= 80:  # 約2.8m相当以下
+                viz.plot_detailed_fitting(bscan_data, result, output_dir)
+                plotted_count += 1
     
     print(f"処理完了。結果は {output_dir} に保存されました。")
 
