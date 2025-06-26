@@ -11,8 +11,7 @@ from scipy import signal
 import json
 
 # --- ユーザ入力 ---
-print('B-scanデータファイル(.txt)のパスを入力してください:')
-data_path = input().strip()
+data_path = input('B-scanデータファイル(.txt)のパスを入力してください:').strip()
 if not os.path.exists(data_path):
     print('エラー: 指定されたファイルが存在しません')
     exit(1)
@@ -20,8 +19,7 @@ if not data_path.lower().endswith('.txt'):
     print("エラー: B-scanデータはテキストファイル(.txt)を指定してください。")
     exit(1)
 
-print('データの種類を選択してください（raw, bandpass_filtered, time_zero_corrected, background_filtered, gained）:')
-data_type = input().strip().lower()
+data_type = input('データの種類を選択してください（raw, bandpass_filtered, time_zero_corrected, background_filtered, gained）:').strip()
 if data_type not in ['raw', 'bandpass_filtered', 'time_zero_corrected', 'background_filtered', 'gained']:
     print('エラー: 無効なデータ種類です')
     exit(1)
@@ -39,17 +37,65 @@ if use_plot_range:
         use_plot_range = False
         plot_range = None
 
-# --- ラベルJSON読み込み ---
-labels_path = data_path.replace('.txt', '_labels.json')
-if not os.path.exists(labels_path):
-    print('エラー: ラベルファイルが見つかりません:', labels_path)
-    exit(1)
-with open(labels_path, 'r') as f:
-    labels_data = json.load(f)
-results = labels_data.get('results', {})
-x   = np.array([v['x']            for v in results.values()])
-t   = np.array([v['y']            for v in results.values()])
-lab = np.array([v['label']        for v in results.values()], dtype=int)
+# --- Load Labels from JSON files in 'rock_labels' directory ---
+# Initialize lists to store all collected x, t, and lab values
+all_x_coords = []
+all_y_coords = []
+all_labels = []
+
+label_files_dir = os.path.join(os.path.dirname(data_path), 'rock_labels')
+
+json_files = []
+if os.path.exists(label_files_dir) and os.path.isdir(label_files_dir):
+    for filename in sorted(os.listdir(label_files_dir)):
+        if filename.endswith('.json'):
+            json_files.append(os.path.join(label_files_dir, filename))
+else:
+    print(f"エラー: ラベルディレクトリ '{label_files_dir}' が見つからないか、ディレクトリではありません。")
+    exit(1) # Exit if the label directory doesn't exist
+
+if not json_files:
+    print(f"ディレクトリ '{label_files_dir}' にJSONファイルが見つかりませんでした。")
+    # If no JSON files are found, the x, t, lab arrays will be empty, which is acceptable
+    # if there are genuinely no labels.
+else:
+    print(f"ディレクトリ '{label_files_dir}' から以下のJSONファイルを処理します:")
+    for json_file in json_files:
+        print(f"- {os.path.basename(json_file)}")
+
+    print("\n--- 処理開始 ---")
+    for labels_path in json_files:
+        print(f"\nファイル: {os.path.basename(labels_path)} を処理中...")
+        try:
+            with open(labels_path, 'r', encoding='utf-8') as f:
+                labels_data = json.load(f)
+
+            results = labels_data.get('results', {})
+
+            if not results:
+                print(f"  Warning: '{os.path.basename(labels_path)}' に 'results' キーが見つからないか、空でした。スキップします。")
+                continue
+
+            # Extend the master lists with data from the current JSON file
+            all_x_coords.extend([v['x'] for v in results.values()])
+            all_y_coords.extend([v['y'] for v in results.values()])
+            all_labels.extend([v['label'] for v in results.values()])
+
+            print(f"  処理完了: {os.path.basename(labels_path)}")
+
+        except json.JSONDecodeError:
+                print(f"  Error: '{os.path.basename(labels_path)}' が有効なJSON形式ではありません。")
+        except KeyError as e:
+            print(f"  Error: '{os.path.basename(labels_path)}' の 'results' 内に期待されるキー '{e}' が見つかりませんでした。")
+        except Exception as e:
+            print(f"  予期せぬエラーが発生しました: {e} (ファイル: {os.path.basename(labels_path)})")
+
+    # Convert collected lists to NumPy arrays
+    x = np.array(all_x_coords)
+    t = np.array(all_y_coords) # Renamed to t as per original code's variable
+    lab = np.array(all_labels, dtype=int)
+    print("\n--- 全てのラベルファイルの処理が終了しました ---")
+    print(f"合計 {len(x)} 個のラベルポイントを読み込みました。")
 
 # --- パラメータ ---
 sample_interval = 0.312500  # [ns]
