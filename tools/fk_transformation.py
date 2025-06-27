@@ -128,26 +128,36 @@ def plot_fk_result(KK_shifted, f_MHz, K, output_path, title="F-K Transform"):
     # imshow plot
     im = plt.imshow(KK_power_log, aspect='auto',
                     extent=(K.min(), K.max(), f_MHz.min(), f_MHz.max()),
-                    cmap='turbo', origin='lower', 
+                    cmap='turbo', origin='lower',
                     vmin=np.percentile(KK_power_log, 5),
-                    vmax=np.percentile(KK_power_log, 95))
+                    vmax=np.percentile(KK_power_log, 99))
     
+    # ラベル設定（フォントサイズ20、明示的な位置指定）
+    ax = plt.gca()
+    ax.set_xlabel('Wavenumber [1/m]', fontsize=20)
+    ax.set_ylabel('Frequency [MHz]', fontsize=20)
+    ax.tick_params(labelsize=16)
+    
+    # ラベル位置を明示的に指定
+    ax.xaxis.set_label_position('bottom')  # xラベルを下に
+    ax.yaxis.set_label_position('left')    # yラベルを左に
+
     # Colorbar
     divider = axgrid1.make_axes_locatable(plt.gca())
     cax = divider.append_axes('right', size='5%', pad=0.1)
     cbar = plt.colorbar(im, cax=cax)
-    cbar.set_label('Amplitude [dB]', fontsize=14)
-    cbar.ax.tick_params(labelsize=12)
+    cbar.set_label('Amplitude [dB]', fontsize=20)
+    cbar.ax.tick_params(labelsize=16)
     
-    plt.xlabel('Wavenumber [1/m]', fontsize=14)
-    plt.ylabel('Frequency [MHz]', fontsize=14)
-    plt.title(title, fontsize=16)
-    plt.tick_params(labelsize=12)
+    
+    
     plt.tight_layout()
     
-    # 保存
-    plt.savefig(output_path, dpi=150, bbox_inches='tight')
-    plt.close()  # メモリ節約のため閉じる
+    # PNG とPDF両方で保存
+    base_path = output_path.rsplit('.', 1)[0]  # 拡張子を除去
+    plt.savefig(f'{base_path}.png', dpi=150, bbox_inches='tight')
+    plt.savefig(f'{base_path}.pdf', dpi=300, bbox_inches='tight')
+    plt.show()
 
 def plot_combined_bscan_fk(window_data, KK_shifted, f_MHz, K, output_path, 
                           x_start_m, t_start_ns, dt, dx, global_data_max):
@@ -208,7 +218,7 @@ def plot_combined_bscan_fk(window_data, KK_shifted, f_MHz, K, output_path,
                      extent=(K.min(), K.max(), f_MHz.min(), f_MHz.max()),
                      cmap='turbo', origin='lower',
                      vmin=np.percentile(KK_power_log, 5),
-                     vmax=np.percentile(KK_power_log, 95))
+                     vmax=np.percentile(KK_power_log, 99))
     
     ax2.set_xlabel('Wavenumber [1/m]', fontsize=20)
     ax2.set_ylabel('Frequency [MHz]', fontsize=20)
