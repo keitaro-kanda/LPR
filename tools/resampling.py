@@ -60,8 +60,8 @@ def resampling(signal_data, position_data, sequence_id): # input is 2D array inc
 
 	#* Define a moving window to avoid taking into account small portions with high values.
 	#* We want to take the signal_data only when it has a value highest than thres for window consecutive traces
-    window = 25
-    thres = 20000
+    window = 16
+    thres = 25000
 
 
 	#* Init output vector as 0s

@@ -290,7 +290,8 @@ def terrain_correction(data, z_profile):
     #* Prepare empty array for corrected data
     z_max = np.max(z_profile) # Maximum elevation in the z-profile
     z_min = np.min(z_profile) # Minimum elevation in the z-profile
-    t_expand_min = np.abs(int(z_max / c / sample_interval)) # index number
+    print('z_max: ', z_max, 'z_min: ', z_min)
+    t_expand_min = np.abs(int(z_max / c / sample_interval)) # index number, don't use subsurface velocity
     t_expand_max = np.abs(int(z_min / c / sample_interval)) # index number
     corrected_data = np.zeros((data.shape[0] + t_expand_min + t_expand_max, data.shape[1]))
     corrected_data[:, :] = np.nan  # Initialize with NaN to avoid artifacts

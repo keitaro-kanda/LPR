@@ -101,6 +101,14 @@ def load_positions():
             total_x = np.append(total_x, X_ref[i] + XPOSITION[i])
             total_y = np.append(total_y, Y_ref[i] + YPOSITION[i])
             total_z = np.append(total_z, Z_ref[i] + ZPOSITION[i])
+    
+    # Runnning average
+    # window_length = 200
+    # window = np.ones(window_length) / window_length
+    # total_x = np.convolve(total_x, window, mode='valid')
+    # total_y = np.convolve(total_y, window, mode='valid')
+    # total_z = np.convolve(total_z, window, mode='valid')
+
     #* Save total position
     total_positions_data = np.column_stack([total_x, total_y, total_z])
     np.savetxt(os.path.join(output_dir, 'total_position.txt'), total_positions_data,
