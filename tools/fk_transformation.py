@@ -27,8 +27,14 @@ def fk_transform_full(data, dt, dx):
         波数軸 [1/m]
     """
     
+    # Handle NaN values
+    data_clean = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+    
     # Normalize data
-    data_norm = data / np.amax(data)
+    data_max = np.nanmax(np.abs(data_clean))
+    if data_max == 0 or np.isnan(data_max):
+        data_max = 1.0
+    data_norm = data_clean / data_max
     
     # Create frequency and wavenumber vectors
     N_time = data.shape[0]
@@ -97,6 +103,15 @@ def fk_transform_windowed(data, dt, dx, window_time, window_trace):
             if window_data.shape[0] < 10 or window_data.shape[1] < 10:
                 continue
             
+            # Check for NaN values in window data
+            if np.any(np.isnan(window_data)):
+                print(f"窓 ({i}, {j}) にNaN値が含まれています - 処理を続行")
+            
+            # Check if window data has any valid values
+            if np.all(np.isnan(window_data)) or np.nanmax(np.abs(window_data)) == 0:
+                print(f"窓 ({i}, {j}) に有効なデータがありません - スキップ")
+                continue
+            
             # この窓のf-k変換
             try:
                 KK_shifted, f_MHz, K = fk_transform_full(window_data, dt, dx)
@@ -120,8 +135,10 @@ def plot_fk_result(KK_shifted, f_MHz, K, output_path, title="F-K Transform"):
     """
     f-k変換結果をプロット・保存（単体版）
     """
-    # 対数スケールで振幅を計算
-    KK_power_log = 20 * np.log10(np.abs(KK_shifted) + 1e-10)  # 小さい値を追加してlog(0)を防ぐ
+    # 対数スケールで振幅を計算（NaN値を処理）
+    KK_abs = np.abs(KK_shifted)
+    KK_abs_clean = np.nan_to_num(KK_abs, nan=1e-10, posinf=1e10, neginf=1e-10)
+    KK_power_log = 20 * np.log10(KK_abs_clean + 1e-10)  # 小さい値を追加してlog(0)を防ぐ
     
     plt.figure(figsize=(12, 8))
     
@@ -212,8 +229,10 @@ def plot_combined_bscan_fk(window_data, KK_shifted, f_MHz, K, output_path,
     cbar1.set_label('Amplitude', fontsize=20)
     cbar1.ax.tick_params(labelsize=16)
     
-    # Right plot: F-K transform
-    KK_power_log = 20 * np.log10(np.abs(KK_shifted) + 1e-10)
+    # Right plot: F-K transform（NaN値を処理）
+    KK_abs = np.abs(KK_shifted)
+    KK_abs_clean = np.nan_to_num(KK_abs, nan=1e-10, posinf=1e10, neginf=1e-10)
+    KK_power_log = 20 * np.log10(KK_abs_clean + 1e-10)
     im2 = ax2.imshow(KK_power_log, aspect='auto',
                      extent=(K.min(), K.max(), f_MHz.min(), f_MHz.max()),
                      cmap='turbo', origin='lower',
@@ -307,6 +326,14 @@ def main():
     Bscan_data = np.loadtxt(data_path, delimiter=' ')
     print(f'データ形状: {Bscan_data.shape}')
     
+    # NaN値の統計を表示
+    nan_count = np.sum(np.isnan(Bscan_data))
+    total_count = Bscan_data.size
+    if nan_count > 0:
+        print(f'NaN値の数: {nan_count} / {total_count} ({nan_count/total_count*100:.2f}%)')
+    else:
+        print('NaN値は検出されませんでした')
+    
     # モード1または3: 全体f-k変換
     if mode in ['1', '3']:
         print("\n=== 全体f-k変換 ===")
@@ -325,8 +352,10 @@ def main():
     if mode in ['2', '3']:
         print(f"\n=== 区切りf-k変換 ===")
         
-        # 全データの最大値を計算（カラーバー範囲統一用）
-        global_data_max = np.amax(np.abs(Bscan_data))
+        # 全データの最大値を計算（カラーバー範囲統一用、NaN値を考慮）
+        global_data_max = np.nanmax(np.abs(Bscan_data))
+        if np.isnan(global_data_max) or global_data_max == 0:
+            global_data_max = 1.0
         
         # 区切りf-k変換を実行
         windowed_results = fk_transform_windowed(Bscan_data, dt, dx, 
