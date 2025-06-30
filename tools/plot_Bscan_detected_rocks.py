@@ -19,10 +19,30 @@ if not data_path.lower().endswith('.txt'):
     print("エラー: B-scanデータはテキストファイル(.txt)を指定してください。")
     exit(1)
 
-data_type = input('データの種類を選択してください（raw, bandpass_filtered, time_zero_corrected, background_filtered, gained）:').strip()
-if data_type not in ['raw', 'bandpass_filtered', 'time_zero_corrected', 'background_filtered', 'gained']:
-    print('エラー: 無効なデータ種類です')
+print('データの種類を選択してください:')
+print('1: Raw data')
+print('2: Bandpass filtered')
+print('3: Time-zero corrected')
+print('4: Background removed')
+print('5: Gain corrected')
+print('6: Terrain corrected')
+data_type_choice = input('選択 (1-6): ').strip()
+
+data_type_map = {
+    '1': 'raw',
+    '2': 'bandpass_filtered', 
+    '3': 'time_zero_corrected',
+    '4': 'background_filtered',
+    '5': 'gained',
+    '6': 'terrain_corrected'
+}
+
+if data_type_choice not in data_type_map:
+    print('エラー: 無効な選択です。1-6の数字を入力してください。')
     exit(1)
+
+data_type = data_type_map[data_type_choice]
+print(f'選択されたデータ種類: {data_type}')
 
 print('プロット範囲を限定しますか？（y/n、デフォルト：n）:')
 use_plot_range = input().strip().lower().startswith('y')
@@ -98,8 +118,10 @@ else:
     print(f"合計 {len(x)} 個のラベルポイントを読み込みました。")
 
 # --- パラメータ ---
-sample_interval = 0.312500  # [ns]
-trace_interval = 3.6e-2     # [m]
+sample_interval = 0.312500e-9  # [s] (run_data_processing.pyと同じ単位)
+trace_interval = 3.6e-2        # [m]
+c = 299792458                  # [m/s] 光速
+epsilon_r = 4.5               # 比誘電率 (run_data_processing.pyと同じ値)
 
 # --- 出力フォルダ ---
 out_dir = os.path.join(os.path.dirname(data_path), 'Bscan_with_detected_rocks')
@@ -114,6 +136,48 @@ try:
 except ValueError:
     print('エラー: データファイルを読み込めませんでした。数値データ形式の.txtファイルを指定してください。')
     exit(1)
+
+# NaN値の統計を表示
+nan_count = np.sum(np.isnan(data))
+total_count = data.size
+if nan_count > 0:
+    print(f'NaN値検出: {nan_count} / {total_count} ({nan_count/total_count*100:.2f}%)')
+else:
+    print('NaN値は検出されませんでした。')
+
+def find_time_zero_index(data):
+    """
+    x=0（最初のトレース）において最初にNaNではない値をとるインデックスを見つける
+    
+    Parameters:
+    -----------
+    data : np.ndarray
+        B-scanデータ (time x traces)
+    
+    Returns:
+    --------
+    time_zero_index : int
+        t=0として設定するインデックス番号
+    """
+    if data.shape[1] == 0:
+        return 0
+    
+    first_trace = data[:, 0]  # x=0のトレース
+    
+    # NaNではない最初のインデックスを探す
+    valid_indices = np.where(~np.isnan(first_trace))[0]
+    
+    if len(valid_indices) == 0:
+        print("警告: x=0のトレースにNaNではない値が見つかりません。t=0をインデックス0に設定します。")
+        return 0
+    
+    time_zero_index = valid_indices[0]
+    print(f"t=0として設定: インデックス {time_zero_index}")
+    
+    return time_zero_index
+
+# t=0インデックスを取得
+time_zero_index = find_time_zero_index(data)
 
 # --- プロット関数 ---
 font_large = 20
@@ -131,16 +195,35 @@ def single_plot(plot_data, label_keys=None, suffix=''):
     # B-scan表示
     vmin, vmax = -10, 10
     if data_type == 'gained':
-        vmax = np.max(np.abs(plot_data)) / 15
+        vmax = np.nanmax(np.abs(plot_data)) / 15  # NaN対応
         vmin = -vmax
-    im = ax.imshow(
-        plot_data,
-        aspect='auto',
-        cmap='viridis',
-        extent=[0, plot_data.shape[1]*trace_interval,
-                plot_data.shape[0]*sample_interval, 0],
-        vmin=vmin, vmax=vmax
-    )
+    
+    # 時間軸の計算（t=0補正を適用）
+    x_start, x_end = 0, plot_data.shape[1] * trace_interval
+    y_start = -time_zero_index * sample_interval / 1e-9  # 負の時間も含む
+    y_end = (plot_data.shape[0] - time_zero_index) * sample_interval / 1e-9
+    
+    print(f"時間軸範囲: {y_start:.2f} ns ～ {y_end:.2f} ns")
+    print(f"空間軸範囲: {x_start:.2f} m ～ {x_end:.2f} m")
+    
+    # terrain correctedデータの場合の特別な処理
+    if data_type == 'terrain_corrected' or 'terrain' in data_type.lower():
+        im = ax.imshow(
+            plot_data,
+            aspect='auto',
+            cmap='viridis',
+            extent=[x_start, x_end, y_end, y_start],
+            vmin=-np.nanmax(np.abs(plot_data))/10 if np.any(~np.isnan(plot_data)) else -1,
+            vmax=np.nanmax(np.abs(plot_data))/10 if np.any(~np.isnan(plot_data)) else 1
+        )
+    else:
+        im = ax.imshow(
+            plot_data,
+            aspect='auto',
+            cmap='viridis',
+            extent=[x_start, x_end, y_end, y_start],
+            vmin=vmin, vmax=vmax
+        )
 
     # ラベル設定
     info = {
@@ -153,7 +236,7 @@ def single_plot(plot_data, label_keys=None, suffix=''):
     }
     keys = label_keys if label_keys is not None else list(info.keys())
     for L in keys:
-        col, desc = info[L]
+        col, _ = info[L]  # desc is used only in legend, not here
         mask = (lab == L)
         if np.any(mask):
             ax.scatter(
@@ -170,13 +253,27 @@ def single_plot(plot_data, label_keys=None, suffix=''):
     ax.set_xlabel('Moving distance [m]', fontsize=font_medium)
     ax.set_ylabel('Time [ns]', fontsize=font_medium)
     ax.tick_params(axis='both', which='major', labelsize=font_small)
+    
+    # 第2縦軸（深さ）を追加
+    ax2 = ax.twinx()
+    # 第1軸の時間範囲を取得
+    t_min, t_max = ax.get_ylim()
+    # 対応する深さ範囲を計算 (run_data_processing.pyと同じ式)
+    # depth [m] = (time [ns] * 1e-9) * c / sqrt(epsilon_r) / 2
+    depth_min = (t_min * 1e-9) * c / np.sqrt(epsilon_r) / 2
+    depth_max = (t_max * 1e-9) * c / np.sqrt(epsilon_r) / 2
+    # 第2軸に深さの範囲とラベルを設定
+    ax2.set_ylim(depth_min, depth_max)
+    ax2.set_ylabel(r'Depth [m] ($\varepsilon_r = 4.5$)', fontsize=font_medium)
+    ax2.tick_params(axis='y', which='major', labelsize=font_small)
 
-    # カラーバー
-    divider = axgrid1.make_axes_locatable(ax)
-    cax = divider.append_axes('right', size='3%', pad=0.1)
-    cbar = plt.colorbar(im, cax=cax, orientation='vertical')
-    cbar.set_label('Amplitude', fontsize=font_large)
-    cax.tick_params(labelsize=font_small)
+    # カラーバーを右下に配置 (run_data_processing.pyと同じスタイル)
+    fig.subplots_adjust(bottom=0.25, right=0.85)  # レジェンドとカラーバーのスペースを確保
+    # Figureのサイズを基準とした位置とサイズ [left, bottom, width, height]
+    cbar_ax = fig.add_axes([0.65, 0.05, 0.2, 0.05])  # [x, y, 幅, 高さ]
+    cbar = plt.colorbar(im, cax=cbar_ax, orientation='horizontal')
+    cbar.set_label('Amplitude', fontsize=font_medium)
+    cbar.ax.tick_params(labelsize=font_small)
 
     # レジェンド（2行3列）
     patches = [Patch(facecolor=info[L][0], edgecolor='white', label=info[L][1]) for L in keys]
@@ -188,7 +285,7 @@ def single_plot(plot_data, label_keys=None, suffix=''):
         frameon=False,
         fontsize=font_medium
     )
-    plt.subplots_adjust(bottom=0.2)
+    # レイアウト調整はカラーバー設定の部分で実施済み
 
     # 保存
     base = os.path.splitext(os.path.basename(data_path))[0]
