@@ -504,7 +504,7 @@ def plot_fk_filter_comparison(original_data, filtered_data, KK_original, KK_filt
     
     # 右上: フィルター適用後のB-scan
     im2 = axes[0,1].imshow(filtered_data, aspect='auto', cmap='viridis',
-                          )
+                          vmin=-np.amax(np.abs(filtered_data))/15, vmax=np.amax(np.abs(filtered_data))/15)
     axes[0,1].set_title(f'Filtered B-scan {filter_info}', fontsize=16)
     axes[0,1].set_xlabel('Trace', fontsize=14)
     axes[0,1].set_ylabel('Time [samples]', fontsize=14)
