@@ -63,6 +63,29 @@ def time_to_depth(time_ns, epsilon_r=4.5):
     depth_m = time_ns * 1e-9 * c / np.sqrt(epsilon_r) * 0.5
     return depth_m
 
+def get_label_color(label):
+    """
+    ラベル番号に対応する色を返す
+    
+    Parameters:
+    -----------
+    label : int
+        ラベル番号 (1-6)
+    
+    Returns:
+    --------
+    str: 色名
+    """
+    color_map = {
+        1: 'r',        # red
+        2: 'g',        # green
+        3: 'b',        # blue
+        4: 'yellow',   # yellow
+        5: 'magenta',  # magenta
+        6: 'cyan'      # cyan
+    }
+    return color_map.get(label, 'gray')  # デフォルトはgray
+
 def create_depth_histogram(data, bin_size_m=1.0, output_dir='rock_statics', label_filter=None, suffix=''):
     """
     深さごとの岩石ラベルヒストグラムを作成
@@ -116,14 +139,13 @@ def create_depth_histogram(data, bin_size_m=1.0, output_dir='rock_statics', labe
     
     # 積み上げヒストグラム
     bottom = np.zeros(len(bin_centers))
-    colors = plt.cm.Set1(np.linspace(0, 1, len(unique_labels)))
     
-    for i, label in enumerate(sorted(unique_labels)):
+    for label in sorted(unique_labels):
         plt.barh(bin_centers, label_counts[label], 
                 height=bin_size_m * 0.8, 
                 left=bottom, 
                 label=f'Label {label}',
-                color=colors[i], alpha=0.7)
+                color=get_label_color(label), alpha=0.7)
         bottom += label_counts[label]
     
     plt.xlabel('Number of rocks', fontsize=16)
@@ -225,14 +247,13 @@ def create_horizontal_histogram(data, bin_size_m=100.0, output_dir='rock_statics
     
     # 積み上げヒストグラム
     bottom = np.zeros(len(bin_centers))
-    colors = plt.cm.Set1(np.linspace(0, 1, len(unique_labels)))
     
-    for i, label in enumerate(sorted(unique_labels)):
+    for label in sorted(unique_labels):
         plt.bar(bin_centers, label_counts[label], 
                width=bin_size_m * 0.8, 
                bottom=bottom,
                label=f'Label {label}',
-               color=colors[i], alpha=0.7)
+               color=get_label_color(label), alpha=0.7)
         bottom += label_counts[label]
     
     plt.xlabel('Horizontal position [m]', fontsize=16)
@@ -318,8 +339,8 @@ def main():
         raise ValueError("JSONファイルを指定してください")
     
     # 出力ディレクトリ設定
-    base_dir = os.path.dirname(json_path)
-    output_dir = os.path.join(base_dir, 'rock_statics')
+    base_dir = os.path.dirname(os.path.dirname(json_path))
+    output_dir = os.path.join(base_dir, 'rock_statics/' + os.path.splitext(os.path.basename(json_path))[0])
     
     # データ読み込み
     print("\nデータを読み込み中...")
