@@ -454,12 +454,12 @@ for i in range(len(plot_data)):
     if step == 4:  # Gain function
         im = ax.imshow(plot_data[i], aspect='auto', cmap='viridis',
                 extent=[0, plot_data[i].shape[1]*trace_interval, plot_data[i].shape[0]*sample_interval*1e9, 0],
-                vmin=-np.amax(np.abs(plot_data[i]))/15, vmax=np.amax(np.abs(plot_data[i]))/15
+                vmin=-np.amax(np.abs(plot_data[i]))/10, vmax=np.amax(np.abs(plot_data[i]))/10
                 )
     elif step == 5:  # Terrain correction
         im = ax.imshow(plot_data[i], aspect='auto', cmap='viridis',
                 extent=[0, plot_data[i].shape[1]*trace_interval, time_max*1e9, time_min*1e9],
-                vmin=-np.nanmax(np.abs(plot_data[i]))/15, vmax=np.nanmax(np.abs(plot_data[i]))/15
+                vmin=-np.nanmax(np.abs(plot_data[i]))/10, vmax=np.nanmax(np.abs(plot_data[i]))/10
                 )
         ax.set_yticks(np.arange(0, plot_data[i].shape[0] * sample_interval / 1e-9, 100))
     else:
