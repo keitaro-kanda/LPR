@@ -11,7 +11,47 @@ def load_data(file_path):
     print("データを読み込んでいます...")
     data = np.loadtxt(file_path, delimiter=' ')
     print("データの読み込みが完了しました。")
+    
+    # NaN値の統計を表示
+    nan_count = np.sum(np.isnan(data))
+    total_count = data.size
+    if nan_count > 0:
+        print(f"NaN値検出: {nan_count} / {total_count} ({nan_count/total_count*100:.2f}%)")
+    else:
+        print("NaN値は検出されませんでした。")
+    
     return data
+
+def find_time_zero_index(data):
+    """
+    x=0（最初のトレース）において最初にNaNではない値をとるインデックスを見つける
+    
+    Parameters:
+    -----------
+    data : np.ndarray
+        B-scanデータ (time x traces)
+    
+    Returns:
+    --------
+    time_zero_index : int
+        t=0として設定するインデックス番号
+    """
+    if data.shape[1] == 0:
+        return 0
+    
+    first_trace = data[:, 0]  # x=0のトレース
+    
+    # NaNではない最初のインデックスを探す
+    valid_indices = np.where(~np.isnan(first_trace))[0]
+    
+    if len(valid_indices) == 0:
+        print("警告: x=0のトレースにNaNではない値が見つかりません。t=0をインデックス0に設定します。")
+        return 0
+    
+    time_zero_index = valid_indices[0]
+    print(f"t=0として設定: インデックス {time_zero_index}")
+    
+    return time_zero_index
 
 def get_color_for_label(label):
     mapping = {
@@ -120,12 +160,24 @@ def main():
     print()
 
     data = load_data(bscan_path)
-    envelop = np.abs(hilbert(data, axis=0))
+    
+    # NaN値対応: hilbert変換前にNaN値をゼロに置換
+    data_for_hilbert = np.nan_to_num(data, nan=0.0)
+    envelop = np.abs(hilbert(data_for_hilbert, axis=0))
 
     sample_interval = 0.312500e-9
     trace_interval = 3.6e-2
+    
+    # t=0補正: x=0で最初にNaNではない値をとるインデックスを見つける
+    time_zero_index = find_time_zero_index(data)
+    
+    # 時間軸の計算（t=0補正を適用）
     x_start, x_end = 0, data.shape[1] * trace_interval
-    y_start, y_end = 0, data.shape[0] * sample_interval / 1e-9
+    y_start = -time_zero_index * sample_interval / 1e-9  # 負の時間も含む
+    y_end = (data.shape[0] - time_zero_index) * sample_interval / 1e-9
+    
+    print(f"時間軸範囲: {y_start:.2f} ns ～ {y_end:.2f} ns")
+    print(f"空間軸範囲: {x_start:.2f} m ～ {x_end:.2f} m")
 
     # JSON 読み込み & マイグレーション
     labels_dict = {}
@@ -223,7 +275,10 @@ def main():
     plot.setYRange(y_start, y_end)
     plot.invertY(True)
 
-    img = pg.ImageItem(data.T)
+    # NaN値を0に置換してから表示用データを作成（描画問題の対処）
+    data_for_display = np.nan_to_num(data, nan=0.0)
+    
+    img = pg.ImageItem(data_for_display.T)
     img.setLookupTable(lut)
     img.setRect(QtCore.QRectF(x_start, y_start, x_end-x_start, y_end-y_start))
     plot.addItem(img)
@@ -257,20 +312,45 @@ def main():
         if 0 <= idx < data.shape[1]:
             a = data[:, idx]
             e = envelop[:, idx]
-            t = np.arange(len(a)) * sample_interval / 1e-9
-            c1.setData(a, t)
-            c2.setData(e, t)
-            ascan.setTitle(f"A-scan at x={xpos:.2f}m")
+            
+            # t=0補正を適用した時間軸
+            t = (np.arange(len(a)) - time_zero_index) * sample_interval / 1e-9
+            
+            # NaN値対応: NaN値がある場合の表示処理
+            valid_mask = ~np.isnan(a)
+            if np.any(valid_mask):
+                # 有効な値のみをプロット
+                c1.setData(a[valid_mask], t[valid_mask])
+                c2.setData(e[valid_mask], t[valid_mask])
+                
+                # NaN値の範囲を表示
+                nan_count = np.sum(~valid_mask)
+                if nan_count > 0:
+                    ascan.setTitle(f"A-scan at x={xpos:.2f}m (NaN: {nan_count} points)")
+                else:
+                    ascan.setTitle(f"A-scan at x={xpos:.2f}m")
+            else:
+                # 全てNaNの場合
+                c1.clear()
+                c2.clear()
+                ascan.setTitle(f"A-scan at x={xpos:.2f}m (All NaN)")
+            
             ascan.setYRange(*plot.viewRange()[1])
         else:
             c1.clear()
+            c2.clear()
             ascan.setTitle("out of range")
             ascan.setYRange(y_start, y_end)
 
     vline.sigPositionChanged.connect(update_ascan)
     update_ascan()
 
-    colorbar = pg.ColorBarItem(values=(-abs(data).max()/15, abs(data).max()/15), colorMap=cpg)
+    # NaN値を考慮したカラーバー範囲設定
+    data_max = np.nanmax(np.abs(data))
+    if np.isnan(data_max) or data_max == 0:
+        data_max = 1.0  # デフォルト値
+    
+    colorbar = pg.ColorBarItem(values=(-data_max/10, data_max/10), colorMap=cpg)
     colorbar.setImageItem(img)
 
     win.addItem(plot, 0, 0)
