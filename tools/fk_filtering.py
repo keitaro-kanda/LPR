@@ -488,8 +488,8 @@ def plot_fk_filter_comparison(original_data, filtered_data, KK_original, KK_filt
     
     # B-scanデータの共通カラーバー範囲
     data_max = max(np.nanmax(np.abs(original_data)), np.nanmax(np.abs(filtered_data)))
-    vmin_bscan = -data_max / 15
-    vmax_bscan = data_max / 15
+    vmin_bscan = -data_max / 10
+    vmax_bscan = data_max / 10
     
     # f-kデータの対数スケール計算
     KK_orig_log = 20 * np.log10(np.abs(KK_original) + 1e-10)
@@ -504,7 +504,7 @@ def plot_fk_filter_comparison(original_data, filtered_data, KK_original, KK_filt
     
     # 右上: フィルター適用後のB-scan
     im2 = axes[0,1].imshow(filtered_data, aspect='auto', cmap='viridis',
-                          vmin=-np.amax(np.abs(filtered_data))/15, vmax=np.amax(np.abs(filtered_data))/15)
+                          vmin=-np.amax(np.abs(filtered_data))/10, vmax=np.amax(np.abs(filtered_data))/10)
     axes[0,1].set_title(f'Filtered B-scan {filter_info}', fontsize=16)
     axes[0,1].set_xlabel('Trace', fontsize=14)
     axes[0,1].set_ylabel('Time [samples]', fontsize=14)
