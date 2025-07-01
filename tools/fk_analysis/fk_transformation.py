@@ -4,6 +4,37 @@ import mpl_toolkits.axes_grid1 as axgrid1
 import os
 from tqdm import tqdm
 
+def find_time_zero_index(data):
+    """
+    x=0において最初に非NaN値が現れるインデックスを見つける（実際のt=0に対応）
+    
+    Parameters:
+    -----------
+    data : np.ndarray
+        入力B-scanデータ (time x traces)
+    
+    Returns:
+    --------
+    t_zero_index : int
+        t=0に対応する実際のデータインデックス
+    """
+    if data.shape[1] == 0:
+        return 0
+    
+    # x=0（最初のトレース）のデータを取得
+    first_trace = data[:, 0]
+    
+    # 最初に非NaN値が現れるインデックスを見つける
+    valid_indices = np.where(~np.isnan(first_trace))[0]
+    
+    if len(valid_indices) == 0:
+        print("警告: x=0において有効なデータが見つかりません。t=0をインデックス0とします。")
+        return 0
+    
+    t_zero_index = valid_indices[0]
+    print(f"t=0インデックス: {t_zero_index} （x=0で最初の有効データ位置）")
+    return t_zero_index
+
 def fk_transform_full(data, dt, dx):
     """
     全体データのf-k変換を実行
@@ -128,6 +159,117 @@ def fk_transform_windowed(data, dt, dx, window_time, window_trace):
             except Exception as e:
                 print(f"窓 ({i}, {j}) でエラー: {e}")
                 continue
+    
+    return results
+
+def fk_transform_representative_points(data, dt, dx, window_time, window_trace, representative_points):
+    """
+    代表点周辺の窓でf-k変換を実行
+    
+    Parameters:
+    -----------
+    data : np.ndarray
+        入力B-scanデータ (time x traces)
+    dt : float
+        時間サンプリング間隔 [s]
+    dx : float
+        トレース間隔 [m]
+    window_time : int
+        時間方向の窓サイズ [サンプル数]
+    window_trace : int
+        トレース方向の窓サイズ [トレース数]
+    representative_points : list
+        代表点座標のリスト [(x1, t1), (x2, t2), ...]、x[m], t[ns]
+    
+    Returns:
+    --------
+    results : list
+        各代表点の変換結果 [{'data': KK_shifted, 'f_MHz': f_MHz, 'K': K, 'pos': (t_start, x_start), 'center': (x, t), 'window_data': window_data}]
+    """
+    print(f'代表点f-k変換を実行中... (窓サイズ: {window_time} x {window_trace})')
+    
+    N_time, N_traces = data.shape
+    results = []
+    
+    print(f'データ形状: {N_time} x {N_traces}')
+    print(f'代表点数: {len(representative_points)}')
+    
+    # t=0に対応する実際のデータインデックスを取得
+    t_zero_index = find_time_zero_index(data)
+    
+    # 各代表点での処理
+    for point_idx, (x_center_m, t_center_ns) in enumerate(tqdm(representative_points, desc="代表点処理")):
+        # 物理座標をサンプル/トレースインデックスに変換
+        # 時間座標はt=0インデックスからの相対位置として計算
+        t_center_sample = t_zero_index + int(t_center_ns * 1e-9 / dt)
+        x_center_trace = int(x_center_m / dx)
+        
+        # 窓の範囲を計算（中心座標を基準）
+        half_window_time = window_time // 2
+        half_window_trace = window_trace // 2
+        
+        t_start = max(0, t_center_sample - half_window_time)
+        t_end = min(N_time, t_center_sample + half_window_time)
+        x_start = max(0, x_center_trace - half_window_trace)
+        x_end = min(N_traces, x_center_trace + half_window_trace)
+        
+        # 実際の窓サイズを確保（境界で調整された場合）
+        actual_window_time = t_end - t_start
+        actual_window_trace = x_end - x_start
+        
+        # 窓データを抽出
+        window_data = data[t_start:t_end, x_start:x_end]
+        
+        # デバッグ情報：窓の詳細を表示
+        actual_t_start_ns = t_start * dt * 1e9
+        actual_t_end_ns = t_end * dt * 1e9  
+        actual_x_start_m = x_start * dx
+        actual_x_end_m = x_end * dx
+        
+        print(f"代表点 {point_idx+1} (x={x_center_m}, t={t_center_ns}): " +
+              f"窓範囲 x=[{actual_x_start_m:.1f}, {actual_x_end_m:.1f}]m, " +
+              f"t=[{actual_t_start_ns:.1f}, {actual_t_end_ns:.1f}]ns, " +
+              f"サイズ={actual_window_trace}×{actual_window_time}")
+        
+        # 窓が小さすぎる場合はスキップ
+        if window_data.shape[0] < 10 or window_data.shape[1] < 10:
+            print(f"  → 窓が小さすぎます - スキップ")
+            continue
+        
+        # データ範囲の確認
+        if x_center_trace >= N_traces or t_center_sample >= N_time:
+            print(f"  → データ範囲外 - スキップ")
+            continue
+        
+        # NaN値の確認
+        if np.any(np.isnan(window_data)):
+            print(f"  → NaN値が含まれています - 処理を続行")
+        
+        # 有効なデータがあるかチェック
+        if np.all(np.isnan(window_data)) or np.nanmax(np.abs(window_data)) == 0:
+            print(f"  → 有効なデータがありません - スキップ")
+            continue
+        
+        # この窓のf-k変換
+        try:
+            KK_shifted, f_MHz, K = fk_transform_full(window_data, dt, dx)
+            
+            results.append({
+                'data': KK_shifted,
+                'f_MHz': f_MHz,
+                'K': K,
+                'pos': (t_start, x_start),
+                'shape': window_data.shape,
+                'center': (x_center_m, t_center_ns),
+                'point_idx': point_idx + 1,
+                'window_data': window_data  # B-scanデータも保存
+            })
+            
+            print(f"  → 処理完了")
+            
+        except Exception as e:
+            print(f"  → エラー: {e}")
+            continue
     
     return results
 
@@ -265,7 +407,7 @@ def main():
     print("\n計算モードを選択してください:")
     print("1. 全体f-k変換")
     print("2. 区切りf-k変換")
-    print("3. 両方実行")
+    print("3. テストモード（代表的な地点での区切りf-k変換）")
     
     mode = input("モード番号を入力 (1/2/3): ").strip()
     if mode not in ['1', '2', '3']:
@@ -275,7 +417,22 @@ def main():
     dt = 0.312500e-9  # [s] Sample interval
     dx = 3.6e-2       # [m] Trace interval
     
-    # 窓サイズ設定（区切りf-k変換の場合）
+    # テストモード用の代表点座標定義
+    if mode == '3':
+        print("\n*** 注意: テストモードは terrain_corrected データでの座標を使用します ***")
+        print("代表的な地点での f-k 変換を実行します")
+        
+        # 代表点座標 (x [m], t [ns])
+        representative_points = [
+            (322, 65), (364, 70), (247, 65), (600, 90), 
+            (1180, 90), (710, 130), (850, 80), (325, 190), (1050, 380)
+        ]
+        
+        print("代表点座標 (terrain_corrected):")
+        for i, (x, t) in enumerate(representative_points):
+            print(f"  {i+1}: (x={x} m, t={t} ns)")
+    
+    # 窓サイズ設定（区切りf-k変換とテストモードの場合）
     if mode in ['2', '3']:
         print("\n窓サイズを設定してください:")
         
@@ -334,8 +491,8 @@ def main():
     else:
         print('NaN値は検出されませんでした')
     
-    # モード1または3: 全体f-k変換
-    if mode in ['1', '3']:
+    # モード1: 全体f-k変換
+    if mode == '1':
         print("\n=== 全体f-k変換 ===")
         KK_shifted, f_MHz, K = fk_transform_full(Bscan_data, dt, dx)
         
@@ -348,14 +505,17 @@ def main():
         np.savetxt(os.path.join(output_dir, 'full_fk_data.txt'), 
                    np.abs(KK_shifted), delimiter=' ')
     
-    # モード2または3: 区切りf-k変換
-    if mode in ['2', '3']:
+    # モード2: 区切りf-k変換
+    if mode == '2':
         print(f"\n=== 区切りf-k変換 ===")
         
         # 全データの最大値を計算（カラーバー範囲統一用、NaN値を考慮）
         global_data_max = np.nanmax(np.abs(Bscan_data))
         if np.isnan(global_data_max) or global_data_max == 0:
             global_data_max = 1.0
+        
+        # t=0に対応する実際のデータインデックスを取得
+        t_zero_index = find_time_zero_index(Bscan_data)
         
         # 区切りf-k変換を実行
         windowed_results = fk_transform_windowed(Bscan_data, dt, dx, 
@@ -373,8 +533,8 @@ def main():
         for idx, result in enumerate(tqdm(windowed_results, desc="保存中")):
             t_start_sample, x_start_sample = result['pos']
             
-            # 物理単位での開始位置を計算
-            t_start_ns = t_start_sample * dt * 1e9  # サンプル → ns
+            # 物理単位での開始位置を計算（t=0インデックス補正適用）
+            t_start_ns = (t_start_sample - t_zero_index) * dt * 1e9  # サンプル → ns
             x_start_m = x_start_sample * dx  # トレース → m
             
             # ファイル名作成（物理単位使用）
@@ -389,6 +549,55 @@ def main():
         
         print(f"区切りf-k変換結果を保存: {windowed_dir}")
         print(f"総ファイル数: {len(windowed_results)}")
+    
+    # モード3: テストモード（代表点での区切りf-k変換）
+    if mode == '3':
+        print(f"\n=== テストモード: 代表点での区切りf-k変換 ===")
+        
+        # 全データの最大値を計算（カラーバー範囲統一用、NaN値を考慮）
+        global_data_max = np.nanmax(np.abs(Bscan_data))
+        if np.isnan(global_data_max) or global_data_max == 0:
+            global_data_max = 1.0
+        
+        # 代表点での f-k変換を実行
+        test_results = fk_transform_representative_points(
+            Bscan_data, dt, dx, window_time, window_trace, representative_points
+        )
+        
+        print(f"処理完了: {len(test_results)} 個の代表点")
+        
+        # 出力ディレクトリ名を決定
+        window_time_ns_display = window_time * dt * 1e9  # サンプル → ns
+        window_trace_m_display = window_trace * dx  # トレース → m
+        windowed_dir = os.path.join(output_dir, f'windowed_results_x{window_trace_m_display:.1f}m_t{window_time_ns_display:.1f}ns')
+        test_dir = os.path.join(windowed_dir, 'test')
+        os.makedirs(test_dir, exist_ok=True)
+        
+        print("各代表点の結果を保存中...")
+        for result in tqdm(test_results, desc="保存中"):
+            x_center, t_center = result['center']
+            
+            # ファイル名作成（代表点座標使用）
+            png_filename = f'x={x_center}_t={t_center}.png'
+            pdf_filename = f'x={x_center}_t={t_center}.pdf'
+            png_path = os.path.join(test_dir, png_filename)
+            pdf_path = os.path.join(test_dir, pdf_filename)
+            
+            # 併記プロットで保存（PNG）
+            plot_combined_bscan_fk(
+                result['window_data'], result['data'], result['f_MHz'], result['K'],
+                png_path, x_center, t_center, dt, dx, global_data_max
+            )
+            
+            # PDF版も保存
+            plot_combined_bscan_fk(
+                result['window_data'], result['data'], result['f_MHz'], result['K'],
+                pdf_path, x_center, t_center, dt, dx, global_data_max
+            )
+        
+        print(f"テストモード結果を保存: {test_dir}")
+        print(f"代表点数: {len(test_results)}")
+        print("各代表点について PNG と PDF ファイルを生成しました")
     
     print(f"\n処理完了! 結果は {output_dir} に保存されました。")
 
