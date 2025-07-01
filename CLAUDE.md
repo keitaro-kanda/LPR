@@ -133,9 +133,9 @@ All LPR data is stored on an external Samsung SSD mounted at:
 ### Directory Structure
 
 #### Main Channels
-- **LPR_1/**: High-frequency channel (60 MHz) data
-- **LPR_2A/**: Low-frequency channel A (5 MHz) data  
-- **LPR_2B/**: Low-frequency channel B (5 MHz) data
+- **LPR_1/**: Low-frequency channel (60 MHz) data
+- **LPR_2A/**: High-frequency channel A (500 MHz) data  
+- **LPR_2B/**: High-frequency channel B (500 MHz) data
 
 #### Data Organization per Channel
 
@@ -367,6 +367,86 @@ else:
 # NaN-aware operations
 vmax = np.nanmax(np.abs(data)) / 10  # Use nanmax instead of max
 ```
+
+## Tools Directory Organization
+
+### Directory Structure
+
+The `tools/` directory is organized by functionality to improve maintainability and usability:
+
+```
+tools/
+├── core_pipeline/          # Main data processing pipeline
+├── signal_processing/      # Signal processing algorithms  
+├── fk_analysis/           # Frequency-wavenumber analysis
+├── detection/             # Feature detection algorithms
+├── analysis/              # Statistical and mathematical analysis
+├── visualization/         # Plotting and visualization tools
+├── utilities/             # Common utilities and helper functions
+├── testing/               # Test and experimental code
+└── legacy/                # Deprecated tools
+```
+
+### Organization Rules
+
+**File Placement Guidelines**:
+
+1. **Core Pipeline** (`core_pipeline/`):
+   - Main processing controller (`run_data_processing.py`)
+   - Data I/O tools (binary reading, resampling, conversion)
+   - Core processing steps (filtering, correction, gain, terrain)
+
+2. **Signal Processing** (`signal_processing/`):
+   - Filter algorithms (Sobel, median, pulse compression)
+   - Signal analysis (gradient, autocorrelation, Hilbert)
+   - Preprocessing utilities
+
+3. **F-K Analysis** (`fk_analysis/`):
+   - All `fk_*.py` files
+   - Frequency-wavenumber domain processing
+   - Migration and filtering in F-K space
+
+4. **Detection** (`detection/`):
+   - All `detect_*.py` files  
+   - Feature detection algorithms
+   - Hyperbola detection subdirectory
+   - Local similarity and correlation analysis (`local_similarity/`)
+
+5. **Analysis** (`analysis/`):
+   - Statistical analysis tools (`plot_rock_statistic.py`, `make_RSFD_*.py`)
+   - Mathematical analysis (`calc_RCS.py`)
+   - Research analysis utilities
+
+6. **Visualization** (`visualization/`):
+   - All `plot_*.py` files
+   - Interactive viewers (`plot_viewer/`)
+   - Data visualization and display tools
+
+7. **Utilities** (`utilities/`):
+   - Common functions shared across tools
+   - Configuration and constants
+   - Helper utilities (future development)
+
+8. **Testing** (`testing/`):
+   - All `test_*.py` files and `test/` subdirectories
+   - Experimental code
+   - Development utilities
+
+9. **Legacy** (`legacy/`):
+   - Deprecated tools (`old_tools/`)
+   - Obsolete versions
+   - Maintained for compatibility only
+
+**Naming Conventions**:
+- Maintain existing naming patterns within each directory
+- Each directory contains a `README.md` with tool descriptions
+- Tools should import from appropriate directories
+
+**When Adding New Tools**:
+1. Determine primary functionality (pipeline, processing, analysis, etc.)
+2. Place in appropriate directory based on main purpose
+3. Update relevant `README.md` with tool description
+4. Follow existing coding standards and patterns
 
 ## 絶対禁止事項
 
