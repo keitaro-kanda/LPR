@@ -208,6 +208,166 @@ When updating processing tools, these SSD paths are frequently referenced:
 - Base data path: `/Volumes/SSD_Kanda_SAMSUNG/LPR/`
 - Position data: `/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Resampled_Data/position_plot/total_position.txt`
 
+## Coding Standards and Conventions
+It is recommended that these rules be followed during code development
+
+### File Naming Conventions
+The codebase follows consistent naming patterns based on functionality:
+
+**Primary Patterns**:
+- `plot_*.py` - Visualization tools (plot_Bscan.py, plot_Ascan.py, plot_rock_statistic.py)
+- `fk_*.py` - Frequency-wavenumber domain processing (fk_filtering.py, fk_transformation.py, fk_migration.py)
+- `detect_*.py` - Detection algorithms (detect_hyperbola.py, detect_peak.py)
+- `calc_*.py` - Calculation utilities (calc_RCS.py, calc_acorr.py)
+- `convert_*.py` - Data conversion tools (convert_terrain_corrected_labels.py)
+- `read_*.py` - Data reading utilities (read_binary_xml.py)
+
+**Special Cases**:
+- `run_data_processing.py` - Main pipeline controller
+- `resampling.py` - Core data preprocessing
+- Single-word tools (bandpass.py, sobel.py, gradient.py, hilbert.py)
+
+### Code Structure Template
+All analysis tools follow a standardized structure:
+
+```python
+# 1. Imports (standardized order)
+import numpy as np
+import matplotlib.pyplot as plt
+import os
+import mpl_toolkits.axes_grid1 as axgrid1
+from tqdm import tqdm
+from scipy import signal
+
+# 2. Interactive input section
+channel_name = input('Input channel name (2A, 2B): ').strip()
+data_path = input('データファイルのパスを入力してください: ').strip()
+
+# 3. Parameter definitions
+sample_interval = 0.312500e-9  # [s]
+trace_interval = 3.6e-2        # [m]
+c = 299792458                  # [m/s]
+epsilon_r = 4.5               # Relative permittivity
+
+# 4. Path validation and directory creation
+if not os.path.exists(data_path):
+    print('エラー: 指定されたファイルが存在しません')
+    exit(1)
+
+# 5. Output directory setup
+output_dir = os.path.join(os.path.dirname(data_path), 'output_folder')
+os.makedirs(output_dir, exist_ok=True)
+
+# 6. Main processing functions
+def main_function():
+    # Processing logic
+    pass
+
+# 7. Execution
+if __name__ == "__main__":
+    main()
+```
+
+### Standard Parameters
+All tools must use these standardized physical constants and parameters:
+
+**Universal Physical Constants**:
+```python
+sample_interval = 0.312500e-9    # [s] - Time sampling interval
+trace_interval = 3.6e-2          # [m] - Spatial trace interval
+c = 299792458                    # [m/s] - Speed of light
+epsilon_r = 4.5                  # Relative permittivity of lunar regolith
+reciever_time_delay = 28.203e-9  # [s] - Hardware delay
+```
+
+**Font Size Standards**:
+```python
+font_large = 20      # Titles and labels
+font_medium = 18     # Axis labels  
+font_small = 16      # Tick labels
+```
+
+### Interactive Input Standards
+Use consistent patterns for user interaction:
+
+```python
+# Standardized user prompts (mixed Japanese/English)
+data_path = input('データファイルのパスを入力してください: ').strip()
+channel_name = input('Input channel name (2A, 2B): ').strip()
+
+# Validation with error handling
+if not os.path.exists(data_path):
+    print('エラー: 指定されたファイルが存在しません')
+    exit(1)
+
+# Choice selection format
+print('データの種類を選択してください:')
+print('1: Raw data')
+print('2: Bandpass filtered')
+choice = input('選択 (1-2): ').strip()
+```
+
+### Output Format Standards
+All tools must save outputs in multiple formats:
+
+```python
+# Standard save pattern
+plt.savefig(f'{output_path}.png', dpi=120)   # Web quality
+plt.savefig(f'{output_path}.pdf', dpi=600)   # Publication quality
+np.savetxt(f'{output_path}.txt', data, delimiter=' ')  # Data format
+
+# Directory creation
+output_dir = os.path.join(os.path.dirname(data_path), 'analysis_type')
+os.makedirs(output_dir, exist_ok=True)
+```
+
+### Rock Label Classification Standard
+Use the standardized label-color-description mapping:
+
+```python
+# Consistent across all tools
+label_info = {
+    1: ('red',     'Single-peaked NPN'),
+    2: ('green',   'Double-peaked NPN'),
+    3: ('blue',    'PNP and NPN'),
+    4: ('yellow',  'Single-peaked PNP'),
+    5: ('magenta', 'Double-peaked PNP'),
+    6: ('cyan',    'NPN and PNP')
+}
+```
+
+### Progress Tracking Standards
+Use tqdm consistently for long operations:
+
+```python
+# Standard progress bar usage
+for i in tqdm(range(data.shape[1]), desc='Processing traces'):
+    result = process_trace(data[:, i])
+
+# Multi-step processing
+for file in tqdm(natsorted(file_list), desc='Integrating data'):
+    process_file(file)
+```
+
+### NaN Value Handling Standards
+Implement consistent NaN value processing:
+
+```python
+# Standard NaN handling pattern
+data_clean = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+
+# NaN statistics reporting
+nan_count = np.sum(np.isnan(data))
+total_count = data.size
+if nan_count > 0:
+    print(f'NaN値検出: {nan_count} / {total_count} ({nan_count/total_count*100:.2f}%)')
+else:
+    print('NaN値は検出されませんでした。')
+
+# NaN-aware operations
+vmax = np.nanmax(np.abs(data)) / 10  # Use nanmax instead of max
+```
+
 ## 絶対禁止事項
 
 以下の行為は絶対に禁止されています:
