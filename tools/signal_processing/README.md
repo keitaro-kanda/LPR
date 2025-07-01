@@ -9,6 +9,7 @@ LPRデータの信号処理アルゴリズムを実装したツール群です�
 - **`sobel.py`**: Sobelフィルタによる空間微分処理
 - **`gradient.py`**: 勾配解析（従来手法と除算手法）
 - **`median_filter.py`**: メディアンフィルタによるノイズ除去
+- **`envelope_median_filter.py`**: エンベロープ計算とメディアンフィルタの組み合わせ処理
 
 ### 信号解析
 - **`hilbert.py`**: ヒルベルト変換によるエンベロープ抽出
@@ -22,6 +23,9 @@ python signal_processing/pulse_compression.py
 
 # 勾配解析
 python signal_processing/gradient.py
+
+# エンベロープ計算とメディアンフィルタ
+python signal_processing/envelope_median_filter.py
 
 # 自己相関解析  
 python signal_processing/calc_acorr.py
