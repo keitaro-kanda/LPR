@@ -195,7 +195,7 @@ def create_depth_histogram(data, bin_size_m=1.0, output_dir='rock_statics', labe
     
     print(f"深さ統計データ保存: {stats_path}")
 
-def create_horizontal_histogram(data, bin_size_m=100.0, output_dir='rock_statics', label_filter=None, suffix=''):
+def create_horizontal_histogram(data, bin_size_m=50.0, output_dir='rock_statics', label_filter=None, suffix=''):
     """
     水平位置ごとの岩石ラベルヒストグラムを作成
     
