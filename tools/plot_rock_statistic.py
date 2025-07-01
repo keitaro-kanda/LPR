@@ -350,8 +350,8 @@ def main():
     print_summary_statistics(data)
     
     # 固定設定
-    depth_bin = 1.0  # 1 m
-    horizontal_bin = 100.0  # 100 m
+    depth_bin = 0.50  # 0.5 m
+    horizontal_bin = 50.0  # 50 m
     
     print(f"\n設定:")
     print(f"  深さビンサイズ: {depth_bin} m")
