@@ -190,7 +190,7 @@ def single_plot(plot_data, label_keys=None, suffix=''):
     label_keys: list of label numbers to plot (e.g. [1,2,3]) or None for all
     suffix: string appended to output file base name
     """
-    fig, ax = plt.subplots(figsize=(18, 8), tight_layout=True)
+    fig, ax = plt.subplots(figsize=(18, 9), tight_layout=True)
 
     # B-scan表示
     vmin, vmax = -10, 10
@@ -267,24 +267,40 @@ def single_plot(plot_data, label_keys=None, suffix=''):
     ax2.set_ylabel(r'Depth [m] ($\varepsilon_r = 4.5$)', fontsize=font_medium)
     ax2.tick_params(axis='y', which='major', labelsize=font_small)
 
-    # カラーバーを右下に配置 (run_data_processing.pyと同じスタイル)
-    fig.subplots_adjust(bottom=0.25, right=0.85)  # レジェンドとカラーバーのスペースを確保
-    # Figureのサイズを基準とした位置とサイズ [left, bottom, width, height]
-    cbar_ax = fig.add_axes([0.65, 0.05, 0.2, 0.05])  # [x, y, 幅, 高さ]
-    cbar = plt.colorbar(im, cax=cbar_ax, orientation='horizontal')
-    cbar.set_label('Amplitude', fontsize=font_medium)
-    cbar.ax.tick_params(labelsize=font_small)
-
-    # レジェンド（2行3列）
+    # レジェンドとカラーバーの動的レイアウト調整
+    num_labels = len(keys)
+    
+    # レジェンドの配置を決定（表示するラベル数に応じて調整）
     patches = [Patch(facecolor=info[L][0], edgecolor='white', label=info[L][1]) for L in keys]
+    
+    if num_labels <= 3:
+        # 岩石のみ（1-3ラベル）の場合:
+        legend_bbox = (0.35, -0.1)
+        cbar_y_pos = 0.07
+        ncol_legend = 3
+    else:
+        # 全ラベル（4-6ラベル）の場合:
+        legend_bbox = (0.35, -0.1)
+        cbar_y_pos = 0.10
+        ncol_legend = 3
+    
+    # レジェンド配置
     ax.legend(
         handles=patches,
         loc='upper center',
-        bbox_to_anchor=(0.5, -0.1),
-        ncol=3,
+        bbox_to_anchor=legend_bbox,
+        ncol=ncol_legend,
         frameon=False,
         fontsize=font_medium
     )
+    
+    # カラーバーを右下に配置（レジェンド幅に応じて調整）
+    fig.subplots_adjust(bottom=0.25, right=0.85)  # レジェンドとカラーバーのスペースを確保
+    # Figureのサイズを基準とした位置とサイズ [left, bottom, width, height]
+    cbar_ax = fig.add_axes([0.70, cbar_y_pos, 0.2, 0.05])  # [x, y, 幅, 高さ]
+    cbar = plt.colorbar(im, cax=cbar_ax, orientation='horizontal')
+    cbar.set_label('Amplitude', fontsize=font_medium)
+    cbar.ax.tick_params(labelsize=font_small)
     # レイアウト調整はカラーバー設定の部分で実施済み
 
     # 保存
