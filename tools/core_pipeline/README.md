@@ -28,14 +28,16 @@
 標準的な物理パラメータ:
 - `sample_interval = 0.312500e-9` [s] - 時間サンプリング間隔
 - `trace_interval = 3.6e-2` [m] - 空間トレース間隔
-- `epsilon_r = 4.5` - 月面レゴリスの比誘電率
+- `epsilon_r = 4.5` - 月面レゴリスの比誘電率（Zhang et al., 2024）
 - `c = 299792458` [m/s] - 光速
 
 ## 処理フロー
-
-1. データ統合 (`data_integration`)
-2. バンドパスフィルタ (`bandpass_filter`) 
-3. 時間ゼロ補正 (`time_zero_correction`)
-4. 背景除去 (`background_removal`)
-5. ゲイン関数 (`gain_function`)
-6. 地形補正 (`terrain_correction`)
+1. バイナリデータの読み取り（`read_binary_xml.py`）
+2. リサンプリング（`resampbling.py`）
+3. 各種データ処理（処理手順や使う処理方法は任意に変更可能）
+    -  データ統合 (`data_integration`)
+    -  バンドパスフィルタ (`bandpass_filter`)
+    -  時間ゼロ補正 (`time_zero_correction`)
+    -  背景除去 (`background_removal`)
+    -  ゲイン関数 (`gain_function`)
+    -  地形補正 (`terrain_correction`)
