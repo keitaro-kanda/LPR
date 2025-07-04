@@ -135,7 +135,7 @@ def create_depth_histogram(data, bin_size_m=1.0, output_dir='rock_statics', labe
         label_counts[label] = counts
     
     # プロット作成
-    plt.figure(figsize=(10, 8))
+    plt.figure(figsize=(8, 10))
     
     # 積み上げヒストグラム
     bottom = np.zeros(len(bin_centers))
@@ -148,15 +148,22 @@ def create_depth_histogram(data, bin_size_m=1.0, output_dir='rock_statics', labe
                 color=get_label_color(label), alpha=0.7)
         bottom += label_counts[label]
     
-    plt.xlabel('Number of rocks', fontsize=16)
-    plt.ylabel('Depth [m]', fontsize=16)
+    plt.xlabel('Number of rocks', fontsize=20)
+    plt.ylabel('Depth [m]', fontsize=20)
+    plt.tick_params(axis='both', which='major', labelsize=16)
     title_text = 'Rock distribution by depth'
     if label_filter is not None:
         title_text += f' (Labels {label_filter})'
-    plt.title(title_text, fontsize=18)
-    plt.legend(fontsize=12)
+    # Use 2 columns for legend if 6 labels are present
+    ncol = 2 if len(unique_labels) == 6 else 1
+    plt.legend(fontsize=18, ncol=ncol)
     plt.grid(True, alpha=0.3)
     plt.gca().invert_yaxis()  # 深い方を下に
+    
+    # Set x-axis limit to max number + 1 for depth histogram
+    # Calculate the maximum stacked count across all bins
+    max_count = np.max(bottom) if len(bottom) > 0 else 1
+    plt.xlim(0, max_count + 1)
     
     plt.tight_layout()
     
@@ -243,7 +250,7 @@ def create_horizontal_histogram(data, bin_size_m=50.0, output_dir='rock_statics'
         label_counts[label] = counts
     
     # プロット作成
-    plt.figure(figsize=(12, 6))
+    plt.figure(figsize=(10, 8))
     
     # 積み上げヒストグラム
     bottom = np.zeros(len(bin_centers))
@@ -256,14 +263,18 @@ def create_horizontal_histogram(data, bin_size_m=50.0, output_dir='rock_statics'
                color=get_label_color(label), alpha=0.7)
         bottom += label_counts[label]
     
-    plt.xlabel('Horizontal position [m]', fontsize=16)
-    plt.ylabel('Number of rocks', fontsize=16)
-    title_text = 'Rock distribution by horizontal position'
-    if label_filter is not None:
-        title_text += f' (Labels {label_filter})'
-    plt.title(title_text, fontsize=18)
-    plt.legend(fontsize=12)
+    plt.xlabel('Horizontal position [m]', fontsize=20)
+    plt.ylabel('Number of rocks', fontsize=20)
+    plt.tick_params(axis='both', which='major', labelsize=16)
+    # Use 2 columns for legend if 6 labels are present
+    ncol = 2 if len(unique_labels) == 6 else 1
+    plt.legend(fontsize=18, ncol=ncol)
     plt.grid(True, alpha=0.3)
+    
+    # Set y-axis limit to max number + 1 for horizontal histogram
+    # Calculate the maximum stacked count across all bins
+    max_count = np.max(bottom) if len(bottom) > 0 else 1
+    plt.ylim(0, max_count + 1)
     
     plt.tight_layout()
     
