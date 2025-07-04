@@ -36,6 +36,20 @@ print('Loading data...')
 data = np.loadtxt(data_path, delimiter=' ')
 print('Data shape:', data.shape)
 
+#* NaN value handling
+nan_count = np.sum(np.isnan(data))
+total_count = data.size
+if nan_count > 0:
+    print(f'NaN値検出: {nan_count} / {total_count} ({nan_count/total_count*100:.2f}%)')
+    data_clean = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+    print('NaN値を0で置き換えました。')
+else:
+    print('NaN値は検出されませんでした。')
+    data_clean = data
+
+# Update data reference for consistency
+data = data_clean
+
 
 
 #* Set parameters
@@ -54,14 +68,14 @@ class PlotParams:
     def _compute_params(self):
         if self.data_type == 'Bscan':
             cmap = 'viridis'
-            vmin = -np.amax(np.abs(self.data_array)) / 15
-            vmax = np.amax(np.abs(self.data_array)) / 15
+            vmin = -np.nanmax(np.abs(self.data_array)) / 15
+            vmax = np.nanmax(np.abs(self.data_array)) / 15
             xlabel = 'Distance [m]'
             ylabel = 'Time [ns]'
             cbar_label = 'Amplitude'
         elif self.data_type == 'pulse_compression':
             cmap = 'viridis'
-            cbar_max = np.amax(np.abs(self.data_array)) / 5
+            cbar_max = np.nanmax(np.abs(self.data_array)) / 5
             vmin = -cbar_max
             vmax = cbar_max
             xlabel = 'Distance [m]'
@@ -70,7 +84,7 @@ class PlotParams:
         elif self.data_type == 'fk_migration':
             cmap = 'viridis'
             vmin = 0
-            vmax = np.amax(np.abs(self.data_array)) / 5
+            vmax = np.nanmax(np.abs(self.data_array)) / 5
             xlabel = 'Distance [m]'
             ylabel = 'z [m]'
             cbar_label = 'Amplitude [dB]'
