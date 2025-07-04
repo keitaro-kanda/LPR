@@ -80,9 +80,9 @@ def get_label_color(label):
         1: 'r',        # red
         2: 'g',        # green
         3: 'b',        # blue
-        4: 'yellow',   # yellow
+        4: 'cyan',   # yellow
         5: 'magenta',  # magenta
-        6: 'cyan'      # cyan
+        6: 'yellow'      # cyan
     }
     return color_map.get(label, 'gray')  # デフォルトはgray
 
