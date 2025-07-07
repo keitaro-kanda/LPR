@@ -148,8 +148,8 @@ def create_depth_histogram(data, bin_size_m=1.0, output_dir='rock_statics', labe
                 color=get_label_color(label), alpha=0.7)
         bottom += label_counts[label]
     
-    plt.xlabel('Number of rocks', fontsize=20)
-    plt.ylabel('Depth [m]', fontsize=20)
+    plt.xlabel('Number of echoes', fontsize=20)
+    plt.ylabel(r'Depth [m] in $\varepsilon_r = 4.5$', fontsize=20)
     plt.tick_params(axis='both', which='major', labelsize=16)
     title_text = 'Rock distribution by depth'
     if label_filter is not None:
@@ -264,7 +264,7 @@ def create_horizontal_histogram(data, bin_size_m=50.0, output_dir='rock_statics'
         bottom += label_counts[label]
     
     plt.xlabel('Horizontal position [m]', fontsize=20)
-    plt.ylabel('Number of rocks', fontsize=20)
+    plt.ylabel('Number of echoes', fontsize=20)
     plt.tick_params(axis='both', which='major', labelsize=16)
     # Use 2 columns for legend if 6 labels are present
     ncol = 2 if len(unique_labels) == 6 else 1
