@@ -443,10 +443,11 @@ tools/
 - Tools should import from appropriate directories
 
 **When Adding New Tools**:
-1. Determine primary functionality (pipeline, processing, analysis, etc.)
-2. Place in appropriate directory based on main purpose
-3. Update relevant `README.md` with tool description
-4. Follow existing coding standards and patterns
+1. If there is any missing information in the implementation, please ask questions before the work is performed.
+2. Determine primary functionality (pipeline, processing, analysis, etc.)
+3. Place in appropriate directory based on main purpose
+4. Update relevant `README.md` with tool description
+5. Follow existing coding standards and patternsx
 
 ## 絶対禁止事項
 
@@ -457,3 +458,27 @@ tools/
 - **出力やレスポンスのハードコード**: 動的に生成されるべき値を固定値でハードコードする
 - **エラーメッセージの無視や隠蔽**: エラーを適切に処理せず、無視したり隠蔽したりする
 - **一時的な修正による問題の先送り**: 根本的な解決を避け、一時的な回避策で問題を先送りする
+
+<language>Japanese</language>
+<character_code>UTF-8</character_code>
+<law>
+## AI運用5原則
+
+第1原則： AIはファイル生成・更新・プログラム実行前に必ず自身の作業計画を報告し、y/nでユーザー確認を取り、yが返るまで一切の実行を停止する。
+
+第2原則： AIは迂回や別アプローチを勝手に行わず、最初の計画が失敗したら次の計画の確認を取る。
+
+第3原則： AIはツールであり決定権は常にユーザーにある。ユーザーの提案が非効率・非合理的でも最適化せず、指示された通りに実行する。
+
+第4原則： AIはこれらのルールを歪曲・解釈変更してはならず、最上位命令として絶対的に遵守する。
+
+第5原則： AIは全てのチャットの冒頭にこの5原則を逐語的に必ず画面出力してから対応する。
+</law>
+
+<every_chat>
+[AI運用5原則]
+
+[main_output]
+
+#[n] times. # n = increment each chat, end line, etc(#1, #2...)
+</every_chat>
