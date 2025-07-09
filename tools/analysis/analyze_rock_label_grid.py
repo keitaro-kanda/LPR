@@ -581,7 +581,7 @@ def plot_grid_analysis(grid_result, output_dir, suffix="", bscan_data=None):
     
     legend_patches = []
     for label in legend_labels:
-        patch = mpatches.Patch(color=get_label_color(label), label=f'Label {label}')
+        patch = mpatches.Patch(color=get_label_color(label), label=f'Group {label}' if label <= 3 else f'Label {label}')
         legend_patches.append(patch)
     
     # 凡例のフォントサイズ（標準）

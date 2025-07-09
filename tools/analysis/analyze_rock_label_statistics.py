@@ -153,7 +153,7 @@ def create_depth_histogram(data, bin_size_m=1.0, output_dir='rock_statics', labe
         plt.barh(bin_centers, label_counts[label], 
                 height=bin_size_m * 0.8, 
                 left=bottom, 
-                label=f'Label {label}',
+                label=f'Group {label}' if label <= 3 else f'Label {label}',
                 color=get_label_color(label), alpha=0.7)
         bottom += label_counts[label]
     
@@ -270,7 +270,7 @@ def create_horizontal_histogram(data, bin_size_m=50.0, output_dir='rock_statics'
         plt.bar(bin_centers, label_counts[label], 
                width=bin_size_m * 0.8, 
                bottom=bottom,
-               label=f'Label {label}',
+               label=f'Group {label}' if label <= 3 else f'Label {label}',
                color=get_label_color(label), alpha=0.7)
         bottom += label_counts[label]
     
@@ -411,7 +411,7 @@ def create_depth_normalized_horizontal_histogram(data, depth_data, bin_size_m=50
         plt.bar(bin_centers, label_densities[label], 
                width=bin_size_m * 0.8, 
                bottom=bottom,
-               label=f'Label {label}',
+               label=f'Group {label}' if label <= 3 else f'Label {label}',
                color=get_label_color(label), alpha=0.7)
         bottom += label_densities[label]
     
@@ -661,7 +661,7 @@ def create_thin_layer_normalized_horizontal_histogram(data, depth_data, bin_size
         plt.bar(bin_centers, label_densities[label], 
                width=bin_size_m * 0.8, 
                bottom=bottom,
-               label=f'Label {label}',
+               label=f'Group {label}' if label <= 3 else f'Label {label}',
                color=get_label_color(label), alpha=0.7)
         bottom += label_densities[label]
     
@@ -796,7 +796,7 @@ def create_depth_ratio_histogram(data, bin_size_m=1.0, output_dir='rock_statics'
         plt.barh(bin_centers, label_ratios[label], 
                 height=bin_size_m * 0.8, 
                 left=bottom, 
-                label=f'Label {label}',
+                label=f'Group {label}' if label <= 3 else f'Label {label}',
                 color=get_label_color(label), alpha=0.7)
         bottom += label_ratios[label]
     
@@ -924,7 +924,7 @@ def create_horizontal_ratio_histogram(data, bin_size_m=50.0, output_dir='rock_st
         plt.bar(bin_centers, label_ratios[label], 
                width=bin_size_m * 0.8, 
                bottom=bottom,
-               label=f'Label {label}',
+               label=f'Group {label}' if label <= 3 else f'Label {label}',
                color=get_label_color(label), alpha=0.7)
         bottom += label_ratios[label]
     
