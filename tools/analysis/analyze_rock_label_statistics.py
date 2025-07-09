@@ -1029,9 +1029,14 @@ def main():
         else:
             print(f"警告: 深さ計測ファイルが見つかりません: {depth_json_path}")
     
+    # ウィンドウサイズ入力
+    depth_bin = float(input("深さビンサイズ [m] を入力してください: ").strip())
+    horizontal_bin = float(input("水平位置ビンサイズ [m] を入力してください: ").strip())
+    
     # 出力ディレクトリ設定
     base_dir = os.path.dirname(os.path.dirname(json_path))
-    output_base_dir = os.path.join(base_dir, 'label_statics/' + os.path.splitext(os.path.basename(json_path))[0])
+    filename = os.path.splitext(os.path.basename(json_path))[0]
+    output_base_dir = os.path.join(base_dir, f'label_statics/{filename}_d{depth_bin}_h{horizontal_bin}')
     output_basic_dir = os.path.join(output_base_dir, 'basic')
     output_normalized_dir = os.path.join(output_base_dir, 'normalized')
     output_ratio_dir = os.path.join(output_base_dir, 'ratio')
@@ -1049,10 +1054,6 @@ def main():
         print(f"計測点数: {len(depth_data['x'])}")
         print(f"x座標範囲: {depth_data['x'].min():.2f} - {depth_data['x'].max():.2f} m")
         print(f"深さ範囲: {depth_data['depth'].min():.3f} - {depth_data['depth'].max():.3f} m")
-    
-    # 固定設定
-    depth_bin = 0.50  # 0.5 m
-    horizontal_bin = 50.0  # 50 m
     
     print(f"\n設定:")
     print(f"  深さビンサイズ: {depth_bin} m")
