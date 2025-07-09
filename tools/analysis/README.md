@@ -5,7 +5,7 @@ LPRデータの統計解析・数理解析ツール群です。
 ## 主要ツール
 
 ### 統計解析
-- **`plot_rock_statistic.py`**: 岩石ラベルの統計的性質をヒストグラム表示
+- **`analyze_rock_label_statistics.py`**: 岩石ラベルの統計的性質をヒストグラム表示
   - 深さ・水平位置別の岩石分布ヒストグラム
   - 深さ計測データによる規格化ヒストグラム（1mあたりの平均岩石個数）
   - ラベル別フィルタリング機能（岩石のみ、全ラベル）
@@ -21,7 +21,7 @@ LPRデータの統計解析・数理解析ツール群です。
 
 ```bash
 # 岩石統計解析（基本機能）
-python analysis/plot_rock_statistic.py
+python analysis/analyze_rock_label_statistics.py
 # 実行時に岩石ラベルJSONファイルを指定
 # 深さ計測JSONファイル（オプション）で規格化ヒストグラムも生成
 
@@ -47,7 +47,7 @@ python analysis/calc_RCS.py
 - **べき則フィッティング**: 累積サイズ分布のモデリング
 - **散乱断面積計算**: レーダー反射強度の定量化
 
-## plot_rock_statistic.py 詳細機能
+## analyze_rock_label_statistics.py 詳細機能
 
 ### 入力データ
 - **岩石ラベルJSON**: `plot_viewer_add_label.py`で作成されたラベルデータ
