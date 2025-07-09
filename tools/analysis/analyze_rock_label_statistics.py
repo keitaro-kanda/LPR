@@ -582,7 +582,7 @@ def main():
     
     # 出力ディレクトリ設定
     base_dir = os.path.dirname(os.path.dirname(json_path))
-    output_dir = os.path.join(base_dir, 'rock_statics/' + os.path.splitext(os.path.basename(json_path))[0])
+    output_dir = os.path.join(base_dir, 'label_statics/' + os.path.splitext(os.path.basename(json_path))[0])
     
     # データ読み込み
     print("\nデータを読み込み中...")
