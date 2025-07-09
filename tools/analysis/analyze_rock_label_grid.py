@@ -15,7 +15,6 @@ import json
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.patches import Wedge
 import matplotlib.patches as mpatches
 
 def load_label_data(json_path):
@@ -138,9 +137,16 @@ def create_grid_analysis(data, window_x, window_d, label_filter=None, filter_nam
     x_min, x_max = data['x'].min(), data['x'].max()
     depth_min, depth_max = time_to_depth(data['y']).min(), time_to_depth(data['y']).max()
     
-    # グリッドビン作成
-    x_bins = np.arange(x_min, x_max + window_x, window_x)
-    depth_bins = np.arange(depth_min, depth_max + window_d, window_d)
+    # x軸グリッドビン作成（0基準）
+    x_start = 0
+    x_end = np.ceil(x_max / window_x) * window_x  # 最大値を含む最小の倍数
+    x_bins = np.arange(x_start, x_end + window_x, window_x)
+    
+    # y軸グリッドビン作成（0基準、負の値も含む）
+    # 最小値と最大値を0基準のウィンドウサイズの倍数に拡張
+    depth_start = np.floor(depth_min / window_d) * window_d  # 最小値を含む最大の倍数
+    depth_end = np.ceil(depth_max / window_d) * window_d    # 最大値を含む最小の倍数
+    depth_bins = np.arange(depth_start, depth_end + window_d, window_d)
     
     # グリッドセンター計算
     x_centers = (x_bins[:-1] + x_bins[1:]) / 2
@@ -249,6 +255,11 @@ def plot_grid_analysis(grid_result, output_dir, suffix=""):
     # 最適な図サイズを計算
     fig_width, fig_height = calculate_optimal_figure_size(x_bins, depth_bins, window_x, window_d)
     
+    # CLAUDE.mdの標準フォントサイズを定義
+    font_large = 20      # Titles and labels
+    font_medium = 18     # Axis labels  
+    font_small = 16      # Tick labels
+    
     # プロット作成
     fig, ax = plt.subplots(figsize=(fig_width, fig_height))
     
@@ -258,7 +269,7 @@ def plot_grid_analysis(grid_result, output_dir, suffix=""):
             counts = grid_counts.get((i, j), {})
             
             if counts:
-                # 円グラフのサイズ設定（データ数とアスペクト比に応じて調整）
+                # 積み上げ棒グラフの設定
                 total_count = sum(counts.values())
                 
                 # データ範囲に基づいた基本サイズ計算
@@ -266,36 +277,65 @@ def plot_grid_analysis(grid_result, output_dir, suffix=""):
                 depth_range = depth_bins[-1] - depth_bins[0]
                 physical_aspect_ratio = x_range / depth_range
                 
-                # 物理的アスペクト比に応じた基本半径の調整
-                if physical_aspect_ratio > 10:  # 極端に横長
-                    base_radius = min(window_x * 0.15, window_d * 0.4)
-                elif physical_aspect_ratio > 5:  # 横長
-                    base_radius = min(window_x * 0.2, window_d * 0.35)
-                else:  # 通常
-                    base_radius = min(window_x * 0.3, window_d * 0.3)
+                # 棒グラフのパディング設定
+                padding_x = window_x * 0.1  # 左右のパディング
+                padding_d = window_d * 0.1  # 上下のパディング
                 
-                # データ数に応じた半径調整
-                count_factor = min(1.0, total_count / 10)
-                radius = base_radius * (0.5 + 0.5 * count_factor)
+                # 棒グラフの実際のサイズ
+                bar_width = window_x - 2 * padding_x
+                bar_height = window_d - 2 * padding_d
                 
-                # 円グラフデータ準備
-                labels_list = list(counts.keys())
-                sizes = list(counts.values())
-                colors = [get_label_color(label) for label in labels_list]
+                # 棒グラフの開始位置
+                bar_x = x_center - bar_width / 2
+                bar_y = depth_center - bar_height / 2
                 
-                # 円グラフ描画
-                wedges, _ = ax.pie(sizes, colors=colors, center=(x_center, depth_center),
-                                 radius=radius, startangle=90, 
-                                 textprops={'fontsize': 6})
+                # ラベルをソートして一貫した表示順序を保つ
+                sorted_labels = sorted(counts.keys())
                 
-                # 各セクションに数値を表示（物理的アスペクト比に応じてフォントサイズ調整）
-                font_size = max(4, min(8, 6 / max(1, physical_aspect_ratio / 10)))
-                for wedge, count in zip(wedges, sizes):
-                    angle = (wedge.theta1 + wedge.theta2) / 2
-                    x_text = x_center + radius * 0.6 * np.cos(np.radians(angle))
-                    y_text = depth_center + radius * 0.6 * np.sin(np.radians(angle))
-                    ax.text(x_text, y_text, str(count), ha='center', va='center', 
-                           fontsize=font_size, fontweight='bold')
+                # 積み上げ棒グラフを描画
+                current_height = 0
+                for label in sorted_labels:
+                    count = counts[label]
+                    # 各セグメントの高さを計算（比例配分）
+                    segment_height = (count / total_count) * bar_height
+                    
+                    # 矩形を描画
+                    rect = plt.Rectangle((bar_x, bar_y + current_height),
+                                       bar_width, segment_height,
+                                       facecolor=get_label_color(label),
+                                       edgecolor='black',
+                                       linewidth=0.5,
+                                       alpha=0.8)
+                    ax.add_patch(rect)
+                    
+                    # 数値ラベルを追加（セグメントが十分大きい場合）
+                    min_segment_ratio = 0.08  # 最小セグメント比率
+                    if segment_height > bar_height * min_segment_ratio:
+                        # 標準フォントサイズを使用
+                        font_size = font_small
+                        
+                        # 数値を中央に配置
+                        text_x = bar_x + bar_width / 2
+                        text_y = bar_y + current_height + segment_height / 2
+                        
+                        # 背景色に応じて文字色を調整
+                        text_color = 'white' if label in [1, 3, 5] else 'black'
+                        ax.text(text_x, text_y, str(count), 
+                               ha='center', va='center',
+                               fontsize=font_size, fontweight='bold',
+                               color=text_color)
+                    else:
+                        # 小さなセグメントの場合は棒グラフの外側に数値を表示
+                        if count > 0:  # 0でない場合のみ表示
+                            font_size = font_small
+                            text_x = bar_x + bar_width + padding_x * 0.5
+                            text_y = bar_y + current_height + segment_height / 2
+                            ax.text(text_x, text_y, str(count), 
+                                   ha='left', va='center',
+                                   fontsize=font_size, fontweight='bold',
+                                   color=get_label_color(label))
+                    
+                    current_height += segment_height
             else:
                 # データがない場合は白い四角を描画
                 rect = plt.Rectangle((x_center - window_x/2, depth_center - window_d/2),
@@ -313,27 +353,24 @@ def plot_grid_analysis(grid_result, output_dir, suffix=""):
     ax.set_xlim(x_bins[0], x_bins[-1])
     ax.set_ylim(depth_bins[0], depth_bins[-1])
     
-    # 物理的な距離の比率に基づいたフォントサイズ調整
+    # 物理的な距離の比率を計算
     x_range = x_bins[-1] - x_bins[0]
     depth_range = depth_bins[-1] - depth_bins[0]
     physical_aspect_ratio = x_range / depth_range
     
-    if physical_aspect_ratio > 10:  # 極端に横長
-        xlabel_fontsize = 16
-        ylabel_fontsize = 16
-        tick_fontsize = 12
-    elif physical_aspect_ratio > 5:  # 横長
-        xlabel_fontsize = 18
-        ylabel_fontsize = 18
-        tick_fontsize = 14
-    else:  # 通常
-        xlabel_fontsize = 20
-        ylabel_fontsize = 20
-        tick_fontsize = 16
+    ax.set_xlabel('Horizontal position [m]', fontsize=font_medium)
+    ax.set_ylabel(r'Depth [m] in $\varepsilon_r = 4.5$', fontsize=font_medium)
     
-    ax.set_xlabel('Horizontal position [m]', fontsize=xlabel_fontsize)
-    ax.set_ylabel(r'Depth [m] in $\varepsilon_r = 4.5$', fontsize=ylabel_fontsize)
-    ax.tick_params(axis='both', which='major', labelsize=tick_fontsize)
+    # 軸のticks設定
+    # 水平方向のticks（適切な間隔で設定）
+    x_ticks = np.arange(x_bins[0], x_bins[-1], 200)
+    ax.set_xticks(x_ticks)
+    
+    # 深さ方向のticks（適切な間隔で設定）
+    depth_ticks = np.arange(depth_bins[0], depth_bins[-1], 2.0)
+    ax.set_yticks(depth_ticks)
+    
+    ax.tick_params(axis='both', which='major', labelsize=font_small)
     ax.invert_yaxis()  # 深い方を下に
     
     # 等アスペクト比の設定（物理的な距離の比率に基づいて判定）
@@ -357,11 +394,10 @@ def plot_grid_analysis(grid_result, output_dir, suffix=""):
         patch = mpatches.Patch(color=get_label_color(label), label=f'Label {label}')
         legend_patches.append(patch)
     
-    # 凡例のフォントサイズも物理的アスペクト比に応じて調整
-    legend_fontsize = max(10, min(14, 14 / max(1, physical_aspect_ratio / 5)))
-    ax.legend(handles=legend_patches, loc='upper right', fontsize=legend_fontsize)
+    # 凡例のフォントサイズ（標準）
+    ax.legend(handles=legend_patches, fontsize=font_medium)
     
-    # タイトル（アスペクト比に応じてフォントサイズ調整）
+    # タイトル（標準フォントサイズ）
     filter_text = {
         "rocks_only": "Rocks only (Labels 1-3)",
         "non_rocks_only": "Non-rocks only (Labels 4-6)",
@@ -370,8 +406,7 @@ def plot_grid_analysis(grid_result, output_dir, suffix=""):
     title = f"Grid Analysis - {filter_text[grid_result['filter_name']]}"
     title += f" (Window: {window_x}m x {window_d}m)"
     
-    title_fontsize = max(12, min(16, 16 / max(1, physical_aspect_ratio / 5)))
-    ax.set_title(title, fontsize=title_fontsize, pad=20)
+    ax.set_title(title, fontsize=font_large, pad=20)
     
     plt.tight_layout()
     
@@ -481,7 +516,10 @@ def main():
     
     print(f"総ラベル数: {len(data['label'])}")
     print(f"水平位置範囲: {data['x'].min():.2f} - {data['x'].max():.2f} m")
-    print(f"深さ範囲: {time_to_depth(data['y'].min()):.3f} - {time_to_depth(data['y'].max()):.3f} m")
+    depth_min = time_to_depth(data['y'].min())
+    depth_max = time_to_depth(data['y'].max())
+    print(f"深さ範囲: {depth_min:.3f} - {depth_max:.3f} m")
+    print(f"グリッド範囲: x=0 - {np.ceil(data['x'].max() / window_x) * window_x:.0f} m, depth={np.floor(depth_min / window_d) * window_d:.2f} - {np.ceil(depth_max / window_d) * window_d:.2f} m")
     
     # 3パターンの解析実行
     print("\nグリッド解析を実行中...")
