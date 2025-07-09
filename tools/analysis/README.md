@@ -10,6 +10,11 @@ LPRデータの統計解析・数理解析ツール群です。
   - 深さ計測データによる規格化ヒストグラム（1mあたりの平均岩石個数）
   - ラベル別フィルタリング機能（岩石のみ、全ラベル）
   - JSON形式の詳細統計データ出力
+- **`analyze_rock_label_grid.py`**: 2次元グリッドベース岩石ラベル解析
+  - 指定ウィンドウサイズでの2次元グリッド分割
+  - 各グリッドセル内での円グラフ表示（ラベル数を直接表示）
+  - 3パターンの集計（岩石のみ1-3、非岩石のみ4-6、全ラベル1-6）
+  - グリッド統計データのテキスト出力
 - **`make_RSFD_plot.py`**: 岩石サイズ頻度分布（RSFD）の作成・プロット
 - **`make_RSFD_from_csv.py`**: CSVからRSFDプロットを生成
 
@@ -24,6 +29,10 @@ LPRデータの統計解析・数理解析ツール群です。
 python analysis/analyze_rock_label_statistics.py
 # 実行時に岩石ラベルJSONファイルを指定
 # 深さ計測JSONファイル（オプション）で規格化ヒストグラムも生成
+
+# 2次元グリッドベース解析
+python analysis/analyze_rock_label_grid.py
+# 実行時にJSONファイルとウィンドウサイズ（水平・深さ）を指定
 
 # RSFD解析
 python analysis/make_RSFD_plot.py
