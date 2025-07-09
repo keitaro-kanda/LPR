@@ -722,6 +722,264 @@ def create_thin_layer_normalized_horizontal_histogram(data, depth_data, bin_size
     
     print(f"薄い層規格化統計データ保存: {stats_path}")
 
+def create_depth_ratio_histogram(data, bin_size_m=1.0, output_dir='rock_statics', label_filter=None, suffix=''):
+    """
+    深さごとの岩石ラベルの割合ヒストグラムを作成
+    
+    Parameters:
+    -----------
+    data : dict
+        ラベルデータ
+    bin_size_m : float
+        深さビンサイズ [m]
+    output_dir : str
+        出力ディレクトリ
+    label_filter : list or None
+        含めるラベル番号のリスト（None=全て）
+    suffix : str
+        ファイル名のサフィックス
+    """
+    y_coords = data['y']
+    labels = data['label']
+    
+    # ラベルフィルタリング
+    if label_filter is not None:
+        mask = np.isin(labels, label_filter)
+        y_coords = y_coords[mask]
+        labels = labels[mask]
+    
+    if len(labels) == 0:
+        print(f"警告: フィルタリング後のデータが空です (フィルタ: {label_filter})")
+        return
+    
+    # 深さ変換
+    depths = time_to_depth(y_coords)
+    
+    # 深さビン設定（0.5の倍数で区切り）
+    all_depths = time_to_depth(data['y'])
+    depth_min, depth_max = all_depths.min(), all_depths.max()
+    
+    # 0.5の倍数でビン境界を設定
+    bin_start = np.floor(depth_min / bin_size_m) * bin_size_m
+    bin_end = np.ceil(depth_max / bin_size_m) * bin_size_m
+    bins = np.arange(bin_start, bin_end + bin_size_m, bin_size_m)
+    bin_centers = (bins[:-1] + bins[1:]) / 2
+    
+    # ラベル別にヒストグラム計算
+    unique_labels = np.unique(labels)
+    label_counts = {}
+    label_ratios = {}
+    
+    for label in unique_labels:
+        mask = labels == label
+        counts, _ = np.histogram(depths[mask], bins=bins)
+        label_counts[label] = counts
+    
+    # 各ビンでの割合を計算
+    for label in unique_labels:
+        ratios = np.zeros(len(bin_centers))
+        for i in range(len(bin_centers)):
+            total_count = sum(label_counts[l][i] for l in unique_labels)
+            if total_count > 0:
+                ratios[i] = (label_counts[label][i] / total_count) * 100  # パーセント
+            else:
+                ratios[i] = 0
+        label_ratios[label] = ratios
+    
+    # プロット作成
+    plt.figure(figsize=(8, 10))
+    
+    # 積み上げヒストグラム（割合）
+    bottom = np.zeros(len(bin_centers))
+    
+    for label in sorted(unique_labels):
+        plt.barh(bin_centers, label_ratios[label], 
+                height=bin_size_m * 0.8, 
+                left=bottom, 
+                label=f'Label {label}',
+                color=get_label_color(label), alpha=0.7)
+        bottom += label_ratios[label]
+    
+    plt.xlabel('Percentage [%]', fontsize=20)
+    plt.ylabel(r'Depth [m] in $\varepsilon_r = 4.5$', fontsize=20)
+    plt.tick_params(axis='both', which='major', labelsize=16)
+    title_text = 'Rock ratio distribution by depth'
+    if label_filter is not None:
+        title_text += f' (Labels {label_filter})'
+    # Use 2 columns for legend if 6 labels are present
+    ncol = 2 if len(unique_labels) == 6 else 1
+    plt.legend(fontsize=18, ncol=ncol)
+    plt.grid(True, alpha=0.3)
+    plt.gca().invert_yaxis()  # 深い方を下に
+    
+    # Set x-axis limit to 0-100%
+    plt.xlim(0, 100)
+    
+    plt.tight_layout()
+    
+    # 保存
+    os.makedirs(output_dir, exist_ok=True)
+    filename = f'depth_ratio_histogram{suffix}'
+    png_path = os.path.join(output_dir, f'{filename}.png')
+    pdf_path = os.path.join(output_dir, f'{filename}.pdf')
+    
+    plt.savefig(png_path, dpi=300, bbox_inches='tight')
+    plt.savefig(pdf_path, dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    print(f"深さ割合ヒストグラム保存: {png_path}")
+    
+    # 統計データ保存
+    stats_path = os.path.join(output_dir, f'depth_ratio_statistics{suffix}.txt')
+    with open(stats_path, 'w') as f:
+        f.write("# Depth ratio statistics\n")
+        f.write(f"# Bin size: {bin_size_m} m\n")
+        if label_filter is not None:
+            f.write(f"# Label filter: {label_filter}\n")
+        f.write("# Depth_center[m]\t")
+        for label in sorted(unique_labels):
+            f.write(f"Label_{label}_count\tLabel_{label}_ratio[%]\t")
+        f.write("Total_count\n")
+        
+        for i, depth in enumerate(bin_centers):
+            f.write(f"{depth:.3f}\t")
+            total = 0
+            for label in sorted(unique_labels):
+                count = label_counts[label][i]
+                ratio = label_ratios[label][i]
+                f.write(f"{count}\t{ratio:.1f}\t")
+                total += count
+            f.write(f"{total}\n")
+    
+    print(f"深さ割合統計データ保存: {stats_path}")
+
+def create_horizontal_ratio_histogram(data, bin_size_m=50.0, output_dir='rock_statics', label_filter=None, suffix=''):
+    """
+    水平位置ごとの岩石ラベルの割合ヒストグラムを作成
+    
+    Parameters:
+    -----------
+    data : dict
+        ラベルデータ
+    bin_size_m : float
+        水平位置ビンサイズ [m]
+    output_dir : str
+        出力ディレクトリ
+    label_filter : list or None
+        含めるラベル番号のリスト（None=全て）
+    suffix : str
+        ファイル名のサフィックス
+    """
+    x_coords = data['x']
+    labels = data['label']
+    
+    # ラベルフィルタリング
+    if label_filter is not None:
+        mask = np.isin(labels, label_filter)
+        x_coords_filtered = x_coords[mask]
+        labels_filtered = labels[mask]
+    else:
+        x_coords_filtered = x_coords
+        labels_filtered = labels
+    
+    if len(labels_filtered) == 0:
+        print(f"警告: フィルタリング後のデータが空です (フィルタ: {label_filter})")
+        return
+    
+    # ビン設定（0スタート）
+    x_max = data['x'].max()
+    bin_start = 0
+    bin_end = np.ceil(x_max / bin_size_m) * bin_size_m
+    bins = np.arange(bin_start, bin_end + bin_size_m, bin_size_m)
+    bin_centers = (bins[:-1] + bins[1:]) / 2
+    
+    # ラベル別にヒストグラム計算
+    unique_labels = np.unique(labels_filtered)
+    label_counts = {}
+    label_ratios = {}
+    
+    for label in unique_labels:
+        mask = labels_filtered == label
+        counts, _ = np.histogram(x_coords_filtered[mask], bins=bins)
+        label_counts[label] = counts
+    
+    # 各ビンでの割合を計算
+    for label in unique_labels:
+        ratios = np.zeros(len(bin_centers))
+        for i in range(len(bin_centers)):
+            total_count = sum(label_counts[l][i] for l in unique_labels)
+            if total_count > 0:
+                ratios[i] = (label_counts[label][i] / total_count) * 100  # パーセント
+            else:
+                ratios[i] = 0
+        label_ratios[label] = ratios
+    
+    # プロット作成
+    plt.figure(figsize=(10, 8))
+    
+    # 積み上げヒストグラム（割合）
+    bottom = np.zeros(len(bin_centers))
+    
+    for label in sorted(unique_labels):
+        plt.bar(bin_centers, label_ratios[label], 
+               width=bin_size_m * 0.8, 
+               bottom=bottom,
+               label=f'Label {label}',
+               color=get_label_color(label), alpha=0.7)
+        bottom += label_ratios[label]
+    
+    plt.xlabel('Horizontal position [m]', fontsize=20)
+    plt.ylabel('Percentage [%]', fontsize=20)
+    plt.tick_params(axis='both', which='major', labelsize=16)
+    title_text = 'Rock ratio distribution by horizontal position'
+    if label_filter is not None:
+        title_text += f' (Labels {label_filter})'
+    # Use 2 columns for legend if 6 labels are present
+    ncol = 2 if len(unique_labels) == 6 else 1
+    plt.legend(fontsize=18, ncol=ncol)
+    plt.grid(True, alpha=0.3)
+    
+    # Set y-axis limit to 0-100%
+    plt.ylim(0, 100)
+    
+    plt.tight_layout()
+    
+    # 保存
+    os.makedirs(output_dir, exist_ok=True)
+    filename = f'horizontal_ratio_histogram{suffix}'
+    png_path = os.path.join(output_dir, f'{filename}.png')
+    pdf_path = os.path.join(output_dir, f'{filename}.pdf')
+    
+    plt.savefig(png_path, dpi=300, bbox_inches='tight')
+    plt.savefig(pdf_path, dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    print(f"水平位置割合ヒストグラム保存: {png_path}")
+    
+    # 統計データ保存
+    stats_path = os.path.join(output_dir, f'horizontal_ratio_statistics{suffix}.txt')
+    with open(stats_path, 'w') as f:
+        f.write("# Horizontal position ratio statistics\n")
+        f.write(f"# Bin size: {bin_size_m} m\n")
+        if label_filter is not None:
+            f.write(f"# Label filter: {label_filter}\n")
+        f.write("# Position_center[m]\t")
+        for label in sorted(unique_labels):
+            f.write(f"Label_{label}_count\tLabel_{label}_ratio[%]\t")
+        f.write("Total_count\n")
+        
+        for i, pos in enumerate(bin_centers):
+            f.write(f"{pos:.2f}\t")
+            total = 0
+            for label in sorted(unique_labels):
+                count = label_counts[label][i]
+                ratio = label_ratios[label][i]
+                f.write(f"{count}\t{ratio:.1f}\t")
+                total += count
+            f.write(f"{total}\n")
+    
+    print(f"水平位置割合統計データ保存: {stats_path}")
+
 def print_summary_statistics(data):
     """
     データの概要統計を表示
@@ -776,6 +1034,7 @@ def main():
     output_base_dir = os.path.join(base_dir, 'label_statics/' + os.path.splitext(os.path.basename(json_path))[0])
     output_basic_dir = os.path.join(output_base_dir, 'basic')
     output_normalized_dir = os.path.join(output_base_dir, 'normalized')
+    output_ratio_dir = os.path.join(output_base_dir, 'ratio')
     
     # データ読み込み
     print("\nデータを読み込み中...")
@@ -801,6 +1060,7 @@ def main():
     print(f"  出力ディレクトリ: {output_base_dir}")
     print(f"    - 基本ヒストグラム: {output_basic_dir}")
     print(f"    - 規格化ヒストグラム: {output_normalized_dir}")
+    print(f"    - 割合ヒストグラム: {output_ratio_dir}")
     print(f"  誘電率: 4.5")
     print(f"  深さ規格化: {'有効' if depth_data is not None else '無効'}")
     
@@ -811,6 +1071,13 @@ def main():
                           label_filter=rock_labels, suffix='_rocks_only')
     create_horizontal_histogram(data, bin_size_m=horizontal_bin, output_dir=output_basic_dir, 
                                label_filter=rock_labels, suffix='_rocks_only')
+    
+    # 割合ヒストグラム（岩石のみ）
+    print("\n割合ヒストグラム（岩石のみ）を作成中...")
+    create_depth_ratio_histogram(data, bin_size_m=depth_bin, output_dir=output_ratio_dir, 
+                                label_filter=rock_labels, suffix='_rocks_only')
+    create_horizontal_ratio_histogram(data, bin_size_m=horizontal_bin, output_dir=output_ratio_dir, 
+                                     label_filter=rock_labels, suffix='_rocks_only')
     
     # 深さ規格化水平ヒストグラム（岩石のみ）
     if depth_data is not None:
@@ -831,6 +1098,13 @@ def main():
                           label_filter=None, suffix='_all_labels')
     create_horizontal_histogram(data, bin_size_m=horizontal_bin, output_dir=output_basic_dir, 
                                label_filter=None, suffix='_all_labels')
+    
+    # 割合ヒストグラム（全ラベル）
+    print("\n割合ヒストグラム（全ラベル）を作成中...")
+    create_depth_ratio_histogram(data, bin_size_m=depth_bin, output_dir=output_ratio_dir, 
+                                label_filter=None, suffix='_all_labels')
+    create_horizontal_ratio_histogram(data, bin_size_m=horizontal_bin, output_dir=output_ratio_dir, 
+                                     label_filter=None, suffix='_all_labels')
     
     # 深さ規格化水平ヒストグラム（全ラベル）
     if depth_data is not None:
