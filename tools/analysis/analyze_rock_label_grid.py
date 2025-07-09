@@ -292,50 +292,23 @@ def plot_grid_analysis(grid_result, output_dir, suffix=""):
                 # ラベルをソートして一貫した表示順序を保つ
                 sorted_labels = sorted(counts.keys())
                 
-                # 積み上げ棒グラフを描画
-                current_height = 0
+                # 横方向の積み上げ棒グラフを描画
+                current_width = 0
                 for label in sorted_labels:
                     count = counts[label]
-                    # 各セグメントの高さを計算（比例配分）
-                    segment_height = (count / total_count) * bar_height
+                    # 各セグメントの幅を計算（比例配分）
+                    segment_width = (count / total_count) * bar_width
                     
                     # 矩形を描画
-                    rect = plt.Rectangle((bar_x, bar_y + current_height),
-                                       bar_width, segment_height,
+                    rect = plt.Rectangle((bar_x + current_width, bar_y),
+                                       segment_width, bar_height,
                                        facecolor=get_label_color(label),
                                        edgecolor='black',
                                        linewidth=0.5,
                                        alpha=0.8)
                     ax.add_patch(rect)
                     
-                    # 数値ラベルを追加（セグメントが十分大きい場合）
-                    min_segment_ratio = 0.08  # 最小セグメント比率
-                    if segment_height > bar_height * min_segment_ratio:
-                        # 標準フォントサイズを使用
-                        font_size = font_small
-                        
-                        # 数値を中央に配置
-                        text_x = bar_x + bar_width / 2
-                        text_y = bar_y + current_height + segment_height / 2
-                        
-                        # 背景色に応じて文字色を調整
-                        text_color = 'white' if label in [1, 3, 5] else 'black'
-                        ax.text(text_x, text_y, str(count), 
-                               ha='center', va='center',
-                               fontsize=font_size, fontweight='bold',
-                               color=text_color)
-                    else:
-                        # 小さなセグメントの場合は棒グラフの外側に数値を表示
-                        if count > 0:  # 0でない場合のみ表示
-                            font_size = font_small
-                            text_x = bar_x + bar_width + padding_x * 0.5
-                            text_y = bar_y + current_height + segment_height / 2
-                            ax.text(text_x, text_y, str(count), 
-                                   ha='left', va='center',
-                                   fontsize=font_size, fontweight='bold',
-                                   color=get_label_color(label))
-                    
-                    current_height += segment_height
+                    current_width += segment_width
             else:
                 # データがない場合は白い四角を描画
                 rect = plt.Rectangle((x_center - window_x/2, depth_center - window_d/2),
