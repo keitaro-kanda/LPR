@@ -52,6 +52,107 @@ def load_label_data(json_path):
         'label': np.array(labels, dtype=int)
     }
 
+def load_bscan_data(bscan_path):
+    """
+    B-scanデータファイルを読み込む
+    
+    Parameters:
+    -----------
+    bscan_path : str
+        B-scanデータファイルのパス
+    
+    Returns:
+    --------
+    np.ndarray: B-scanデータ (time x traces)
+    """
+    if not os.path.exists(bscan_path):
+        raise FileNotFoundError(f"B-scanファイルが見つかりません: {bscan_path}")
+    
+    print(f"B-scanデータを読み込み中: {bscan_path}")
+    data = np.loadtxt(bscan_path, delimiter=' ')
+    print("B-scanデータの読み込みが完了しました。")
+    
+    # NaN値の統計を表示
+    nan_count = np.sum(np.isnan(data))
+    total_count = data.size
+    if nan_count > 0:
+        print(f"NaN値検出: {nan_count} / {total_count} ({nan_count/total_count*100:.2f}%)")
+    else:
+        print("NaN値は検出されませんでした。")
+    
+    return data
+
+def find_bscan_path(json_path):
+    """
+    JSONファイルのパスからB-scanデータファイルのパスを推定する
+    
+    Parameters:
+    -----------
+    json_path : str
+        JSONファイルのパス
+    
+    Returns:
+    --------
+    str or None: B-scanデータファイルのパス（見つからない場合はNone）
+    """
+    # JSONファイルが格納されているディレクトリの親ディレクトリを取得
+    json_dir = os.path.dirname(json_path)
+    parent_dir = os.path.dirname(json_dir)
+    
+    # 親ディレクトリ内でB-scanデータファイルを探す
+    # パターン: ディレクトリ名+.txt
+    for item in os.listdir(parent_dir):
+        item_path = os.path.join(parent_dir, item)
+        if os.path.isdir(item_path):
+            # ディレクトリ名と同じ名前の.txtファイルを探す
+            potential_bscan = os.path.join(parent_dir, f"{item}.txt")
+            if os.path.exists(potential_bscan):
+                return potential_bscan
+    
+    return None
+
+def get_bscan_data_path(json_path):
+    """
+    B-scanデータファイルのパスを取得する（自動検出 + 手動指定オプション）
+    
+    Parameters:
+    -----------
+    json_path : str
+        JSONファイルのパス
+    
+    Returns:
+    --------
+    str or None: B-scanデータファイルのパス（None=スキップ）
+    """
+    # 自動検出を試行
+    auto_path = find_bscan_path(json_path)
+    
+    if auto_path:
+        print(f"B-scanデータファイルを自動検出しました: {auto_path}")
+        use_auto = input("このファイルを使用しますか？ (y/n/skip): ").strip().lower()
+        
+        if use_auto == 'y':
+            return auto_path
+        elif use_auto == 'skip':
+            print("B-scan背景表示をスキップします")
+            return None
+    else:
+        print("B-scanデータファイルの自動検出に失敗しました")
+    
+    # 手動指定
+    print("B-scanデータファイルのパスを手動で指定してください")
+    manual_path = input("B-scanデータファイルのパス（空=スキップ）: ").strip()
+    
+    if not manual_path:
+        print("B-scan背景表示をスキップします")
+        return None
+    
+    if not os.path.exists(manual_path):
+        print(f"警告: 指定されたファイルが見つかりません: {manual_path}")
+        return None
+    
+    return manual_path
+
 def time_to_depth(time_ns, epsilon_r=4.5):
     """
     時間[ns]を深さ[m]に変換
@@ -134,7 +235,7 @@ def create_grid_analysis(data, window_x, window_d, label_filter=None, filter_nam
         return None
     
     # グリッド範囲設定
-    x_min, x_max = data['x'].min(), data['x'].max()
+    x_max = data['x'].max()
     depth_min, depth_max = time_to_depth(data['y']).min(), time_to_depth(data['y']).max()
     
     # x軸グリッドビン作成（0基準）
@@ -154,8 +255,8 @@ def create_grid_analysis(data, window_x, window_d, label_filter=None, filter_nam
     
     # 各グリッドセルでのラベル集計
     grid_counts = {}
-    for i, x_center in enumerate(x_centers):
-        for j, depth_center in enumerate(depth_centers):
+    for i in range(len(x_centers)):
+        for j in range(len(depth_centers)):
             # セル範囲内のデータを抽出
             x_mask = (x_coords >= x_bins[i]) & (x_coords < x_bins[i+1])
             d_mask = (depths >= depth_bins[j]) & (depths < depth_bins[j+1])
@@ -180,7 +281,7 @@ def create_grid_analysis(data, window_x, window_d, label_filter=None, filter_nam
         'total_points': len(labels)
     }
 
-def calculate_optimal_figure_size(x_bins, depth_bins, window_x, window_d):
+def calculate_optimal_figure_size(x_bins, depth_bins):
     """
     データ範囲に基づいて最適な図サイズを計算
     
@@ -190,10 +291,6 @@ def calculate_optimal_figure_size(x_bins, depth_bins, window_x, window_d):
         水平方向のビン
     depth_bins : array
         深さ方向のビン
-    window_x : float
-        水平方向ウィンドウサイズ
-    window_d : float
-        深さ方向ウィンドウサイズ
     
     Returns:
     --------
@@ -228,7 +325,93 @@ def calculate_optimal_figure_size(x_bins, depth_bins, window_x, window_d):
     
     return width, height
 
-def plot_grid_analysis(grid_result, output_dir, suffix=""):
+def find_time_zero_index(data):
+    """
+    x=0（最初のトレース）において最初にNaNではない値をとるインデックスを見つける
+    
+    Parameters:
+    -----------
+    data : np.ndarray
+        B-scanデータ (time x traces)
+    
+    Returns:
+    --------
+    time_zero_index : int
+        t=0として設定するインデックス番号
+    """
+    if data.shape[1] == 0:
+        return 0
+    
+    first_trace = data[:, 0]  # x=0のトレース
+    
+    # NaNではない最初のインデックスを探す
+    valid_indices = np.where(~np.isnan(first_trace))[0]
+    
+    if len(valid_indices) == 0:
+        print("警告: x=0のトレースにNaNではない値が見つかりません。t=0をインデックス0に設定します。")
+        return 0
+    
+    time_zero_index = valid_indices[0]
+    print(f"t=0として設定: インデックス {time_zero_index}")
+    
+    return time_zero_index
+
+def prepare_bscan_background(bscan_data):
+    """
+    B-scanデータを背景表示用に準備する
+    
+    Parameters:
+    -----------
+    bscan_data : np.ndarray
+        B-scanデータ (time x traces)
+    
+    Returns:
+    --------
+    dict: B-scan背景表示用データ
+    """
+    # CLAUDE.mdの標準パラメータ
+    sample_interval = 0.312500e-9  # [s] - Time sampling interval
+    trace_interval = 3.6e-2        # [m] - Spatial trace interval
+    
+    # NaN値を0に置換
+    bscan_display = np.nan_to_num(bscan_data, nan=0.0)
+    
+    # B-scanの座標軸を計算
+    x_bscan_end = bscan_data.shape[1] * trace_interval
+    
+    # t=0補正: x=0で最初にNaNではない値をとるインデックスを見つける
+    time_zero_index = find_time_zero_index(bscan_data)
+    
+    # 時間軸から深さ軸への変換（t=0補正を適用）
+    # 時間軸（ns単位、t=0補正適用）
+    y_start = -time_zero_index * sample_interval / 1e-9  # 負の時間も含む
+    y_end = (bscan_data.shape[0] - time_zero_index) * sample_interval / 1e-9
+    
+    # 深さ軸（m単位）
+    epsilon_r = 4.5
+    c = 299792458  # [m/s]
+    
+    # 時間軸から深さ軸への変換
+    time_ns_array = np.arange(-time_zero_index, bscan_data.shape[0] - time_zero_index) * sample_interval / 1e-9
+    depth_m_array = time_ns_array * 1e-9 * c / np.sqrt(epsilon_r) * 0.5
+    
+    # B-scanの範囲
+    y_bscan_start = depth_m_array[0]
+    y_bscan_end = depth_m_array[-1]
+    
+    print(f"B-scan時間軸範囲: {y_start:.2f} ns ～ {y_end:.2f} ns")
+    print(f"B-scan深さ軸範囲: {y_bscan_start:.3f} m ～ {y_bscan_end:.3f} m")
+    
+    return {
+        'data': bscan_display,
+        'x_start': 0,
+        'x_end': x_bscan_end,
+        'y_start': y_bscan_start,
+        'y_end': y_bscan_end,
+        'extent': [0, x_bscan_end, y_bscan_end, y_bscan_start]  # [left, right, bottom, top]
+    }
+
+def plot_grid_analysis(grid_result, output_dir, suffix="", bscan_data=None):
     """
     グリッド解析結果をプロット
     
@@ -240,6 +423,8 @@ def plot_grid_analysis(grid_result, output_dir, suffix=""):
         出力ディレクトリ
     suffix : str
         ファイル名のサフィックス
+    bscan_data : np.ndarray or None
+        B-scanデータ（背景表示用、None=背景表示なし）
     """
     if grid_result is None:
         return
@@ -253,7 +438,7 @@ def plot_grid_analysis(grid_result, output_dir, suffix=""):
     window_d = grid_result['window_d']
     
     # 最適な図サイズを計算
-    fig_width, fig_height = calculate_optimal_figure_size(x_bins, depth_bins, window_x, window_d)
+    fig_width, fig_height = calculate_optimal_figure_size(x_bins, depth_bins)
     
     # CLAUDE.mdの標準フォントサイズを定義
     font_large = 20      # Titles and labels
@@ -262,6 +447,28 @@ def plot_grid_analysis(grid_result, output_dir, suffix=""):
     
     # プロット作成
     fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    
+    # B-scan背景表示
+    if bscan_data is not None:
+        bscan_bg = prepare_bscan_background(bscan_data)
+        
+        # グレースケールでB-scanを背景表示
+        # カラーバー範囲の計算
+        bscan_data_abs_max = np.nanmax(np.abs(bscan_bg['data']))
+        if np.isnan(bscan_data_abs_max) or bscan_data_abs_max == 0:
+            bscan_data_abs_max = 1.0  # デフォルト値
+        
+        ax.imshow(bscan_bg['data'],
+                 extent=bscan_bg['extent'], 
+                 aspect='auto', 
+                 cmap='gray',
+                 alpha=1.0,  # 透明度を設定
+                 origin='upper',
+                 interpolation='nearest',
+                 vmin=-bscan_data_abs_max/15, 
+                 vmax=bscan_data_abs_max/15)
+        
+        print(f"B-scan背景表示: {bscan_bg['x_start']:.1f} - {bscan_bg['x_end']:.1f} m, {bscan_bg['y_start']:.3f} - {bscan_bg['y_end']:.3f} m")
     
     # 各グリッドセルに円グラフを描画
     for i, x_center in enumerate(x_centers):
@@ -305,22 +512,32 @@ def plot_grid_analysis(grid_result, output_dir, suffix=""):
                                        facecolor=get_label_color(label),
                                        edgecolor='black',
                                        linewidth=0.5,
-                                       alpha=0.8)
+                                       alpha=0.9)  # グリッドの透明度を上げてB-scanと区別
                     ax.add_patch(rect)
                     
                     current_width += segment_width
             else:
-                # データがない場合は白い四角を描画
-                rect = plt.Rectangle((x_center - window_x/2, depth_center - window_d/2),
-                                   window_x, window_d, 
-                                   facecolor='white', edgecolor='lightgray', linewidth=0.5)
-                ax.add_patch(rect)
+                # データがない場合は白い四角を描画（B-scan背景がある場合は透明に）
+                if bscan_data is None:
+                    rect = plt.Rectangle((x_center - window_x/2, depth_center - window_d/2),
+                                       window_x, window_d, 
+                                       facecolor='white', edgecolor='lightgray', linewidth=0.5)
+                    ax.add_patch(rect)
+                else:
+                    # B-scan背景がある場合は透明な境界線のみ
+                    rect = plt.Rectangle((x_center - window_x/2, depth_center - window_d/2),
+                                       window_x, window_d, 
+                                       facecolor='none', edgecolor='lightgray', linewidth=0.3, alpha=0.7)
+                    ax.add_patch(rect)
     
-    # グリッドライン描画
+    # グリッドライン描画（B-scan背景がある場合は少し目立たせる）
+    grid_alpha = 0.6 if bscan_data is not None else 0.3
     for x_bin in x_bins:
-        ax.axvline(x_bin, color='gray', linestyle='-', alpha=0.3, linewidth=0.5)
+        ax.axvline(x_bin, color='white' if bscan_data is not None else 'gray', 
+                  linestyle='-', alpha=grid_alpha, linewidth=0.5)
     for depth_bin in depth_bins:
-        ax.axhline(depth_bin, color='gray', linestyle='-', alpha=0.3, linewidth=0.5)
+        ax.axhline(depth_bin, color='white' if bscan_data is not None else 'gray', 
+                  linestyle='-', alpha=grid_alpha, linewidth=0.5)
     
     # 軸設定（アスペクト比に応じた調整）
     ax.set_xlim(x_bins[0], x_bins[-1])
@@ -379,6 +596,10 @@ def plot_grid_analysis(grid_result, output_dir, suffix=""):
     title = f"Grid Analysis - {filter_text[grid_result['filter_name']]}"
     title += f" (Window: {window_x}m x {window_d}m)"
     
+    # B-scan背景表示の有無をタイトルに追加
+    if bscan_data is not None:
+        title += " with B-scan background"
+    
     ax.set_title(title, fontsize=font_large, pad=20)
     
     plt.tight_layout()
@@ -386,6 +607,8 @@ def plot_grid_analysis(grid_result, output_dir, suffix=""):
     # 保存
     os.makedirs(output_dir, exist_ok=True)
     filename = f'grid_analysis_{grid_result["filter_name"]}{suffix}'
+    if bscan_data is not None:
+        filename += '_with_bscan'
     png_path = os.path.join(output_dir, f'{filename}.png')
     pdf_path = os.path.join(output_dir, f'{filename}.pdf')
     
@@ -478,10 +701,28 @@ def main():
     window_x = float(input("水平方向ウィンドウサイズ [m] を入力してください: ").strip())
     window_d = float(input("深さ方向ウィンドウサイズ [m] を入力してください: ").strip())
     
+    # B-scanデータの取得
+    print("\nB-scan背景表示の設定...")
+    bscan_path = get_bscan_data_path(json_path)
+    bscan_data = None
+    
+    if bscan_path:
+        try:
+            bscan_data = load_bscan_data(bscan_path)
+            print(f"B-scanデータ形状: {bscan_data.shape}")
+        except Exception as e:
+            print(f"B-scanデータ読み込みエラー: {e}")
+            print("B-scan背景表示なしで続行します")
+            bscan_data = None
+    
     # 出力ディレクトリ設定
     base_dir = os.path.dirname(os.path.dirname(json_path))
     filename = os.path.splitext(os.path.basename(json_path))[0]
-    output_dir = os.path.join(base_dir, f'label_statistics_grid/{filename}_x{window_x}_d{window_d}')
+    base_output_dir = os.path.join(base_dir, f'label_statistics_grid/{filename}_x{window_x}_d{window_d}')
+    
+    # B-scan有り/無しで分けたディレクトリを作成
+    output_dir_without_bscan = os.path.join(base_output_dir, 'without_bscan')
+    output_dir_with_bscan = os.path.join(base_output_dir, 'with_bscan')
     
     # データ読み込み
     print("\nデータを読み込み中...")
@@ -511,23 +752,42 @@ def main():
     
     # プロット作成
     print("\nプロットを作成中...")
-    if rocks_result:
-        plot_grid_analysis(rocks_result, output_dir)
-    if non_rocks_result:
-        plot_grid_analysis(non_rocks_result, output_dir)
-    if all_result:
-        plot_grid_analysis(all_result, output_dir)
     
-    # 統計データ保存
+    # B-scan背景なしのプロット（常に作成）
+    print("B-scan背景なしのプロットを作成中...")
+    if rocks_result:
+        plot_grid_analysis(rocks_result, output_dir_without_bscan, bscan_data=None)
+    if non_rocks_result:
+        plot_grid_analysis(non_rocks_result, output_dir_without_bscan, bscan_data=None)
+    if all_result:
+        plot_grid_analysis(all_result, output_dir_without_bscan, bscan_data=None)
+    
+    # B-scan背景ありのプロット（B-scanデータがある場合のみ）
+    if bscan_data is not None:
+        print("B-scan背景ありのプロットを作成中...")
+        if rocks_result:
+            plot_grid_analysis(rocks_result, output_dir_with_bscan, bscan_data=bscan_data)
+        if non_rocks_result:
+            plot_grid_analysis(non_rocks_result, output_dir_with_bscan, bscan_data=bscan_data)
+        if all_result:
+            plot_grid_analysis(all_result, output_dir_with_bscan, bscan_data=bscan_data)
+    
+    # 統計データ保存（両方のディレクトリに保存）
     print("\n統計データを保存中...")
     grid_results = {
         'rocks_only': rocks_result,
         'non_rocks_only': non_rocks_result,
         'all': all_result
     }
-    save_grid_statistics(grid_results, output_dir, window_x, window_d)
+    save_grid_statistics(grid_results, output_dir_without_bscan, window_x, window_d)
     
-    print(f"\n出力ディレクトリ: {output_dir}")
+    if bscan_data is not None:
+        save_grid_statistics(grid_results, output_dir_with_bscan, window_x, window_d)
+    
+    print(f"\n出力ディレクトリ:")
+    print(f"  B-scan背景なし: {output_dir_without_bscan}")
+    if bscan_data is not None:
+        print(f"  B-scan背景あり: {output_dir_with_bscan}")
     print("処理完了!")
 
 if __name__ == "__main__":
