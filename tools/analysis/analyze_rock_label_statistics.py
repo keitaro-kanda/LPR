@@ -124,10 +124,14 @@ def create_depth_histogram(data, bin_size_m=1.0, output_dir='rock_statics', labe
     # 深さ変換
     depths = time_to_depth(y_coords)
     
-    # 深さビン設定（全データ範囲）
+    # 深さビン設定（0.5の倍数で区切り）
     all_depths = time_to_depth(data['y'])
     depth_min, depth_max = all_depths.min(), all_depths.max()
-    bins = np.arange(depth_min, depth_max + bin_size_m, bin_size_m)
+    
+    # 0.5の倍数でビン境界を設定
+    bin_start = np.floor(depth_min / bin_size_m) * bin_size_m
+    bin_end = np.ceil(depth_max / bin_size_m) * bin_size_m
+    bins = np.arange(bin_start, bin_end + bin_size_m, bin_size_m)
     bin_centers = (bins[:-1] + bins[1:]) / 2
     
     # ラベル別にヒストグラム計算
@@ -240,9 +244,11 @@ def create_horizontal_histogram(data, bin_size_m=50.0, output_dir='rock_statics'
         print(f"警告: フィルタリング後のデータが空です (フィルタ: {label_filter})")
         return
     
-    # ビン設定（全データ範囲）
-    x_min, x_max = x_coords.min(), x_coords.max()
-    bins = np.arange(x_min, x_max + bin_size_m, bin_size_m)
+    # ビン設定（0スタート）
+    x_max = data['x'].max()
+    bin_start = 0
+    bin_end = np.ceil(x_max / bin_size_m) * bin_size_m
+    bins = np.arange(bin_start, bin_end + bin_size_m, bin_size_m)
     bin_centers = (bins[:-1] + bins[1:]) / 2
     
     # ラベル別にヒストグラム計算
@@ -357,15 +363,17 @@ def create_depth_normalized_horizontal_histogram(data, depth_data, bin_size_m=50
         print(f"警告: フィルタリング後のデータが空です (フィルタ: {label_filter})")
         return
     
-    # ビン設定（全データ範囲）
-    x_min, x_max = x_coords.min(), x_coords.max()
-    bins = np.arange(x_min, x_max + bin_size_m, bin_size_m)
+    # ビン設定（0スタート）
+    x_max = data['x'].max()
+    bin_start = 0
+    bin_end = np.ceil(x_max / bin_size_m) * bin_size_m
+    bins = np.arange(bin_start, bin_end + bin_size_m, bin_size_m)
     bin_centers = (bins[:-1] + bins[1:]) / 2
     
-    # 各ビンに対応する深さを取得
+    # 各ビンに対応する深さを取得（ビン下限基準）
     bin_depths = []
-    for bin_center in bin_centers:
-        depth = find_nearest_depth(bin_center, depth_data, tolerance=bin_size_m/2)
+    for bin_lower in bins[:-1]:
+        depth = find_nearest_depth(bin_lower, depth_data, tolerance=bin_size_m/2)
         bin_depths.append(depth)
     
     # 深さが見つからないビンの数をカウント
@@ -423,7 +431,7 @@ def create_depth_normalized_horizontal_histogram(data, depth_data, bin_size_m=50
     
     # 保存
     os.makedirs(output_dir, exist_ok=True)
-    filename = f'depth_normalized_horizontal_histogram{suffix}'
+    filename = f'normalized_horizontal_histogram{suffix}'
     png_path = os.path.join(output_dir, f'{filename}.png')
     pdf_path = os.path.join(output_dir, f'{filename}.pdf')
     
@@ -434,20 +442,20 @@ def create_depth_normalized_horizontal_histogram(data, depth_data, bin_size_m=50
     print(f"深さ規格化水平位置ヒストグラム保存: {png_path}")
     
     # 統計データ保存
-    stats_path = os.path.join(output_dir, f'depth_normalized_horizontal_statistics{suffix}.txt')
+    stats_path = os.path.join(output_dir, f'normalized_horizontal_statistics{suffix}.txt')
     with open(stats_path, 'w') as f:
         f.write("# Depth-normalized horizontal position statistics\n")
         f.write(f"# Bin size: {bin_size_m} m\n")
         if label_filter is not None:
             f.write(f"# Label filter: {label_filter}\n")
-        f.write("# Position_center[m]\tBin_depth[m]\t")
+        f.write("# Position_center[m]\tBin_lower[m]\tBin_depth[m]\t")
         for label in sorted(unique_labels):
             f.write(f"Label_{label}_count\tLabel_{label}_density[count/m]\t")
         f.write("Total_count\tTotal_density[count/m]\n")
         
-        for i, (pos, depth) in enumerate(zip(bin_centers, bin_depths)):
+        for i, (pos, bin_lower, depth) in enumerate(zip(bin_centers, bins[:-1], bin_depths)):
             depth_str = f"{depth:.3f}" if depth is not None else "N/A"
-            f.write(f"{pos:.2f}\t{depth_str}\t")
+            f.write(f"{pos:.2f}\t{bin_lower:.2f}\t{depth_str}\t")
             total_count = 0
             total_density = 0
             for label in sorted(unique_labels):
@@ -531,6 +539,189 @@ def find_nearest_depth(x_target, depth_data, tolerance=1.0):
     else:
         return None
 
+def depth_to_time(depth_m, epsilon_r=4.5):
+    """
+    深さ[m]を時間[ns]に変換
+    
+    Parameters:
+    -----------
+    depth_m : float
+        深さ [m]
+    epsilon_r : float
+        比誘電率（デフォルト: 4.5）
+    
+    Returns:
+    --------
+    float: 時間 [ns]
+    """
+    c = 299792458  # 光速 [m/s]
+    time_s = depth_m * 2 * np.sqrt(epsilon_r) / c
+    return time_s * 1e9  # [ns]
+
+def create_thin_layer_normalized_horizontal_histogram(data, depth_data, bin_size_m=50.0, output_dir='rock_statics', label_filter=None, suffix=''):
+    """
+    最も薄い層の厚みまでのデータを用いた深さ規格化水平位置ヒストグラムを作成
+    
+    Parameters:
+    -----------
+    data : dict
+        ラベルデータ
+    depth_data : dict
+        深さ計測データ {'x': array, 'depth': array}
+    bin_size_m : float
+        水平位置ビンサイズ [m]
+    output_dir : str
+        出力ディレクトリ
+    label_filter : list or None
+        含めるラベル番号のリスト（None=全て）
+    suffix : str
+        ファイル名のサフィックス
+    """
+    if depth_data is None:
+        print("警告: 深さ計測データが提供されていません。薄い層規格化ヒストグラムをスキップします。")
+        return
+    
+    # 最も薄い層の厚みを取得
+    min_depth = np.min(depth_data['depth'])
+    max_time_ns = depth_to_time(min_depth)
+    
+    print(f"最も薄い層の厚み: {min_depth:.3f} m (時間: {max_time_ns:.1f} ns)")
+    
+    x_coords = data['x']
+    y_coords = data['y']
+    labels = data['label']
+    
+    # 薄い層までのデータでフィルタリング
+    depth_mask = y_coords <= max_time_ns
+    x_coords_depth_filtered = x_coords[depth_mask]
+    labels_depth_filtered = labels[depth_mask]
+    
+    print(f"薄い層フィルタリング後のデータ: {len(labels_depth_filtered)}個 (全体の{len(labels_depth_filtered)/len(labels)*100:.1f}%)")
+    
+    # ラベルフィルタリング
+    if label_filter is not None:
+        mask = np.isin(labels_depth_filtered, label_filter)
+        x_coords_filtered = x_coords_depth_filtered[mask]
+        labels_filtered = labels_depth_filtered[mask]
+    else:
+        x_coords_filtered = x_coords_depth_filtered
+        labels_filtered = labels_depth_filtered
+    
+    if len(labels_filtered) == 0:
+        print(f"警告: フィルタリング後のデータが空です (フィルタ: {label_filter})")
+        return
+    
+    # ビン設定（0スタート）
+    x_max = data['x'].max()
+    bin_start = 0
+    bin_end = np.ceil(x_max / bin_size_m) * bin_size_m
+    bins = np.arange(bin_start, bin_end + bin_size_m, bin_size_m)
+    bin_centers = (bins[:-1] + bins[1:]) / 2
+    
+    # 各ビンに対応する深さを取得（ビン下限基準）
+    bin_depths = []
+    for bin_lower in bins[:-1]:
+        depth = find_nearest_depth(bin_lower, depth_data, tolerance=bin_size_m/2)
+        bin_depths.append(depth)
+    
+    # 深さが見つからないビンの数をカウント
+    missing_depth_count = sum(1 for d in bin_depths if d is None)
+    if missing_depth_count > 0:
+        print(f"警告: {missing_depth_count}個のビンで深さデータが見つかりません")
+    
+    # ラベル別にヒストグラム計算
+    unique_labels = np.unique(labels_filtered)
+    label_counts = {}
+    label_densities = {}
+    
+    for label in unique_labels:
+        mask = labels_filtered == label
+        counts, _ = np.histogram(x_coords_filtered[mask], bins=bins)
+        label_counts[label] = counts
+        
+        # 薄い層の深さで規格化した密度を計算
+        densities = np.zeros(len(counts))
+        for i, (count, depth) in enumerate(zip(counts, bin_depths)):
+            if depth is not None and depth > 0:
+                # 薄い層の厚みを使用
+                effective_depth = min(depth, min_depth)
+                densities[i] = count / effective_depth  # 個/m
+            else:
+                densities[i] = 0  # 深さデータがない場合は0
+        
+        label_densities[label] = densities
+    
+    # プロット作成
+    plt.figure(figsize=(10, 8))
+    
+    # 積み上げヒストグラム
+    bottom = np.zeros(len(bin_centers))
+    
+    for label in sorted(unique_labels):
+        plt.bar(bin_centers, label_densities[label], 
+               width=bin_size_m * 0.8, 
+               bottom=bottom,
+               label=f'Label {label}',
+               color=get_label_color(label), alpha=0.7)
+        bottom += label_densities[label]
+    
+    plt.xlabel('Horizontal position [m]', fontsize=20)
+    plt.ylabel(f'Rock density [count/m depth] (depth ≤ {min_depth:.3f}m)', fontsize=20)
+    plt.tick_params(axis='both', which='major', labelsize=16)
+    # Use 2 columns for legend if 6 labels are present
+    ncol = 2 if len(unique_labels) == 6 else 1
+    plt.legend(fontsize=18, ncol=ncol)
+    plt.grid(True, alpha=0.3)
+    
+    # Set y-axis limit to max density + 10%
+    max_density = np.max(bottom) if len(bottom) > 0 else 1
+    plt.ylim(0, max_density * 1.1)
+    
+    plt.tight_layout()
+    
+    # 保存
+    os.makedirs(output_dir, exist_ok=True)
+    filename = f'normalized_horizontal_histogram_thin{suffix}'
+    png_path = os.path.join(output_dir, f'{filename}.png')
+    pdf_path = os.path.join(output_dir, f'{filename}.pdf')
+    
+    plt.savefig(png_path, dpi=300, bbox_inches='tight')
+    plt.savefig(pdf_path, dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    print(f"薄い層規格化水平位置ヒストグラム保存: {png_path}")
+    
+    # 統計データ保存
+    stats_path = os.path.join(output_dir, f'normalized_horizontal_statistics_thin{suffix}.txt')
+    with open(stats_path, 'w') as f:
+        f.write(f"# Thin layer normalized horizontal position statistics (depth ≤ {min_depth:.3f}m)\n")
+        f.write(f"# Bin size: {bin_size_m} m\n")
+        f.write(f"# Max depth used: {min_depth:.3f} m (time: {max_time_ns:.1f} ns)\n")
+        f.write(f"# Data after depth filtering: {len(labels_depth_filtered)} / {len(labels)} ({len(labels_depth_filtered)/len(labels)*100:.1f}%)\n")
+        if label_filter is not None:
+            f.write(f"# Label filter: {label_filter}\n")
+        f.write("# Position_center[m]\tBin_lower[m]\tBin_depth[m]\tEffective_depth[m]\t")
+        for label in sorted(unique_labels):
+            f.write(f"Label_{label}_count\tLabel_{label}_density[count/m]\t")
+        f.write("Total_count\tTotal_density[count/m]\n")
+        
+        for i, (pos, bin_lower, depth) in enumerate(zip(bin_centers, bins[:-1], bin_depths)):
+            depth_str = f"{depth:.3f}" if depth is not None else "N/A"
+            effective_depth = min(depth, min_depth) if depth is not None else min_depth
+            effective_depth_str = f"{effective_depth:.3f}" if depth is not None else "N/A"
+            f.write(f"{pos:.2f}\t{bin_lower:.2f}\t{depth_str}\t{effective_depth_str}\t")
+            total_count = 0
+            total_density = 0
+            for label in sorted(unique_labels):
+                count = label_counts[label][i]
+                density = label_densities[label][i]
+                f.write(f"{count}\t{density:.3f}\t")
+                total_count += count
+                total_density += density
+            f.write(f"{total_count}\t{total_density:.3f}\n")
+    
+    print(f"薄い層規格化統計データ保存: {stats_path}")
+
 def print_summary_statistics(data):
     """
     データの概要統計を表示
@@ -582,7 +773,9 @@ def main():
     
     # 出力ディレクトリ設定
     base_dir = os.path.dirname(os.path.dirname(json_path))
-    output_dir = os.path.join(base_dir, 'label_statics/' + os.path.splitext(os.path.basename(json_path))[0])
+    output_base_dir = os.path.join(base_dir, 'label_statics/' + os.path.splitext(os.path.basename(json_path))[0])
+    output_basic_dir = os.path.join(output_base_dir, 'basic')
+    output_normalized_dir = os.path.join(output_base_dir, 'normalized')
     
     # データ読み込み
     print("\nデータを読み込み中...")
@@ -605,41 +798,55 @@ def main():
     print(f"\n設定:")
     print(f"  深さビンサイズ: {depth_bin} m")
     print(f"  水平位置ビンサイズ: {horizontal_bin} m")
-    print(f"  出力ディレクトリ: {output_dir}")
+    print(f"  出力ディレクトリ: {output_base_dir}")
+    print(f"    - 基本ヒストグラム: {output_basic_dir}")
+    print(f"    - 規格化ヒストグラム: {output_normalized_dir}")
     print(f"  誘電率: 4.5")
     print(f"  深さ規格化: {'有効' if depth_data is not None else '無効'}")
     
     # 岩石のみ（ラベル1-3）のヒストグラム作成
     print("\n岩石のみ（ラベル1-3）のヒストグラムを作成中...")
     rock_labels = [1, 2, 3]
-    create_depth_histogram(data, bin_size_m=depth_bin, output_dir=output_dir, 
+    create_depth_histogram(data, bin_size_m=depth_bin, output_dir=output_basic_dir, 
                           label_filter=rock_labels, suffix='_rocks_only')
-    create_horizontal_histogram(data, bin_size_m=horizontal_bin, output_dir=output_dir, 
+    create_horizontal_histogram(data, bin_size_m=horizontal_bin, output_dir=output_basic_dir, 
                                label_filter=rock_labels, suffix='_rocks_only')
     
     # 深さ規格化水平ヒストグラム（岩石のみ）
     if depth_data is not None:
         print("\n深さ規格化水平ヒストグラム（岩石のみ）を作成中...")
         create_depth_normalized_horizontal_histogram(data, depth_data, bin_size_m=horizontal_bin, 
-                                                   output_dir=output_dir, label_filter=rock_labels, 
+                                                   output_dir=output_normalized_dir, label_filter=rock_labels, 
                                                    suffix='_rocks_only')
+        
+        # 薄い層規格化水平ヒストグラム（岩石のみ）
+        print("\n薄い層規格化水平ヒストグラム（岩石のみ）を作成中...")
+        create_thin_layer_normalized_horizontal_histogram(data, depth_data, bin_size_m=horizontal_bin, 
+                                                        output_dir=output_normalized_dir, label_filter=rock_labels, 
+                                                        suffix='_rocks_only')
     
     # 全ラベルのヒストグラム作成
     print("\n全ラベルのヒストグラムを作成中...")
-    create_depth_histogram(data, bin_size_m=depth_bin, output_dir=output_dir, 
+    create_depth_histogram(data, bin_size_m=depth_bin, output_dir=output_basic_dir, 
                           label_filter=None, suffix='_all_labels')
-    create_horizontal_histogram(data, bin_size_m=horizontal_bin, output_dir=output_dir, 
+    create_horizontal_histogram(data, bin_size_m=horizontal_bin, output_dir=output_basic_dir, 
                                label_filter=None, suffix='_all_labels')
     
     # 深さ規格化水平ヒストグラム（全ラベル）
     if depth_data is not None:
         print("\n深さ規格化水平ヒストグラム（全ラベル）を作成中...")
         create_depth_normalized_horizontal_histogram(data, depth_data, bin_size_m=horizontal_bin, 
-                                                   output_dir=output_dir, label_filter=None, 
+                                                   output_dir=output_normalized_dir, label_filter=None, 
                                                    suffix='_all_labels')
+        
+        # 薄い層規格化水平ヒストグラム（全ラベル）
+        print("\n薄い層規格化水平ヒストグラム（全ラベル）を作成中...")
+        create_thin_layer_normalized_horizontal_histogram(data, depth_data, bin_size_m=horizontal_bin, 
+                                                        output_dir=output_normalized_dir, label_filter=None, 
+                                                        suffix='_all_labels')
     
     # 全体統計保存
-    summary_path = os.path.join(output_dir, 'summary_statistics.txt')
+    summary_path = os.path.join(output_base_dir, 'summary_statistics.txt')
     with open(summary_path, 'w') as f:
         f.write("# Rock label summary statistics\n")
         f.write(f"# Settings: depth_bin={depth_bin}m, horizontal_bin={horizontal_bin}m, epsilon_r=4.5\n")

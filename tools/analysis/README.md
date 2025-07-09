@@ -8,7 +8,9 @@ LPRデータの統計解析・数理解析ツール群です。
 - **`analyze_rock_label_statistics.py`**: 岩石ラベルの統計的性質をヒストグラム表示
   - 深さ・水平位置別の岩石分布ヒストグラム
   - 深さ計測データによる規格化ヒストグラム（1mあたりの平均岩石個数）
+  - **薄い層規格化ヒストグラム**: 最も薄い層の厚みまでのデータで規格化
   - ラベル別フィルタリング機能（岩石のみ、全ラベル）
+  - 出力ディレクトリ分離（basic/、normalized/）
   - JSON形式の詳細統計データ出力
 - **`analyze_rock_label_grid.py`**: 2次元グリッドベース岩石ラベル解析
   - 指定ウィンドウサイズでの2次元グリッド分割
@@ -62,13 +64,28 @@ python analysis/calc_RCS.py
 - **岩石ラベルJSON**: `plot_viewer_add_label.py`で作成されたラベルデータ
 - **深さ計測JSON**: `plot_viewer_depth_measurement.py`で作成された深さデータ（オプション）
 
-### 出力ファイル
-#### 基本ヒストグラム
+### 出力ディレクトリ構造
+```
+label_statics/{json_filename}/
+├── basic/                    # 規格化なしのヒストグラム
+│   ├── depth_histogram_*.png/pdf
+│   ├── horizontal_histogram_*.png/pdf
+│   └── *_statistics.txt
+├── normalized/              # 規格化ありのヒストグラム
+│   ├── normalized_horizontal_histogram_*.png/pdf
+│   ├── normalized_horizontal_histogram_thin_*.png/pdf
+│   └── *_statistics.txt
+└── summary_statistics.txt   # 全体の概要統計
+```
+
+### 出力ファイル詳細
+#### 基本ヒストグラム（`basic/`ディレクトリ）
 - `depth_histogram_*.png/pdf`: 深さ別岩石分布
 - `horizontal_histogram_*.png/pdf`: 水平位置別岩石分布
 
-#### 深さ規格化ヒストグラム（新機能）
-- `depth_normalized_horizontal_histogram_*.png/pdf`: 深さで規格化された水平分布
+#### 深さ規格化ヒストグラム（`normalized/`ディレクトリ）
+- `normalized_horizontal_histogram_*.png/pdf`: 深さで規格化された水平分布
+- `normalized_horizontal_histogram_thin_*.png/pdf`: 薄い層規格化水平分布
 - Y軸: 岩石密度 [count/m depth] - 1mあたりの平均岩石個数
 
 #### 統計データ
@@ -76,13 +93,30 @@ python analysis/calc_RCS.py
 - `summary_statistics.txt`: 全体概要統計
 
 ### 深さ規格化の仕組み
-1. **x座標マッチング**: 各ビンの中心座標に最も近い深さ計測点を検索
+#### 通常の規格化
+1. **x座標マッチング**: 各ビンの下限座標に最も近い深さ計測点を検索
 2. **許容誤差**: ビンサイズの半分（デフォルト25m）以内の計測点を有効とする
 3. **密度計算**: `岩石個数 / 深さ[m] = 密度[個/m]`
 4. **欠損処理**: 深さデータがないビンは密度0として処理
+
+#### 薄い層規格化（新機能）
+1. **最薄層特定**: 深さ計測データから最小深さを特定
+2. **データフィルタリング**: 最薄層の厚みまでのy座標（時間）でデータをフィルタリング
+3. **有効深さ計算**: 各ビンで実際の深さと最薄層厚みの最小値を使用
+4. **密度計算**: `岩石個数 / 有効深さ[m] = 密度[個/m]`
+
+### ビン設定
+#### 深さビン（0.5の倍数で区切り）
+- ビンサイズ: 0.5 m
+- 境界設定: -1.0, -0.5, 0, 0.5, 1.0... のように0.5の倍数で設定
+
+#### 水平位置ビン（0スタート）
+- ビンサイズ: 50.0 m
+- 境界設定: 0, 50, 100, 150... のように常に0からスタート
 
 ### 設定パラメータ
 - 深さビンサイズ: 0.5 m
 - 水平位置ビンサイズ: 50.0 m  
 - 相対誘電率: 4.5
 - 座標マッチング許容誤差: 25.0 m（ビンサイズの半分）
+- 深さ情報取得: ビン下限座標を基準
