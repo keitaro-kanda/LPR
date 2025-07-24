@@ -195,6 +195,161 @@ def get_label_color(label):
     }
     return color_map.get(label, 'gray')  # デフォルトはgray
 
+def calculate_adaptive_font_size(window_x, window_d, fig_width, fig_height, num_x_grids, num_d_grids):
+    """
+    グリッドサイズに応じた適応的フォントサイズを計算
+    
+    Parameters:
+    -----------
+    window_x : float
+        水平方向ウィンドウサイズ [m]
+    window_d : float  
+        深さ方向ウィンドウサイズ [m]
+    fig_width : float
+        図の幅 [inch]
+    fig_height : float
+        図の高さ [inch]
+    num_x_grids : int
+        水平方向グリッド数
+    num_d_grids : int
+        深さ方向グリッド数
+    
+    Returns:
+    --------
+    dict: フォントサイズ設定 {'total': int, 'detail': int}
+    """
+    # 1グリッドあたりの画面上のサイズ（インチ）を計算
+    grid_width_inch = fig_width / num_x_grids
+    grid_height_inch = fig_height / num_d_grids
+    
+    # より小さい方の次元を基準にフォントサイズを決定
+    min_grid_size_inch = min(grid_width_inch, grid_height_inch)
+    
+    # フォントサイズ計算（経験的な値）
+    # 総数表示用（大きめ）
+    total_font_size = max(6, min(20, int(min_grid_size_inch * 20)))
+    
+    # 詳細表示用（小さめ）
+    detail_font_size = max(4, min(12, int(min_grid_size_inch * 12)))
+    
+    return {
+        'total': total_font_size,
+        'detail': detail_font_size
+    }
+
+def get_text_color_for_background(background_colors, alpha_values):
+    """
+    背景色に応じて最適な文字色を決定
+    
+    Parameters:
+    -----------
+    background_colors : list
+        背景色のリスト（matplotlib color format）
+    alpha_values : list
+        各色のアルファ値のリスト
+    
+    Returns:
+    --------
+    str: 最適な文字色 ('white' or 'black')
+    """
+    import matplotlib.colors as mcolors
+    
+    # 背景色の明度を計算（アルファ値も考慮）
+    total_luminance = 0
+    total_weight = 0
+    
+    for color, alpha in zip(background_colors, alpha_values):
+        # 色をRGB値に変換
+        rgb = mcolors.to_rgb(color)
+        
+        # 輝度計算（ITU-R BT.709）
+        luminance = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]
+        
+        # アルファ値で重み付け
+        total_luminance += luminance * alpha
+        total_weight += alpha
+    
+    # 背景がない場合（アルファ値の合計が小さい）は黒文字
+    if total_weight < 0.3:
+        return 'black'
+    
+    # 平均輝度を計算
+    avg_luminance = total_luminance / total_weight
+    
+    # 輝度が0.5以上なら黒文字、それ以下なら白文字
+    return 'black' if avg_luminance > 0.5 else 'white'
+
+def add_count_text_to_grid(ax, grid_result, font_sizes, show_details=True, bscan_data=None):
+    """
+    各グリッドセルに岩石数の数値を表示
+    
+    Parameters:
+    -----------
+    ax : matplotlib.axes.Axes
+        プロット軸
+    grid_result : dict
+        グリッド解析結果
+    font_sizes : dict
+        フォントサイズ設定 {'total': int, 'detail': int}
+    show_details : bool
+        詳細内訳を表示するかどうか
+    bscan_data : np.ndarray or None
+        B-scanデータ（文字色決定用）
+    """
+    x_centers = grid_result['x_centers']
+    depth_centers = grid_result['depth_centers']
+    grid_counts = grid_result['grid_counts']
+    window_x = grid_result['window_x']
+    window_d = grid_result['window_d']
+    
+    for i, x_center in enumerate(x_centers):
+        for j, depth_center in enumerate(depth_centers):
+            counts = grid_counts.get((i, j), {})
+            
+            if counts:
+                total_count = sum(counts.values())
+                
+                # 背景色の情報を取得（棒グラフの色）
+                sorted_labels = sorted(counts.keys())
+                background_colors = [get_label_color(label) for label in sorted_labels]
+                alpha_values = [counts[label] / total_count for label in sorted_labels]
+                
+                # 最適な文字色を決定
+                text_color = get_text_color_for_background(background_colors, alpha_values)
+                
+                # B-scan背景がある場合の文字色調整
+                if bscan_data is not None:
+                    # B-scan背景がある場合は白文字を優先（見やすさのため）
+                    text_color = 'white'
+                
+                # 総数を中央上部に表示
+                ax.text(x_center, depth_center - window_d * 0.15, 
+                       str(total_count),
+                       ha='center', va='center',
+                       fontsize=font_sizes['total'],
+                       fontweight='bold',
+                       color=text_color,
+                       bbox=dict(boxstyle='round,pad=0.1', 
+                                facecolor='black', alpha=0.3, edgecolor='none') if bscan_data is not None else None)
+                
+                # 詳細内訳を下部に表示（オプション）
+                if show_details and len(counts) > 1:
+                    detail_text = ' '.join([f'{label}:{count}' for label, count in sorted(counts.items())])
+                    ax.text(x_center, depth_center + window_d * 0.25,
+                           detail_text,
+                           ha='center', va='center',
+                           fontsize=font_sizes['detail'],
+                           color=text_color,
+                           bbox=dict(boxstyle='round,pad=0.1', 
+                                    facecolor='black', alpha=0.2, edgecolor='none') if bscan_data is not None else None)
+            else:
+                # データがない場合は「-」を表示（B-scan背景がない場合のみ）
+                if bscan_data is None:
+                    ax.text(x_center, depth_center, '-',
+                           ha='center', va='center',
+                           fontsize=font_sizes['total'],
+                           color='gray', alpha=0.5)
+
 def create_grid_analysis(data, window_x, window_d, label_filter=None, filter_name="all"):
     """
     グリッドベースのラベル解析を実行
@@ -411,7 +566,7 @@ def prepare_bscan_background(bscan_data):
         'extent': [0, x_bscan_end, y_bscan_end, y_bscan_start]  # [left, right, bottom, top]
     }
 
-def plot_grid_analysis(grid_result, output_dir, suffix="", bscan_data=None):
+def plot_grid_analysis(grid_result, output_dir, suffix="", bscan_data=None, show_counts=True, show_details=True):
     """
     グリッド解析結果をプロット
     
@@ -425,6 +580,10 @@ def plot_grid_analysis(grid_result, output_dir, suffix="", bscan_data=None):
         ファイル名のサフィックス
     bscan_data : np.ndarray or None
         B-scanデータ（背景表示用、None=背景表示なし）
+    show_counts : bool
+        数値表示を行うかどうか
+    show_details : bool
+        詳細内訳を表示するかどうか
     """
     if grid_result is None:
         return
@@ -444,6 +603,14 @@ def plot_grid_analysis(grid_result, output_dir, suffix="", bscan_data=None):
     font_large = 20      # Titles and labels
     font_medium = 18     # Axis labels  
     font_small = 16      # Tick labels
+    
+    # 数値表示用の適応的フォントサイズを計算
+    adaptive_font_sizes = None
+    if show_counts:
+        num_x_grids = len(x_centers)
+        num_d_grids = len(depth_centers)
+        adaptive_font_sizes = calculate_adaptive_font_size(
+            window_x, window_d, fig_width, fig_height, num_x_grids, num_d_grids)
     
     # プロット作成
     fig, ax = plt.subplots(figsize=(fig_width, fig_height))
@@ -539,6 +706,10 @@ def plot_grid_analysis(grid_result, output_dir, suffix="", bscan_data=None):
         ax.axhline(depth_bin, color='white' if bscan_data is not None else 'gray', 
                   linestyle='-', alpha=grid_alpha, linewidth=0.5)
     
+    # 数値オーバーレイを追加
+    if show_counts and adaptive_font_sizes is not None:
+        add_count_text_to_grid(ax, grid_result, adaptive_font_sizes, show_details, bscan_data)
+    
     # 軸設定（アスペクト比に応じた調整）
     ax.set_xlim(x_bins[0], x_bins[-1])
     ax.set_ylim(depth_bins[0], depth_bins[-1])
@@ -609,6 +780,11 @@ def plot_grid_analysis(grid_result, output_dir, suffix="", bscan_data=None):
     filename = f'grid_analysis_{grid_result["filter_name"]}{suffix}'
     if bscan_data is not None:
         filename += '_with_bscan'
+    if show_counts:
+        if show_details:
+            filename += '_with_counts_and_details'
+        else:
+            filename += '_with_counts'
     png_path = os.path.join(output_dir, f'{filename}.png')
     pdf_path = os.path.join(output_dir, f'{filename}.pdf')
     
@@ -701,6 +877,16 @@ def main():
     window_x = float(input("水平方向ウィンドウサイズ [m] を入力してください: ").strip())
     window_d = float(input("深さ方向ウィンドウサイズ [m] を入力してください: ").strip())
     
+    # 数値表示オプション
+    print("\n数値表示オプション:")
+    print("1: 数値表示なし（従来通り）")
+    print("2: 総数のみ表示")
+    print("3: 総数+詳細内訳表示")
+    show_option = input("選択 (1-3): ").strip()
+    
+    show_counts = show_option in ['2', '3']
+    show_details = show_option == '3'
+    
     # B-scanデータの取得
     print("\nB-scan背景表示の設定...")
     bscan_path = get_bscan_data_path(json_path)
@@ -756,21 +942,27 @@ def main():
     # B-scan背景なしのプロット（常に作成）
     print("B-scan背景なしのプロットを作成中...")
     if rocks_result:
-        plot_grid_analysis(rocks_result, output_dir_without_bscan, bscan_data=None)
+        plot_grid_analysis(rocks_result, output_dir_without_bscan, bscan_data=None, 
+                          show_counts=show_counts, show_details=show_details)
     if non_rocks_result:
-        plot_grid_analysis(non_rocks_result, output_dir_without_bscan, bscan_data=None)
+        plot_grid_analysis(non_rocks_result, output_dir_without_bscan, bscan_data=None, 
+                          show_counts=show_counts, show_details=show_details)
     if all_result:
-        plot_grid_analysis(all_result, output_dir_without_bscan, bscan_data=None)
+        plot_grid_analysis(all_result, output_dir_without_bscan, bscan_data=None, 
+                          show_counts=show_counts, show_details=show_details)
     
     # B-scan背景ありのプロット（B-scanデータがある場合のみ）
     if bscan_data is not None:
         print("B-scan背景ありのプロットを作成中...")
         if rocks_result:
-            plot_grid_analysis(rocks_result, output_dir_with_bscan, bscan_data=bscan_data)
+            plot_grid_analysis(rocks_result, output_dir_with_bscan, bscan_data=bscan_data, 
+                              show_counts=show_counts, show_details=show_details)
         if non_rocks_result:
-            plot_grid_analysis(non_rocks_result, output_dir_with_bscan, bscan_data=bscan_data)
+            plot_grid_analysis(non_rocks_result, output_dir_with_bscan, bscan_data=bscan_data, 
+                              show_counts=show_counts, show_details=show_details)
         if all_result:
-            plot_grid_analysis(all_result, output_dir_with_bscan, bscan_data=bscan_data)
+            plot_grid_analysis(all_result, output_dir_with_bscan, bscan_data=bscan_data, 
+                              show_counts=show_counts, show_details=show_details)
     
     # 統計データ保存（両方のディレクトリに保存）
     print("\n統計データを保存中...")
