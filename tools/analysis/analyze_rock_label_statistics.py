@@ -85,9 +85,9 @@ def get_label_color(label):
         1: 'r',        # red
         2: 'g',        # green
         3: 'b',        # blue
-        4: 'cyan',   # yellow
+        4: 'cyan',     # cyan
         5: 'magenta',  # magenta
-        6: 'yellow'      # cyan
+        6: 'yellow'    # yellow
     }
     return color_map.get(label, 'gray')  # デフォルトはgray
 
@@ -1093,6 +1093,14 @@ def main():
                                                         output_dir=output_normalized_dir, label_filter=rock_labels, 
                                                         suffix='_rocks_only')
     
+    # ラベル4-6のみのヒストグラム作成
+    print("\nラベル4-6のみのヒストグラムを作成中...")
+    non_rock_labels = [4, 5, 6]
+    create_depth_histogram(data, bin_size_m=depth_bin, output_dir=output_basic_dir, 
+                          label_filter=non_rock_labels, suffix='_labels_4to6_only')
+    create_horizontal_histogram(data, bin_size_m=horizontal_bin, output_dir=output_basic_dir, 
+                               label_filter=non_rock_labels, suffix='_labels_4to6_only')
+    
     # 全ラベルのヒストグラム作成
     print("\n全ラベルのヒストグラムを作成中...")
     create_depth_histogram(data, bin_size_m=depth_bin, output_dir=output_basic_dir, 
@@ -1100,12 +1108,32 @@ def main():
     create_horizontal_histogram(data, bin_size_m=horizontal_bin, output_dir=output_basic_dir, 
                                label_filter=None, suffix='_all_labels')
     
+    # 割合ヒストグラム（ラベル4-6のみ）
+    print("\n割合ヒストグラム（ラベル4-6のみ）を作成中...")
+    create_depth_ratio_histogram(data, bin_size_m=depth_bin, output_dir=output_ratio_dir, 
+                                label_filter=non_rock_labels, suffix='_labels_4to6_only')
+    create_horizontal_ratio_histogram(data, bin_size_m=horizontal_bin, output_dir=output_ratio_dir, 
+                                     label_filter=non_rock_labels, suffix='_labels_4to6_only')
+    
     # 割合ヒストグラム（全ラベル）
     print("\n割合ヒストグラム（全ラベル）を作成中...")
     create_depth_ratio_histogram(data, bin_size_m=depth_bin, output_dir=output_ratio_dir, 
                                 label_filter=None, suffix='_all_labels')
     create_horizontal_ratio_histogram(data, bin_size_m=horizontal_bin, output_dir=output_ratio_dir, 
                                      label_filter=None, suffix='_all_labels')
+    
+    # 深さ規格化水平ヒストグラム（ラベル4-6のみ）
+    if depth_data is not None:
+        print("\n深さ規格化水平ヒストグラム（ラベル4-6のみ）を作成中...")
+        create_depth_normalized_horizontal_histogram(data, depth_data, bin_size_m=horizontal_bin, 
+                                                   output_dir=output_normalized_dir, label_filter=non_rock_labels, 
+                                                   suffix='_labels_4to6_only')
+        
+        # 薄い層規格化水平ヒストグラム（ラベル4-6のみ）
+        print("\n薄い層規格化水平ヒストグラム（ラベル4-6のみ）を作成中...")
+        create_thin_layer_normalized_horizontal_histogram(data, depth_data, bin_size_m=horizontal_bin, 
+                                                        output_dir=output_normalized_dir, label_filter=non_rock_labels, 
+                                                        suffix='_labels_4to6_only')
     
     # 深さ規格化水平ヒストグラム（全ラベル）
     if depth_data is not None:
@@ -1143,6 +1171,11 @@ def main():
         rock_mask = np.isin(data['label'], [1, 2, 3])
         rock_count = np.sum(rock_mask)
         f.write(f"\nRocks only (Labels 1-3): {rock_count} ({rock_count/len(data['label'])*100:.1f}%)\n")
+        
+        # ラベル4-6のみの統計
+        non_rock_mask = np.isin(data['label'], [4, 5, 6])
+        non_rock_count = np.sum(non_rock_mask)
+        f.write(f"Labels 4-6 only: {non_rock_count} ({non_rock_count/len(data['label'])*100:.1f}%)\n")
     
     print(f"\n概要統計保存: {summary_path}")
     print("\n処理完了!")
