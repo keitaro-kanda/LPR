@@ -172,6 +172,25 @@ def time_to_depth(time_ns, epsilon_r=4.5):
     depth_m = time_ns * 1e-9 * c / np.sqrt(epsilon_r) * 0.5
     return depth_m
 
+def depth_to_time(depth_m, epsilon_r=4.5):
+    """
+    深さ[m]を時間[ns]に変換
+    
+    Parameters:
+    -----------
+    depth_m : array
+        深さ [m]
+    epsilon_r : float
+        比誘電率（デフォルト: 4.5）
+    
+    Returns:
+    --------
+    array: 時間 [ns]
+    """
+    c = 299792458  # 光速 [m/s]
+    time_ns = depth_m * 2 * np.sqrt(epsilon_r) / c * 1e9
+    return time_ns
+
 def get_label_color(label):
     """
     ラベル番号に対応する色を返す
@@ -195,7 +214,7 @@ def get_label_color(label):
     }
     return color_map.get(label, 'gray')  # デフォルトはgray
 
-def calculate_adaptive_font_size(window_x, window_d, fig_width, fig_height, num_x_grids, num_d_grids):
+def calculate_adaptive_font_size(window_x, window_t, fig_width, fig_height, num_x_grids, num_t_grids):
     """
     グリッドサイズに応じた適応的フォントサイズを計算
     
@@ -203,16 +222,16 @@ def calculate_adaptive_font_size(window_x, window_d, fig_width, fig_height, num_
     -----------
     window_x : float
         水平方向ウィンドウサイズ [m]
-    window_d : float  
-        深さ方向ウィンドウサイズ [m]
+    window_t : float  
+        時間方向ウィンドウサイズ [ns]
     fig_width : float
         図の幅 [inch]
     fig_height : float
         図の高さ [inch]
     num_x_grids : int
         水平方向グリッド数
-    num_d_grids : int
-        深さ方向グリッド数
+    num_t_grids : int
+        時間方向グリッド数
     
     Returns:
     --------
@@ -220,7 +239,7 @@ def calculate_adaptive_font_size(window_x, window_d, fig_width, fig_height, num_
     """
     # 1グリッドあたりの画面上のサイズ（インチ）を計算
     grid_width_inch = fig_width / num_x_grids
-    grid_height_inch = fig_height / num_d_grids
+    grid_height_inch = fig_height / num_t_grids
     
     # より小さい方の次元を基準にフォントサイズを決定
     min_grid_size_inch = min(grid_width_inch, grid_height_inch)
@@ -300,11 +319,15 @@ def add_count_text_to_grid(ax, grid_result, font_sizes, show_details=True, bscan
     depth_centers = grid_result['depth_centers']
     grid_counts = grid_result['grid_counts']
     window_x = grid_result['window_x']
-    window_d = grid_result['window_d']
+    window_t = grid_result['window_t']
     
     for i, x_center in enumerate(x_centers):
         for j, depth_center in enumerate(depth_centers):
             counts = grid_counts.get((i, j), {})
+            
+            # 深さ座標を時間座標に変換
+            time_center = depth_to_time(depth_center)
+            time_window_t = window_t  # 時間ウィンドウサイズは直接使用
             
             if counts:
                 total_count = sum(counts.values())
@@ -322,8 +345,8 @@ def add_count_text_to_grid(ax, grid_result, font_sizes, show_details=True, bscan
                     # B-scan背景がある場合は白文字を優先（見やすさのため）
                     text_color = 'white'
                 
-                # 総数を中央上部に表示
-                ax.text(x_center, depth_center - window_d * 0.15, 
+                # 総数を中央上部に表示（時間軸ベース）
+                ax.text(x_center, time_center - time_window_t * 0.15, 
                        str(total_count),
                        ha='center', va='center',
                        fontsize=font_sizes['total'],
@@ -335,7 +358,7 @@ def add_count_text_to_grid(ax, grid_result, font_sizes, show_details=True, bscan
                 # 詳細内訳を下部に表示（オプション）
                 if show_details and len(counts) > 1:
                     detail_text = ' '.join([f'{label}:{count}' for label, count in sorted(counts.items())])
-                    ax.text(x_center, depth_center + window_d * 0.25,
+                    ax.text(x_center, time_center + time_window_t * 0.25,
                            detail_text,
                            ha='center', va='center',
                            fontsize=font_sizes['detail'],
@@ -345,12 +368,12 @@ def add_count_text_to_grid(ax, grid_result, font_sizes, show_details=True, bscan
             else:
                 # データがない場合は「-」を表示（B-scan背景がない場合のみ）
                 if bscan_data is None:
-                    ax.text(x_center, depth_center, '-',
+                    ax.text(x_center, time_center, '-',
                            ha='center', va='center',
                            fontsize=font_sizes['total'],
                            color='gray', alpha=0.5)
 
-def create_grid_analysis(data, window_x, window_d, label_filter=None, filter_name="all"):
+def create_grid_analysis(data, window_x, window_t, label_filter=None, filter_name="all"):
     """
     グリッドベースのラベル解析を実行
     
@@ -360,8 +383,8 @@ def create_grid_analysis(data, window_x, window_d, label_filter=None, filter_nam
         ラベルデータ
     window_x : float
         水平方向ウィンドウサイズ [m]
-    window_d : float
-        深さ方向ウィンドウサイズ [m]
+    window_t : float
+        時間方向ウィンドウサイズ [ns]
     label_filter : list or None
         含めるラベル番号のリスト（None=全て）
     filter_name : str
@@ -372,17 +395,14 @@ def create_grid_analysis(data, window_x, window_d, label_filter=None, filter_nam
     dict: グリッド解析結果
     """
     x_coords = data['x']
-    y_coords = data['y']
+    y_coords = data['y']  # これは時間[ns]データ
     labels = data['label']
-    
-    # 深さ変換
-    depths = time_to_depth(y_coords)
     
     # ラベルフィルタリング
     if label_filter is not None:
         mask = np.isin(labels, label_filter)
         x_coords = x_coords[mask]
-        depths = depths[mask]
+        y_coords = y_coords[mask]
         labels = labels[mask]
     
     if len(labels) == 0:
@@ -391,31 +411,37 @@ def create_grid_analysis(data, window_x, window_d, label_filter=None, filter_nam
     
     # グリッド範囲設定
     x_max = data['x'].max()
-    depth_min, depth_max = time_to_depth(data['y']).min(), time_to_depth(data['y']).max()
+    time_min, time_max = data['y'].min(), data['y'].max()
     
     # x軸グリッドビン作成（0基準）
     x_start = 0
     x_end = np.ceil(x_max / window_x) * window_x  # 最大値を含む最小の倍数
     x_bins = np.arange(x_start, x_end + window_x, window_x)
     
-    # y軸グリッドビン作成（0基準、負の値も含む）
+    # 時間軸グリッドビン作成（0基準、負の値も含む）
     # 最小値と最大値を0基準のウィンドウサイズの倍数に拡張
-    depth_start = np.floor(depth_min / window_d) * window_d  # 最小値を含む最大の倍数
-    depth_end = np.ceil(depth_max / window_d) * window_d    # 最大値を含む最小の倍数
-    depth_bins = np.arange(depth_start, depth_end + window_d, window_d)
+    time_start = np.floor(time_min / window_t) * window_t  # 最小値を含む最大の倍数
+    time_end = np.ceil(time_max / window_t) * window_t    # 最大値を含む最小の倍数
+    time_bins = np.arange(time_start, time_end + window_t, window_t)
     
     # グリッドセンター計算
     x_centers = (x_bins[:-1] + x_bins[1:]) / 2
-    depth_centers = (depth_bins[:-1] + depth_bins[1:]) / 2
+    time_centers = (time_bins[:-1] + time_bins[1:]) / 2
+    
+    # 時間センターを深さセンターに変換（表示用）
+    depth_centers = time_to_depth(time_centers)
+    
+    # 時間ビンを深さビンに変換（表示用）
+    depth_bins = time_to_depth(time_bins)
     
     # 各グリッドセルでのラベル集計
     grid_counts = {}
     for i in range(len(x_centers)):
-        for j in range(len(depth_centers)):
-            # セル範囲内のデータを抽出
+        for j in range(len(time_centers)):
+            # セル範囲内のデータを抽出（時間ベース）
             x_mask = (x_coords >= x_bins[i]) & (x_coords < x_bins[i+1])
-            d_mask = (depths >= depth_bins[j]) & (depths < depth_bins[j+1])
-            cell_mask = x_mask & d_mask
+            t_mask = (y_coords >= time_bins[j]) & (y_coords < time_bins[j+1])
+            cell_mask = x_mask & t_mask
             
             if np.any(cell_mask):
                 cell_labels = labels[cell_mask]
@@ -426,12 +452,14 @@ def create_grid_analysis(data, window_x, window_d, label_filter=None, filter_nam
     
     return {
         'x_centers': x_centers,
-        'depth_centers': depth_centers,
+        'depth_centers': depth_centers,  # 表示用（深さ変換後）
+        'time_centers': time_centers,    # 計算用（時間ベース）
         'x_bins': x_bins,
-        'depth_bins': depth_bins,
+        'depth_bins': depth_bins,        # 表示用（深さ変換後）
+        'time_bins': time_bins,          # 計算用（時間ベース）
         'grid_counts': grid_counts,
         'window_x': window_x,
-        'window_d': window_d,
+        'window_t': window_t,            # 時間ベースのウィンドウサイズ
         'filter_name': filter_name,
         'total_points': len(labels)
     }
@@ -594,7 +622,7 @@ def plot_grid_analysis(grid_result, output_dir, suffix="", bscan_data=None, show
     depth_bins = grid_result['depth_bins']
     grid_counts = grid_result['grid_counts']
     window_x = grid_result['window_x']
-    window_d = grid_result['window_d']
+    window_t = grid_result['window_t']
     
     # 最適な図サイズを計算
     fig_width, fig_height = calculate_optimal_figure_size(x_bins, depth_bins)
@@ -608,12 +636,15 @@ def plot_grid_analysis(grid_result, output_dir, suffix="", bscan_data=None, show
     adaptive_font_sizes = None
     if show_counts:
         num_x_grids = len(x_centers)
-        num_d_grids = len(depth_centers)
+        num_t_grids = len(depth_centers)  # depth_centersの数がtime_gridsの数と同じ
         adaptive_font_sizes = calculate_adaptive_font_size(
-            window_x, window_d, fig_width, fig_height, num_x_grids, num_d_grids)
+            window_x, window_t, fig_width, fig_height, num_x_grids, num_t_grids)
     
     # プロット作成
     fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    
+    # 第2縦軸（深さ軸）を作成
+    ax2 = ax.twinx()
     
     # B-scan背景表示
     if bscan_data is not None:
@@ -625,8 +656,16 @@ def plot_grid_analysis(grid_result, output_dir, suffix="", bscan_data=None, show
         if np.isnan(bscan_data_abs_max) or bscan_data_abs_max == 0:
             bscan_data_abs_max = 1.0  # デフォルト値
         
+        # B-scanのextentを時間軸ベースに変換
+        bscan_extent_time = [
+            bscan_bg['extent'][0],  # x_start (変更なし)
+            bscan_bg['extent'][1],  # x_end (変更なし)
+            depth_to_time(bscan_bg['extent'][2]),  # y_bottom (深さ→時間)
+            depth_to_time(bscan_bg['extent'][3])   # y_top (深さ→時間)
+        ]
+        
         ax.imshow(bscan_bg['data'],
-                 extent=bscan_bg['extent'], 
+                 extent=bscan_extent_time, 
                  aspect='auto', 
                  cmap='gray',
                  alpha=1.0,  # 透明度を設定
@@ -642,6 +681,10 @@ def plot_grid_analysis(grid_result, output_dir, suffix="", bscan_data=None, show
         for j, depth_center in enumerate(depth_centers):
             counts = grid_counts.get((i, j), {})
             
+            # 深さ座標を時間座標に変換
+            time_center = depth_to_time(depth_center)
+            time_window_t = window_t  # 時間ウィンドウサイズは直接使用
+            
             if counts:
                 # 積み上げ棒グラフの設定
                 total_count = sum(counts.values())
@@ -653,15 +696,15 @@ def plot_grid_analysis(grid_result, output_dir, suffix="", bscan_data=None, show
                 
                 # 棒グラフのパディング設定
                 padding_x = window_x * 0.1  # 左右のパディング
-                padding_d = window_d * 0.1  # 上下のパディング
+                padding_t = time_window_t * 0.1  # 時間方向のパディング
                 
                 # 棒グラフの実際のサイズ
                 bar_width = window_x - 2 * padding_x
-                bar_height = window_d - 2 * padding_d
+                bar_height = time_window_t - 2 * padding_t
                 
-                # 棒グラフの開始位置
+                # 棒グラフの開始位置（時間軸ベース）
                 bar_x = x_center - bar_width / 2
-                bar_y = depth_center - bar_height / 2
+                bar_y = time_center - bar_height / 2
                 
                 # ラベルをソートして一貫した表示順序を保つ
                 sorted_labels = sorted(counts.keys())
@@ -686,14 +729,14 @@ def plot_grid_analysis(grid_result, output_dir, suffix="", bscan_data=None, show
             else:
                 # データがない場合は白い四角を描画（B-scan背景がある場合は透明に）
                 if bscan_data is None:
-                    rect = plt.Rectangle((x_center - window_x/2, depth_center - window_d/2),
-                                       window_x, window_d, 
+                    rect = plt.Rectangle((x_center - window_x/2, time_center - time_window_t/2),
+                                       window_x, time_window_t, 
                                        facecolor='white', edgecolor='lightgray', linewidth=0.5)
                     ax.add_patch(rect)
                 else:
                     # B-scan背景がある場合は透明な境界線のみ
-                    rect = plt.Rectangle((x_center - window_x/2, depth_center - window_d/2),
-                                       window_x, window_d, 
+                    rect = plt.Rectangle((x_center - window_x/2, time_center - time_window_t/2),
+                                       window_x, time_window_t, 
                                        facecolor='none', edgecolor='lightgray', linewidth=0.3, alpha=0.7)
                     ax.add_patch(rect)
     
@@ -703,7 +746,8 @@ def plot_grid_analysis(grid_result, output_dir, suffix="", bscan_data=None, show
         ax.axvline(x_bin, color='white' if bscan_data is not None else 'gray', 
                   linestyle='-', alpha=grid_alpha, linewidth=0.5)
     for depth_bin in depth_bins:
-        ax.axhline(depth_bin, color='white' if bscan_data is not None else 'gray', 
+        time_bin = depth_to_time(depth_bin)
+        ax.axhline(time_bin, color='white' if bscan_data is not None else 'gray', 
                   linestyle='-', alpha=grid_alpha, linewidth=0.5)
     
     # 数値オーバーレイを追加
@@ -712,27 +756,62 @@ def plot_grid_analysis(grid_result, output_dir, suffix="", bscan_data=None, show
     
     # 軸設定（アスペクト比に応じた調整）
     ax.set_xlim(x_bins[0], x_bins[-1])
-    ax.set_ylim(depth_bins[0], depth_bins[-1])
+    
+    # 第1縦軸（時間軸）の設定
+    ax_time_min = depth_to_time(depth_bins[0])   # 浅い方が小さな時間
+    ax_time_max = depth_to_time(depth_bins[-1])  # 深い方が大きな時間
+    ax.set_ylim(ax_time_min, ax_time_max)
+    
+    # 第2縦軸（深さ軸）の設定
+    ax2.set_ylim(depth_bins[0], depth_bins[-1])
     
     # 物理的な距離の比率を計算
     x_range = x_bins[-1] - x_bins[0]
     depth_range = depth_bins[-1] - depth_bins[0]
     physical_aspect_ratio = x_range / depth_range
     
+    # 軸ラベル設定
     ax.set_xlabel('Horizontal position [m]', fontsize=font_medium)
-    ax.set_ylabel(r'Depth [m] in $\varepsilon_r = 4.5$', fontsize=font_medium)
+    ax.set_ylabel('Time [ns]', fontsize=font_medium)
+    ax2.set_ylabel(r'Depth [m] in $\varepsilon_r = 4.5$', fontsize=font_medium)
     
     # 軸のticks設定
     # 水平方向のticks（適切な間隔で設定）
     x_ticks = np.arange(x_bins[0], x_bins[-1], 200)
     ax.set_xticks(x_ticks)
     
-    # 深さ方向のticks（適切な間隔で設定）
-    depth_ticks = np.arange(depth_bins[0], depth_bins[-1], 2.0)
-    ax.set_yticks(depth_ticks)
+    # 時間軸（第1縦軸）のticks設定
+    time_range = ax_time_max - ax_time_min
+    # 時間範囲に応じて適切な間隔を設定
+    if time_range <= 200:
+        time_interval = 25  # 25ns刻み
+    elif time_range <= 500:
+        time_interval = 50  # 50ns刻み
+    elif time_range <= 1000:
+        time_interval = 100  # 100ns刻み
+    else:
+        time_interval = 200  # 200ns刻み
     
+    # 時間ticksを生成（整数値で開始・終了）
+    time_start = int(np.ceil(ax_time_min / time_interval) * time_interval)
+    time_end = int(np.floor(ax_time_max / time_interval) * time_interval)
+    time_ticks = np.arange(time_start, time_end + time_interval, time_interval)
+    ax.set_yticks(time_ticks)
+    
+    # 深さ軸（第2縦軸）のticks設定
+    depth_interval = 2.0  # 2m刻み
+    depth_start = np.ceil(depth_bins[0] / depth_interval) * depth_interval
+    depth_end = np.floor(depth_bins[-1] / depth_interval) * depth_interval
+    depth_ticks = np.arange(depth_start, depth_end + depth_interval, depth_interval)
+    ax2.set_yticks(depth_ticks)
+    
+    # ticksのフォーマット設定
     ax.tick_params(axis='both', which='major', labelsize=font_small)
-    ax.invert_yaxis()  # 深い方を下に
+    ax2.tick_params(axis='y', which='major', labelsize=font_small)
+    
+    # 両方の軸を反転して深い方を下にする
+    ax.invert_yaxis()   # 時間軸も反転（大きな時間が下）
+    ax2.invert_yaxis()  # 深さ軸も反転（深い方が下）
     
     # 等アスペクト比の設定（物理的な距離の比率に基づいて判定）
     # 物理的な比率が極端に横長でない場合のみ等アスペクト比を適用
@@ -756,7 +835,8 @@ def plot_grid_analysis(grid_result, output_dir, suffix="", bscan_data=None, show
         legend_patches.append(patch)
     
     # 凡例のフォントサイズ（標準）
-    ax.legend(handles=legend_patches, fontsize=font_medium)
+    ax.legend(handles=legend_patches, fontsize=font_medium, 
+              bbox_to_anchor=(0.5, -0.15), loc='upper center', ncol=len(legend_patches))
     
     # タイトル（標準フォントサイズ）
     filter_text = {
@@ -765,7 +845,7 @@ def plot_grid_analysis(grid_result, output_dir, suffix="", bscan_data=None, show
         "all": "All labels (Labels 1-6)"
     }
     title = f"Grid Analysis - {filter_text[grid_result['filter_name']]}"
-    title += f" (Window: {window_x}m x {window_d}m)"
+    title += f" (Window: {window_x}m x {window_t}ns)"
     
     # B-scan背景表示の有無をタイトルに追加
     if bscan_data is not None:
@@ -794,7 +874,7 @@ def plot_grid_analysis(grid_result, output_dir, suffix="", bscan_data=None, show
     
     print(f"グリッド解析プロット保存: {png_path}")
 
-def save_grid_statistics(grid_results, output_dir, window_x, window_d):
+def save_grid_statistics(grid_results, output_dir, window_x, window_t):
     """
     グリッド統計をテキストファイルに保存
     
@@ -805,15 +885,15 @@ def save_grid_statistics(grid_results, output_dir, window_x, window_d):
     output_dir : str
         出力ディレクトリ
     window_x : float
-        水平方向ウィンドウサイズ
-    window_d : float
-        深さ方向ウィンドウサイズ
+        水平方向ウィンドウサイズ [m]
+    window_t : float
+        時間方向ウィンドウサイズ [ns]
     """
     stats_path = os.path.join(output_dir, 'grid_statistics.txt')
     
     with open(stats_path, 'w') as f:
         f.write("# Grid-based rock label statistics\n")
-        f.write(f"# Window size: {window_x}m (horizontal) x {window_d}m (depth)\n")
+        f.write(f"# Window size: {window_x}m (horizontal) x {window_t}ns (time)\n")
         f.write(f"# Grid cells: {len(grid_results['all']['x_centers'])} x {len(grid_results['all']['depth_centers'])}\n")
         f.write("\n")
         
@@ -875,7 +955,7 @@ def main():
     
     # ウィンドウサイズ入力
     window_x = float(input("水平方向ウィンドウサイズ [m] を入力してください: ").strip())
-    window_d = float(input("深さ方向ウィンドウサイズ [m] を入力してください: ").strip())
+    window_t = float(input("時間方向ウィンドウサイズ [ns] を入力してください: ").strip())
     
     # 数値表示オプション
     print("\n数値表示オプション:")
@@ -904,7 +984,7 @@ def main():
     # 出力ディレクトリ設定
     base_dir = os.path.dirname(os.path.dirname(json_path))
     filename = os.path.splitext(os.path.basename(json_path))[0]
-    base_output_dir = os.path.join(base_dir, f'label_statistics_grid/{filename}_x{window_x}_d{window_d}')
+    base_output_dir = os.path.join(base_dir, f'label_statistics_grid/{filename}_x{window_x}_t{window_t}')
     
     # B-scan有り/無しで分けたディレクトリを作成
     output_dir_without_bscan = os.path.join(base_output_dir, 'without_bscan')
@@ -916,25 +996,26 @@ def main():
     
     print(f"総ラベル数: {len(data['label'])}")
     print(f"水平位置範囲: {data['x'].min():.2f} - {data['x'].max():.2f} m")
+    print(f"時間範囲: {data['y'].min():.2f} - {data['y'].max():.2f} ns")
     depth_min = time_to_depth(data['y'].min())
     depth_max = time_to_depth(data['y'].max())
     print(f"深さ範囲: {depth_min:.3f} - {depth_max:.3f} m")
-    print(f"グリッド範囲: x=0 - {np.ceil(data['x'].max() / window_x) * window_x:.0f} m, depth={np.floor(depth_min / window_d) * window_d:.2f} - {np.ceil(depth_max / window_d) * window_d:.2f} m")
+    print(f"グリッド範囲: x=0 - {np.ceil(data['x'].max() / window_x) * window_x:.0f} m, time={np.floor(data['y'].min() / window_t) * window_t:.0f} - {np.ceil(data['y'].max() / window_t) * window_t:.0f} ns")
     
     # 3パターンの解析実行
     print("\nグリッド解析を実行中...")
     
     # 1. 岩石のみ（ラベル1-3）
     print("岩石のみ（ラベル1-3）の解析中...")
-    rocks_result = create_grid_analysis(data, window_x, window_d, [1, 2, 3], "rocks_only")
+    rocks_result = create_grid_analysis(data, window_x, window_t, [1, 2, 3], "rocks_only")
     
     # 2. 非岩石のみ（ラベル4-6）
     print("非岩石のみ（ラベル4-6）の解析中...")
-    non_rocks_result = create_grid_analysis(data, window_x, window_d, [4, 5, 6], "non_rocks_only")
+    non_rocks_result = create_grid_analysis(data, window_x, window_t, [4, 5, 6], "non_rocks_only")
     
     # 3. 全ラベル（ラベル1-6）
     print("全ラベル（ラベル1-6）の解析中...")
-    all_result = create_grid_analysis(data, window_x, window_d, None, "all")
+    all_result = create_grid_analysis(data, window_x, window_t, None, "all")
     
     # プロット作成
     print("\nプロットを作成中...")
@@ -971,10 +1052,10 @@ def main():
         'non_rocks_only': non_rocks_result,
         'all': all_result
     }
-    save_grid_statistics(grid_results, output_dir_without_bscan, window_x, window_d)
+    save_grid_statistics(grid_results, output_dir_without_bscan, window_x, window_t)
     
     if bscan_data is not None:
-        save_grid_statistics(grid_results, output_dir_with_bscan, window_x, window_d)
+        save_grid_statistics(grid_results, output_dir_with_bscan, window_x, window_t)
     
     print(f"\n出力ディレクトリ:")
     print(f"  B-scan背景なし: {output_dir_without_bscan}")
