@@ -556,8 +556,8 @@ def prepare_bscan_background(bscan_data):
     sample_interval = 0.312500e-9  # [s] - Time sampling interval
     trace_interval = 3.6e-2        # [m] - Spatial trace interval
     
-    # NaN値を0に置換
-    bscan_display = np.nan_to_num(bscan_data, nan=0.0)
+    # NaN値を保持したまま処理（NaN領域は白背景で表示するため）
+    bscan_display = bscan_data.copy()
     
     # B-scanの座標軸を計算
     x_bscan_end = bscan_data.shape[1] * trace_interval
@@ -650,8 +650,8 @@ def plot_grid_analysis(grid_result, output_dir, suffix="", bscan_data=None, show
     if bscan_data is not None:
         bscan_bg = prepare_bscan_background(bscan_data)
         
-        # グレースケールでB-scanを背景表示
-        # カラーバー範囲の計算
+        # グレースケールでB-scanを背景表示（NaN領域は白背景）
+        # カラーバー範囲の計算（NaN値を無視）
         bscan_data_abs_max = np.nanmax(np.abs(bscan_bg['data']))
         if np.isnan(bscan_data_abs_max) or bscan_data_abs_max == 0:
             bscan_data_abs_max = 1.0  # デフォルト値
@@ -664,10 +664,15 @@ def plot_grid_analysis(grid_result, output_dir, suffix="", bscan_data=None, show
             depth_to_time(bscan_bg['extent'][3])   # y_top (深さ→時間)
         ]
         
+        # NaN値を白背景で表示するためのカラーマップ設定
+        # グレースケールカラーマップをベースに、NaN値を白に設定
+        cmap = plt.cm.gray.copy()
+        cmap.set_bad('white')  # NaN値を白色で表示
+        
         ax.imshow(bscan_bg['data'],
                  extent=bscan_extent_time, 
                  aspect='auto', 
-                 cmap='gray',
+                 cmap=cmap,
                  alpha=1.0,  # 透明度を設定
                  origin='upper',
                  interpolation='nearest',
