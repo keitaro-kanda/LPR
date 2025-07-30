@@ -8,15 +8,19 @@ from natsort import natsorted
 
 
 #* Get input parameters
-path_type = input('Input channel name (2A, 2B): ').strip()
-#* Define data folder path
-if path_type == '2A':
-    resampled_data_dir = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2A/Resampled_Data/txt'
-elif path_type == '2B':
-    resampled_data_dir = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Resampled_Data/txt'
+resampled_data_dir = input('Input data folder path (Resampled_Data>txt directory): ').strip()
 if not os.path.exists(resampled_data_dir):
-        print('Error: Data path does not exist:', resampled_data_dir)
-        exit(1)
+    raise ValueError('Data folder path does not exist. Please check the path and try again.')
+
+# path_type = input('Input channel name (2A, 2B): ').strip()
+# #* Define data folder path
+# if path_type == '2A':
+#     resampled_data_dir = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2A/Resampled_Data/txt'
+# elif path_type == '2B':
+#     resampled_data_dir = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Resampled_Data/txt'
+# if not os.path.exists(resampled_data_dir):
+#         print('Error: Data path does not exist:', resampled_data_dir)
+#         exit(1)
 
 print('Select function type (calc or plot):')
 function_type = input().strip().lower()

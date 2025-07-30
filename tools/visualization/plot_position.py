@@ -8,17 +8,22 @@ import argparse
 
 
 #* input data folder path
+position_folder_path = input('Input data folder path (Resampled_Data>position directory): ').strip()
+if not os.path.exists(position_folder_path):
+    raise ValueError('Data folder path does not exist. Please check the path and try again.')
 channel_name = input('Input channel name (1, 2A, 2B): ').strip()
+if channel_name not in ['1', '2A', '2B']:
+    raise ValueError('Invalid channel name. Please enter 1, 2A, or 2B.')
 
 #* Data folder path
-if channel_name == '1':
-    position_folder_path = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_1/Resampled_Data/position'
-elif channel_name == '2A':
-    position_folder_path = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2A/Resampled_Data/position'
-elif channel_name == '2B':
-    position_folder_path = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Resampled_Data/position'
-else:
-    raise ValueError("Invalid channel name. Please enter 1, 2A, or 2B.")
+# if channel_name == '1':
+#     position_folder_path = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_1/Resampled_Data/position'
+# elif channel_name == '2A':
+#     position_folder_path = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2A/Resampled_Data/position'
+# elif channel_name == '2B':
+#     position_folder_path = '/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Resampled_Data/position'
+# else:
+#     raise ValueError("Invalid channel name. Please enter 1, 2A, or 2B.")
 
 #* Output folder path
 output_dir = os.path.join(os.path.dirname(position_folder_path), 'position_plot')

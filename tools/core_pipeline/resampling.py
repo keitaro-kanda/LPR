@@ -10,15 +10,12 @@ from scipy import ndimage
 
 
 #* input data folder path
-channel_name = input('Input channel name (1, 2A, 2B): ').strip()
+data_folder_path = input('Input data folder path (echo_position directory): ').strip()
+if not os.path.exists(data_folder_path):
+    raise ValueError('Data folder path does not exist. Please check the path and try again.')
 
-if channel_name == '1':
-    data_folder_path = "/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_1/loaded_data_echo_position"
-elif channel_name == '2A':
-    data_folder_path = "/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2A/loaded_data_echo_position"
-elif channel_name == '2B':
-    data_folder_path = "/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/loaded_data_echo_position"
-else:
+channel_name = input('Input channel name (1, 2A, or 2B): ').strip()
+if channel_name not in ['1', '2A', '2B']:
     raise ValueError('Invalid channel name. Please enter 1, 2A, or 2B.')
 
 
