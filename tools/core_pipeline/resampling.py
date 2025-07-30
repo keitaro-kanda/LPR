@@ -211,7 +211,7 @@ if rover_name == 'CE-4':
     thres_val = 25000  # Threshold value for resampling
 elif rover_name == 'CE-3':
     window_num = 8  # Number of consecutive traces to consider for resampling
-    thres_val = 10500
+    thres_val = 11000
 else:
     raise ValueError('Invalid rover name. Please enter CE-3 or CE-4.')
 

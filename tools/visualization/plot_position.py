@@ -124,6 +124,7 @@ def load_positions():
     plt.grid()
     plt.xlabel('Record number', fontsize=20)
     plt.ylabel('Velocity [m/s]', fontsize=20)
+    plt.ylim(0, 1e10)
     plt.tick_params(labelsize=18)
     plt.savefig(os.path.join(output_dir, 'plot_velocity.png'))
     plt.show()
