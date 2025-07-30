@@ -18,6 +18,9 @@ channel_name = input('Input channel name (1, 2A, or 2B): ').strip()
 if channel_name not in ['1', '2A', '2B']:
     raise ValueError('Invalid channel name. Please enter 1, 2A, or 2B.')
 
+rover_name = input('Input rover name (CE-3 or CE-4): ').strip()
+if rover_name not in ['CE-3', 'CE-4']:
+    raise ValueError('Invalid rover name. Please enter CE-3 or CE-4.')
 
 #* Define output folder path
 output_dir = os.path.join(os.path.dirname(data_folder_path), 'Resampled_Data')
@@ -39,7 +42,7 @@ if not os.path.exists(position_output_dir):
 #data_2B = np.zeros((0, 2048))
 #medf = np.zeros(0)
 
-def resampling(signal_data, position_data, sequence_id): # input is 2D array including position data
+def resampling(signal_data, position_data, sequence_id, window_num, thres_val): # input is 2D array including position data
     #* Do not consider first 300 datapoints
     img = signal_data[300:, :]
 
@@ -57,8 +60,8 @@ def resampling(signal_data, position_data, sequence_id): # input is 2D array inc
 
 	#* Define a moving window to avoid taking into account small portions with high values.
 	#* We want to take the signal_data only when it has a value highest than thres for window consecutive traces
-    window = 16
-    thres = 25000
+    window = window_num
+    thres = thres_val
 
 
 	#* Init output vector as 0s
@@ -102,7 +105,7 @@ def resampling(signal_data, position_data, sequence_id): # input is 2D array inc
 
 
 #* Define the plot function for CH-2B
-def plot_2B(raw_data, sobelx, med_denoised, med, medf, data_filtered, sequence_id):
+def plot_2B(raw_data, sobelx, med_denoised, med, medf, data_filtered, sequence_id, thres):
     fig, ax = plt.subplots(6, 1, figsize=(12, 20), tight_layout=True, sharex=True)
     fontsize_large = 20
     fontsize_medium = 18
@@ -134,11 +137,12 @@ def plot_2B(raw_data, sobelx, med_denoised, med, medf, data_filtered, sequence_i
 
     #* Plot median data
     ax[3].plot(med, label='med')
-    ax[3].hlines(20000, 0, med.shape[0], 'r', label='thres')
+    ax[3].hlines(thres, 0, med.shape[0], 'r', label='thres')
     ax[3].set_title('Filtered signals amplitude', fontsize=fontsize_large)
     ax[3].legend()
     ax[3].set_ylabel('Amplitude', fontsize=fontsize_medium)
     ax[3].tick_params(axis='both', which='major', labelsize=fontsize_small)
+    ax[3].set_ylim(0, 50000)
 
     #* Plot median filtered data
     ax[4].plot(medf)
@@ -200,6 +204,18 @@ def plot_2A(raw_data, medf, data_filtered, sequence_id):
 #* Conduct resampling
 total_trace_num = 0
 resampled_trace_num = 0
+
+#* Set parameters for resampling
+if rover_name == 'CE-4':
+    window_num = 16  # Number of consecutive traces to consider for resampling
+    thres_val = 25000  # Threshold value for resampling
+elif rover_name == 'CE-3':
+    window_num = 8  # Number of consecutive traces to consider for resampling
+    thres_val = 10500
+else:
+    raise ValueError('Invalid rover name. Please enter CE-3 or CE-4.')
+
+
 for ECHO_data in tqdm(natsorted(os.listdir(data_folder_path))):
     #* Load ECHO data
     if not ECHO_data.endswith('.txt'):
@@ -231,11 +247,11 @@ for ECHO_data in tqdm(natsorted(os.listdir(data_folder_path))):
     2B: Apply resampling function
     """
     if channel_name == '2B':
-        sobelx, med_denoised, med, medf, data_filtered, positions_filtered = resampling(signals, positions, sequence_id)
+        sobelx, med_denoised, med, medf, data_filtered, positions_filtered = resampling(signals, positions, sequence_id, window_num, thres_val)
         # data_filtered4plot = np.zeros((2048, data_filtered.shape[1]))
         # data_filtered4plot[:, :data_filtered.shape[1]] = data_filtered
 
-        plot_2B(raw_data, sobelx, med_denoised, med, medf, data_filtered, sequence_id)
+        plot_2B(raw_data, sobelx, med_denoised, med, medf, data_filtered, sequence_id, thres_val)
         print(' ')
 
     elif channel_name == '2A':
