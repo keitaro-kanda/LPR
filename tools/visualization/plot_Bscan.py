@@ -185,12 +185,24 @@ def single_plot(plot_data, time_zero_idx):
 
     return fig
 
+def save_Bscan_size(data, time_zero_idx):
+    """Save B-scan size information to a text file"""
+    output_path = os.path.join(os.path.dirname(data_path), 'Bscan_size.txt')
+    with open(output_path, 'w') as f:
+        f.write(f'B-scan size: {data.shape[0]} x {data.shape[1]}\n')
+        f.write(f'Time zero index: {time_zero_idx}\n')
+        f.write(f'Sample interval: {sample_interval * 1e9:.2f} ns\n')
+        f.write(f'Trace interval: {trace_interval:.2f} m\n')
+    print(f"B-scan size information saved to: {output_path}")
+
 
 # 7. Execution
 if __name__ == "__main__":
     print('Loading data...')
     data = np.loadtxt(data_path, delimiter=' ')
     print("B-scanの形状:", data.shape)
+    # Save B-scan size information
+    save_Bscan_size(data, find_time_zero(data))
 
     # Store original data for NaN handling before any processing
     original_data = data.copy()
