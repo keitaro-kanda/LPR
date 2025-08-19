@@ -196,7 +196,7 @@ def background_removal(data, output_dir=None):
 
     #* Plot background data
     if output_dir is not None:
-        fig, ax = plt.subplots(1, 2, figsize=(12, 8), tight_layout=True)
+        fig, ax = plt.subplots(1, 2, figsize=(6, 10), tight_layout=True)
         time = np.arange(0, data.shape[0]*sample_interval/1e-9, sample_interval/1e-9)
         ax[0].plot(background_data, time)
 
@@ -207,19 +207,53 @@ def background_removal(data, output_dir=None):
         ax[0].invert_yaxis()
         ax[0].set_ylim(np.max(time), 0)
 
-        ax[1].plot(background_data, time)
+        ax[1].plot(np.log(np.abs(background_data)), time)
 
         ax[1].set_xlabel('Amplitude', fontsize=20)
         ax[1].set_ylabel('Time [ns]', fontsize=20)
         ax[1].tick_params(labelsize=18)
         ax[1].grid(which='major', axis='both', linestyle='-.')
         ax[1].invert_yaxis()
-        ax[1].set_ylim(100, 0)
+        ax[1].set_ylim(np.max(time), 0)
 
         plt.savefig(output_dir + '/Background_data.png', format='png', dpi=120)
         plt.savefig(output_dir + '/Background_data.pdf', format='pdf', dpi=300)
         plt.close()
         print('Plot of background data is successfully saved.')
+        print(' ')
+
+    #* Plot background removed average data
+    if output_dir is not None:
+        fig, ax = plt.subplots(1, 2, figsize=(6, 10), tight_layout=True)
+        time = np.arange(0, data.shape[0]*sample_interval/1e-9, sample_interval/1e-9)
+        background_removed_ave = np.mean(background_removed_data, axis=1)
+        background_removed_std = np.std(background_removed_data, axis=1)
+        ax[0].plot(background_removed_ave, time)
+        ax.fill_betweenx(time, background_removed_ave - background_removed_std,
+                            background_removed_ave + background_removed_std, alpha=0.2)
+
+        ax[0].set_xlabel('Amplitude', fontsize=20)
+        ax[0].set_ylabel('Time [ns]', fontsize=20)
+        ax[0].tick_params(labelsize=18)
+        ax[0].grid(which='major', axis='both', linestyle='-.')
+        ax[0].invert_yaxis()
+        ax[0].set_ylim(np.max(time), 0)
+
+        ax[1].plot(np.log(np.abs(background_removed_ave)), time)
+        ax[1].fill_betweenx(time, np.log(np.abs(background_removed_ave)) - np.abs(np.log(np.abs(background_removed_std))),
+                            np.log(np.abs(background_removed_ave)) + np.abs(np.log(np.abs(background_removed_std))), alpha=0.2)
+
+        ax[1].set_xlabel('Amplitude', fontsize=20)
+        ax[1].set_ylabel('Time [ns]', fontsize=20)
+        ax[1].tick_params(labelsize=18)
+        ax[1].grid(which='major', axis='both', linestyle='-.')
+        ax[1].invert_yaxis()
+        ax[1].set_ylim(np.max(time), 0)
+
+        plt.savefig(output_dir + '/Background_removed_data.png', format='png', dpi=120)
+        plt.savefig(output_dir + '/Background_removed_data.pdf', format='pdf', dpi=300)
+        plt.close()
+        print('Plot of background removed data is successfully saved.')
         print(' ')
 
     return background_data,  background_removed_data
