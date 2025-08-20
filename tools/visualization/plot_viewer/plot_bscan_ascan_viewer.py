@@ -458,7 +458,7 @@ class BScanAScanViewer(QtWidgets.QMainWindow):
         extent = [self.x_start, self.x_end, self.y_end, self.y_start]
         vmax = np.nanmax(np.abs(self.data)) / 10
         ax1.imshow(data_for_display, aspect='auto', extent=extent, 
-                  cmap='viridis', vmin=-vmax, vmax=vmax)
+                  cmap='seismic', vmin=-vmax, vmax=vmax)
         
         ax1.set_xlim(x_min, x_max)
         ax1.set_ylim(y_max, y_min)  # Y軸反転
