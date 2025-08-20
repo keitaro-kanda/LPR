@@ -184,7 +184,7 @@ def create_depth_histogram(data, bin_size_m=1.0, output_dir='rock_statics', labe
     
     plt.savefig(png_path, dpi=300, bbox_inches='tight')
     plt.savefig(pdf_path, dpi=300, bbox_inches='tight')
-    plt.show()
+    plt.close()
     
     print(f"深さヒストグラム保存: {png_path}")
     
@@ -211,7 +211,7 @@ def create_depth_histogram(data, bin_size_m=1.0, output_dir='rock_statics', labe
     
     print(f"深さ統計データ保存: {stats_path}")
 
-def create_depth_histogram_time(data, bin_size_ns=10.0, output_dir='rock_statics', label_filter=None, suffix=''):
+def create_time_histogram(data, bin_size_ns=10.0, output_dir='rock_statics', label_filter=None, suffix=''):
     """
     深さごとの岩石ラベルヒストグラムを作成（時間[ns]単位）
     
@@ -285,7 +285,8 @@ def create_depth_histogram_time(data, bin_size_ns=10.0, output_dir='rock_statics
     ax1.legend(fontsize=18, ncol=ncol)
     ax1.grid(True, alpha=0.3)
     ax1.invert_yaxis()  # 深い方を下に
-    
+    ax1.set_yticks(np.arange(0, len(bin_centers) * bin_size_ns, 20))
+
     # Set x-axis limit to max number + 1 for time histogram
     # Calculate the maximum stacked count across all bins
     max_count = np.max(bottom) if len(bottom) > 0 else 1
@@ -313,7 +314,7 @@ def create_depth_histogram_time(data, bin_size_ns=10.0, output_dir='rock_statics
     
     fig.savefig(png_path, dpi=300, bbox_inches='tight')
     fig.savefig(pdf_path, dpi=300, bbox_inches='tight')
-    plt.show()
+    plt.close()
     
     print(f"時間ヒストグラム保存: {png_path}")
     
@@ -426,7 +427,7 @@ def create_horizontal_histogram(data, bin_size_m=50.0, output_dir='rock_statics'
     
     plt.savefig(png_path, dpi=300, bbox_inches='tight')
     plt.savefig(pdf_path, dpi=300, bbox_inches='tight')
-    plt.show()
+    plt.close()
     
     print(f"水平位置ヒストグラム保存: {png_path}")
     
@@ -566,7 +567,7 @@ def create_depth_normalized_horizontal_histogram(data, depth_data, bin_size_m=50
     
     plt.savefig(png_path, dpi=300, bbox_inches='tight')
     plt.savefig(pdf_path, dpi=300, bbox_inches='tight')
-    plt.show()
+    plt.close()
     
     print(f"深さ規格化水平位置ヒストグラム保存: {png_path}")
     
@@ -816,7 +817,7 @@ def create_thin_layer_normalized_horizontal_histogram(data, depth_data, bin_size
     
     plt.savefig(png_path, dpi=300, bbox_inches='tight')
     plt.savefig(pdf_path, dpi=300, bbox_inches='tight')
-    plt.show()
+    plt.close()
     
     print(f"薄い層規格化水平位置ヒストグラム保存: {png_path}")
     
@@ -954,7 +955,7 @@ def create_depth_ratio_histogram(data, bin_size_m=1.0, output_dir='rock_statics'
     
     plt.savefig(png_path, dpi=300, bbox_inches='tight')
     plt.savefig(pdf_path, dpi=300, bbox_inches='tight')
-    plt.show()
+    plt.close()
     
     print(f"深さ割合ヒストグラム保存: {png_path}")
     
@@ -1094,7 +1095,7 @@ def create_depth_ratio_histogram_time(data, bin_size_ns=10.0, output_dir='rock_s
     
     fig.savefig(png_path, dpi=300, bbox_inches='tight')
     fig.savefig(pdf_path, dpi=300, bbox_inches='tight')
-    plt.show()
+    plt.close()
     
     print(f"時間割合ヒストグラム保存: {png_path}")
     
@@ -1221,7 +1222,7 @@ def create_horizontal_ratio_histogram(data, bin_size_m=50.0, output_dir='rock_st
     
     plt.savefig(png_path, dpi=300, bbox_inches='tight')
     plt.savefig(pdf_path, dpi=300, bbox_inches='tight')
-    plt.show()
+    plt.close()
     
     print(f"水平位置割合ヒストグラム保存: {png_path}")
     
@@ -1299,22 +1300,52 @@ def main():
             print(f"警告: 深さ計測ファイルが見つかりません: {depth_json_path}")
     
     # ウィンドウサイズ入力
-    depth_bin = float(input("深さビンサイズ [m] を入力してください: ").strip())
     horizontal_bin = float(input("水平位置ビンサイズ [m] を入力してください: ").strip())
     time_bin = float(input("時間ビンサイズ [ns] を入力してください: ").strip())
     
+    # データ範囲の入力
+    print("\n=== 入力データ範囲 ===")
+    time_range = input("深さ範囲 [ns] を入力してください（例: 0-100, Enter: 全範囲）: ").strip()
+    horizontal_range = input("水平位置範囲 [m] を入力してください（例: 0-100, Enter: 全範囲）: ").strip()
+    try:
+        if time_range:
+            time_min, time_max = map(float, time_range.split('-'))
+        else:
+            time_min, time_max = None, None
+        
+        if horizontal_range:
+            horizontal_min, horizontal_max = map(float, horizontal_range.split('-'))
+        else:
+            horizontal_min, horizontal_max = None, None
+    except ValueError:
+        raise ValueError("範囲の入力形式が正しくありません。例: 0-100")
+
     # 出力ディレクトリ設定
     base_dir = os.path.dirname(os.path.dirname(json_path))
     filename = os.path.splitext(os.path.basename(json_path))[0]
-    output_base_dir = os.path.join(base_dir, f'label_statics/{filename}_d{depth_bin}_h{horizontal_bin}_t{time_bin}')
-    output_basic_dir = os.path.join(output_base_dir, 'basic')
-    output_normalized_dir = os.path.join(output_base_dir, 'normalized')
-    output_ratio_dir = os.path.join(output_base_dir, 'ratio')
-    output_basic_time_dir = os.path.join(output_base_dir, 'basic_time_number')
+    output_base_dir = os.path.join(base_dir, f'label_statics/{filename}_x{horizontal_bin}_t{time_bin}')
+    if time_range:
+        output_base_dir += f'/t{time_min}-{time_max}'
+    elif horizontal_range:
+        output_base_dir += f'/x{horizontal_min}-{horizontal_max}'
+    elif time_range and horizontal_range:
+        output_base_dir += f'/t{time_min}-{time_max}_x{horizontal_min}-{horizontal_max}'
+    else:
+        output_base_dir += '/full_range'
+    output_time_dir = os.path.join(output_base_dir, 'depth_histograms')
+    output_horizontal_dir = os.path.join(output_base_dir, 'horizontal_histograms')
     
     # データ読み込み
     print("\nデータを読み込み中...")
     data = load_label_data(json_path)
+
+    # データ範囲フィルタリング
+    if time_min is not None and time_max is not None:
+        time_mask = (data['y'] >= time_min) & (data['y'] <= time_max)
+        data = {key: value[time_mask] for key, value in data.items()}
+    if horizontal_min is not None and horizontal_max is not None:
+        horizontal_mask = (data['x'] >= horizontal_min) & (data['x'] <= horizontal_max)
+        data = {key: value[horizontal_mask] for key, value in data.items()}
     
     # 概要統計表示
     print_summary_statistics(data)
@@ -1327,126 +1358,123 @@ def main():
         print(f"深さ範囲: {depth_data['depth'].min():.3f} - {depth_data['depth'].max():.3f} m")
     
     print(f"\n設定:")
-    print(f"  深さビンサイズ: {depth_bin} m")
     print(f"  水平位置ビンサイズ: {horizontal_bin} m")
     print(f"  時間ビンサイズ: {time_bin} ns")
     print(f"  出力ディレクトリ: {output_base_dir}")
-    print(f"    - 基本ヒストグラム: {output_basic_dir}")
-    print(f"    - 規格化ヒストグラム: {output_normalized_dir}")
-    print(f"    - 割合ヒストグラム: {output_ratio_dir}")
-    print(f"    - 時間ヒストグラム: {output_basic_time_dir}")
+    print(f"    - 時間方向ヒストグラム: {output_time_dir}")
+    print(f"    - 水平位置ヒストグラム: {output_horizontal_dir}")
     print(f"  誘電率: 4.5")
     print(f"  深さ規格化: {'有効' if depth_data is not None else '無効'}")
     
     # 岩石のみ（ラベル1-3）のヒストグラム作成
     print("\n岩石のみ（ラベル1-3）のヒストグラムを作成中...")
     rock_labels = [1, 2, 3]
-    create_depth_histogram(data, bin_size_m=depth_bin, output_dir=output_basic_dir, 
-                          label_filter=rock_labels, suffix='_rocks_only')
-    create_horizontal_histogram(data, bin_size_m=horizontal_bin, output_dir=output_basic_dir, 
+    # create_depth_histogram(data, bin_size_m=depth_bin, output_dir=output_basic_dir, 
+    #                       label_filter=rock_labels, suffix='_rocks_only')
+    create_horizontal_histogram(data, bin_size_m=horizontal_bin, output_dir=output_horizontal_dir, 
                                label_filter=rock_labels, suffix='_rocks_only')
     
     # 時間ヒストグラム（岩石のみ）
     print("\n時間ヒストグラム（岩石のみ）を作成中...")
-    create_depth_histogram_time(data, bin_size_ns=time_bin, output_dir=output_basic_time_dir, 
-                               label_filter=rock_labels, suffix='_rocks_only')
-    create_depth_ratio_histogram_time(data, bin_size_ns=time_bin, output_dir=output_basic_time_dir, 
-                                     label_filter=rock_labels, suffix='_rocks_only')
+    create_time_histogram(data, bin_size_ns=time_bin, output_dir=output_time_dir, 
+                                label_filter=rock_labels, suffix='_rocks_only')
+    # create_depth_ratio_histogram_time(data, bin_size_ns=time_bin, output_dir=output_time_dir, 
+    #                                  label_filter=rock_labels, suffix='_rocks_only')
     
     # 割合ヒストグラム（岩石のみ）
     print("\n割合ヒストグラム（岩石のみ）を作成中...")
-    create_depth_ratio_histogram(data, bin_size_m=depth_bin, output_dir=output_ratio_dir, 
-                                label_filter=rock_labels, suffix='_rocks_only')
-    create_horizontal_ratio_histogram(data, bin_size_m=horizontal_bin, output_dir=output_ratio_dir, 
+    # create_depth_ratio_histogram(data, bin_size_m=depth_bin, output_dir=output_ratio_dir, 
+    #                             label_filter=rock_labels, suffix='_rocks_only')
+    create_horizontal_ratio_histogram(data, bin_size_m=horizontal_bin, output_dir=output_horizontal_dir, 
                                      label_filter=rock_labels, suffix='_rocks_only')
     
     # 深さ規格化水平ヒストグラム（岩石のみ）
-    if depth_data is not None:
-        print("\n深さ規格化水平ヒストグラム（岩石のみ）を作成中...")
-        create_depth_normalized_horizontal_histogram(data, depth_data, bin_size_m=horizontal_bin, 
-                                                   output_dir=output_normalized_dir, label_filter=rock_labels, 
-                                                   suffix='_rocks_only')
+    # if depth_data is not None:
+    #     print("\n深さ規格化水平ヒストグラム（岩石のみ）を作成中...")
+    #     create_depth_normalized_horizontal_histogram(data, depth_data, bin_size_m=horizontal_bin, 
+    #                                                output_dir=output_normalized_dir, label_filter=rock_labels, 
+    #                                                suffix='_rocks_only')
         
-        # 薄い層規格化水平ヒストグラム（岩石のみ）
-        print("\n薄い層規格化水平ヒストグラム（岩石のみ）を作成中...")
-        create_thin_layer_normalized_horizontal_histogram(data, depth_data, bin_size_m=horizontal_bin, 
-                                                        output_dir=output_normalized_dir, label_filter=rock_labels, 
-                                                        suffix='_rocks_only')
+    #     # 薄い層規格化水平ヒストグラム（岩石のみ）
+    #     print("\n薄い層規格化水平ヒストグラム（岩石のみ）を作成中...")
+    #     create_thin_layer_normalized_horizontal_histogram(data, depth_data, bin_size_m=horizontal_bin, 
+    #                                                     output_dir=output_normalized_dir, label_filter=rock_labels, 
+    #                                                     suffix='_rocks_only')
     
     # ラベル4-6のみのヒストグラム作成
     print("\nラベル4-6のみのヒストグラムを作成中...")
     non_rock_labels = [4, 5, 6]
-    create_depth_histogram(data, bin_size_m=depth_bin, output_dir=output_basic_dir, 
-                          label_filter=non_rock_labels, suffix='_labels_4to6_only')
-    create_horizontal_histogram(data, bin_size_m=horizontal_bin, output_dir=output_basic_dir, 
+    # create_depth_histogram(data, bin_size_m=depth_bin, output_dir=output_basic_dir, 
+    #                       label_filter=non_rock_labels, suffix='_labels_4to6_only')
+    create_horizontal_histogram(data, bin_size_m=horizontal_bin, output_dir=output_horizontal_dir, 
                                label_filter=non_rock_labels, suffix='_labels_4to6_only')
     
     # 時間ヒストグラム（ラベル4-6のみ）
     print("\n時間ヒストグラム（ラベル4-6のみ）を作成中...")
-    create_depth_histogram_time(data, bin_size_ns=time_bin, output_dir=output_basic_time_dir, 
+    create_time_histogram(data, bin_size_ns=time_bin, output_dir=output_time_dir, 
                                label_filter=non_rock_labels, suffix='_labels_4to6_only')
-    create_depth_ratio_histogram_time(data, bin_size_ns=time_bin, output_dir=output_basic_time_dir, 
+    create_depth_ratio_histogram_time(data, bin_size_ns=time_bin, output_dir=output_time_dir, 
                                      label_filter=non_rock_labels, suffix='_labels_4to6_only')
     
     # 全ラベルのヒストグラム作成
     print("\n全ラベルのヒストグラムを作成中...")
-    create_depth_histogram(data, bin_size_m=depth_bin, output_dir=output_basic_dir, 
-                          label_filter=None, suffix='_all_labels')
-    create_horizontal_histogram(data, bin_size_m=horizontal_bin, output_dir=output_basic_dir, 
+    # create_depth_histogram(data, bin_size_m=depth_bin, output_dir=output_basic_dir, 
+    #                       label_filter=None, suffix='_all_labels')
+    create_horizontal_histogram(data, bin_size_m=horizontal_bin, output_dir=output_horizontal_dir, 
                                label_filter=None, suffix='_all_labels')
     
     # 時間ヒストグラム（全ラベル）
     print("\n時間ヒストグラム（全ラベル）を作成中...")
-    create_depth_histogram_time(data, bin_size_ns=time_bin, output_dir=output_basic_time_dir, 
+    create_time_histogram(data, bin_size_ns=time_bin, output_dir=output_time_dir, 
                                label_filter=None, suffix='_all_labels')
-    create_depth_ratio_histogram_time(data, bin_size_ns=time_bin, output_dir=output_basic_time_dir, 
+    create_depth_ratio_histogram_time(data, bin_size_ns=time_bin, output_dir=output_time_dir, 
                                      label_filter=None, suffix='_all_labels')
     
     # 割合ヒストグラム（ラベル4-6のみ）
     print("\n割合ヒストグラム（ラベル4-6のみ）を作成中...")
-    create_depth_ratio_histogram(data, bin_size_m=depth_bin, output_dir=output_ratio_dir, 
-                                label_filter=non_rock_labels, suffix='_labels_4to6_only')
-    create_horizontal_ratio_histogram(data, bin_size_m=horizontal_bin, output_dir=output_ratio_dir, 
+    # create_depth_ratio_histogram(data, bin_size_m=depth_bin, output_dir=output_ratio_dir, 
+    #                             label_filter=non_rock_labels, suffix='_labels_4to6_only')
+    create_horizontal_ratio_histogram(data, bin_size_m=horizontal_bin, output_dir=output_horizontal_dir, 
                                      label_filter=non_rock_labels, suffix='_labels_4to6_only')
     
     # 割合ヒストグラム（全ラベル）
     print("\n割合ヒストグラム（全ラベル）を作成中...")
-    create_depth_ratio_histogram(data, bin_size_m=depth_bin, output_dir=output_ratio_dir, 
-                                label_filter=None, suffix='_all_labels')
-    create_horizontal_ratio_histogram(data, bin_size_m=horizontal_bin, output_dir=output_ratio_dir, 
+    # create_depth_ratio_histogram(data, bin_size_m=depth_bin, output_dir=output_ratio_dir, 
+    #                             label_filter=None, suffix='_all_labels')
+    create_horizontal_ratio_histogram(data, bin_size_m=horizontal_bin, output_dir=output_horizontal_dir, 
                                      label_filter=None, suffix='_all_labels')
     
     # 深さ規格化水平ヒストグラム（ラベル4-6のみ）
-    if depth_data is not None:
-        print("\n深さ規格化水平ヒストグラム（ラベル4-6のみ）を作成中...")
-        create_depth_normalized_horizontal_histogram(data, depth_data, bin_size_m=horizontal_bin, 
-                                                   output_dir=output_normalized_dir, label_filter=non_rock_labels, 
-                                                   suffix='_labels_4to6_only')
+    # if depth_data is not None:
+    #     print("\n深さ規格化水平ヒストグラム（ラベル4-6のみ）を作成中...")
+    #     create_depth_normalized_horizontal_histogram(data, depth_data, bin_size_m=horizontal_bin, 
+    #                                                output_dir=output_normalized_dir, label_filter=non_rock_labels, 
+    #                                                suffix='_labels_4to6_only')
         
-        # 薄い層規格化水平ヒストグラム（ラベル4-6のみ）
-        print("\n薄い層規格化水平ヒストグラム（ラベル4-6のみ）を作成中...")
-        create_thin_layer_normalized_horizontal_histogram(data, depth_data, bin_size_m=horizontal_bin, 
-                                                        output_dir=output_normalized_dir, label_filter=non_rock_labels, 
-                                                        suffix='_labels_4to6_only')
+    #     # 薄い層規格化水平ヒストグラム（ラベル4-6のみ）
+    #     print("\n薄い層規格化水平ヒストグラム（ラベル4-6のみ）を作成中...")
+    #     create_thin_layer_normalized_horizontal_histogram(data, depth_data, bin_size_m=horizontal_bin, 
+    #                                                     output_dir=output_normalized_dir, label_filter=non_rock_labels, 
+    #                                                     suffix='_labels_4to6_only')
     
     # 深さ規格化水平ヒストグラム（全ラベル）
-    if depth_data is not None:
-        print("\n深さ規格化水平ヒストグラム（全ラベル）を作成中...")
-        create_depth_normalized_horizontal_histogram(data, depth_data, bin_size_m=horizontal_bin, 
-                                                   output_dir=output_normalized_dir, label_filter=None, 
-                                                   suffix='_all_labels')
+    # if depth_data is not None:
+    #     print("\n深さ規格化水平ヒストグラム（全ラベル）を作成中...")
+    #     create_depth_normalized_horizontal_histogram(data, depth_data, bin_size_m=horizontal_bin, 
+    #                                                output_dir=output_normalized_dir, label_filter=None, 
+    #                                                suffix='_all_labels')
         
-        # 薄い層規格化水平ヒストグラム（全ラベル）
-        print("\n薄い層規格化水平ヒストグラム（全ラベル）を作成中...")
-        create_thin_layer_normalized_horizontal_histogram(data, depth_data, bin_size_m=horizontal_bin, 
-                                                        output_dir=output_normalized_dir, label_filter=None, 
-                                                        suffix='_all_labels')
+    #     # 薄い層規格化水平ヒストグラム（全ラベル）
+    #     print("\n薄い層規格化水平ヒストグラム（全ラベル）を作成中...")
+    #     create_thin_layer_normalized_horizontal_histogram(data, depth_data, bin_size_m=horizontal_bin, 
+    #                                                     output_dir=output_normalized_dir, label_filter=None, 
+    #                                                     suffix='_all_labels')
     
     # 全体統計保存
     summary_path = os.path.join(output_base_dir, 'summary_statistics.txt')
     with open(summary_path, 'w') as f:
         f.write("# Rock label summary statistics\n")
-        f.write(f"# Settings: depth_bin={depth_bin}m, horizontal_bin={horizontal_bin}m, time_bin={time_bin}ns, epsilon_r=4.5\n")
+        # f.write(f"# Settings: depth_bin={depth_bin}m, horizontal_bin={horizontal_bin}m, time_bin={time_bin}ns, epsilon_r=4.5\n")
         f.write(f"# Depth normalization: {'enabled' if depth_data is not None else 'disabled'}\n")
         if depth_data is not None:
             f.write(f"# Depth measurement file: {depth_json_path}\n")
