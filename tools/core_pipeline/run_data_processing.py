@@ -27,9 +27,7 @@ function_type = input().strip().lower()
 if function_type not in ['calc', 'plot']:
     print('Error: Function type must be calc or plot')
     exit(1)
-
-#* Get processing order
-if function_type == 'calc':
+else:
     print('\nAvailable processing steps:')
     print('0: Raw data integration')
     print('1: Bandpass filter')
@@ -50,8 +48,31 @@ if function_type == 'calc':
     except ValueError:
         print('Error: Invalid processing order format')
         exit(1)
-else:
-    processing_order = [0, 1, 2, 3, 4, 5]  # Default order for plot mode
+
+#* Get processing order
+# if function_type == 'calc':
+#     print('\nAvailable processing steps:')
+#     print('0: Raw data integration')
+#     print('1: Bandpass filter')
+#     print('2: Time-zero correction')
+#     print('3: Background removal')
+#     print('4: Gain function')
+#     print('5: Terrain correction')
+#     print('\nEnter processing order (comma-separated, e.g., 0,1,2,3,4,5):')
+#     processing_order_input = input().strip()
+#     try:
+#         processing_order = [int(x.strip()) for x in processing_order_input.split(',')]
+#         if any(step < 0 or step > 5 for step in processing_order):
+#             print('Error: Processing steps must be between 0 and 5')
+#             exit(1)
+#         if 0 not in processing_order:
+#             print('Error: Step 0 (Raw data integration) is required')
+#             exit(1)
+#     except ValueError:
+#         print('Error: Invalid processing order format')
+#         exit(1)
+# else:
+#     processing_order = [0, 1, 2, 3, 4, 5]  # Default order for plot mode
 
 
 
@@ -442,6 +463,9 @@ elif function_type == 'plot':
     for step in processing_order:
         if step == 0:
             processed_data[0] = np.loadtxt(dir_dict[0] + '/0_Raw_Bscan.txt', delimiter=' ')
+            if not os.path.exists(dir_dict[0] + '/0_Raw_Bscan.txt'):
+                raise FileNotFoundError(f'Raw B-scan data not found in {dir_dict[0]}/0_Raw_Bscan.txt')
+                exit(1)
         elif step == 1:
             processed_data[1] = np.loadtxt(dir_dict[1] + '/1_Bscan_filter.txt', delimiter=' ')
         elif step == 2:
@@ -499,18 +523,18 @@ for i in range(len(plot_data)):
     step = processing_order[i]
     
     if step == 4:  # Gain function
-        im = ax.imshow(plot_data[i], aspect='auto', cmap='viridis',
+        im = ax.imshow(plot_data[i], aspect='auto', cmap='seismic',
                 extent=[0, plot_data[i].shape[1]*trace_interval, plot_data[i].shape[0]*sample_interval*1e9, 0],
                 vmin=-np.amax(np.abs(plot_data[i]))/10, vmax=np.amax(np.abs(plot_data[i]))/10
                 )
     elif step == 5:  # Terrain correction
-        im = ax.imshow(plot_data[i], aspect='auto', cmap='viridis',
+        im = ax.imshow(plot_data[i], aspect='auto', cmap='seismic',
                 extent=[0, plot_data[i].shape[1]*trace_interval, time_max*1e9, time_min*1e9],
                 vmin=-np.nanmax(np.abs(plot_data[i]))/10, vmax=np.nanmax(np.abs(plot_data[i]))/10
                 )
         ax.set_yticks(np.arange(0, plot_data[i].shape[0] * sample_interval / 1e-9, 100))
     else:
-        im = ax.imshow(plot_data[i], aspect='auto', cmap='viridis',
+        im = ax.imshow(plot_data[i], aspect='auto', cmap='seismic',
                     extent=[0, plot_data[i].shape[1]*trace_interval, plot_data[i].shape[0]*sample_interval*1e9, 0],
                     vmin=-10, vmax=10
                     )
