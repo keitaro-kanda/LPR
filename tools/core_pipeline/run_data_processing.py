@@ -190,31 +190,35 @@ def time_correction(data):
 #* Holizontal high pass filter
 def background_removal(data, output_dir=None):
     background_data = np.mean(data, axis=1)
+    # save background data
+    np.savetxt(output_dir + '/background_data.txt', background_data)
+
+    # Background removal
     background_removed_data = np.zeros_like(data)
     for i in tqdm(range(data.shape[1]), desc='Subtracting background'):
         background_removed_data[:, i] =  data[:, i] - background_data
 
-    #* Plot background data
+    # Plot background data
     if output_dir is not None:
-        fig, ax = plt.subplots(1, 2, figsize=(6, 10), tight_layout=True)
+        fig, ax = plt.subplots(figsize=(6, 10), tight_layout=True)
         time = np.arange(0, data.shape[0]*sample_interval/1e-9, sample_interval/1e-9)
-        ax[0].plot(background_data, time)
+        # ax[0].plot(background_data, time)
 
-        ax[0].set_xlabel('Amplitude', fontsize=20)
-        ax[0].set_ylabel('Time [ns]', fontsize=20)
-        ax[0].tick_params(labelsize=18)
-        ax[0].grid(which='major', axis='both', linestyle='-.')
-        ax[0].invert_yaxis()
-        ax[0].set_ylim(np.max(time), 0)
+        # ax[0].set_xlabel('Amplitude', fontsize=20)
+        # ax[0].set_ylabel('Time [ns]', fontsize=20)
+        # ax[0].tick_params(labelsize=18)
+        # ax[0].grid(which='major', axis='both', linestyle='-.')
+        # ax[0].invert_yaxis()
+        # ax[0].set_ylim(np.max(time), 0)
 
-        ax[1].plot(np.log(np.abs(background_data)), time)
+        ax.plot(np.log(np.abs(background_data)), time)
 
-        ax[1].set_xlabel('Amplitude', fontsize=20)
-        ax[1].set_ylabel('Time [ns]', fontsize=20)
-        ax[1].tick_params(labelsize=18)
-        ax[1].grid(which='major', axis='both', linestyle='-.')
-        ax[1].invert_yaxis()
-        ax[1].set_ylim(np.max(time), 0)
+        ax.set_xlabel('Log amplitude', fontsize=20)
+        ax.set_ylabel('Time [ns]', fontsize=20)
+        ax.tick_params(labelsize=18)
+        ax.grid(which='major', axis='both', linestyle='-.')
+        ax.invert_yaxis()
+        ax.set_ylim(np.max(time), 0)
 
         plt.savefig(output_dir + '/Background_data.png', format='png', dpi=120)
         plt.savefig(output_dir + '/Background_data.pdf', format='pdf', dpi=300)
@@ -224,31 +228,36 @@ def background_removal(data, output_dir=None):
 
     #* Plot background removed average data
     if output_dir is not None:
-        fig, ax = plt.subplots(1, 2, figsize=(6, 10), tight_layout=True)
+        fig, ax = plt.subplots(figsize=(6, 10), tight_layout=True)
         time = np.arange(0, data.shape[0]*sample_interval/1e-9, sample_interval/1e-9)
-        background_removed_ave = np.mean(background_removed_data, axis=1)
-        background_removed_std = np.std(background_removed_data, axis=1)
-        ax[0].plot(background_removed_ave, time)
-        ax.fill_betweenx(time, background_removed_ave - background_removed_std,
-                            background_removed_ave + background_removed_std, alpha=0.2)
+        background_removed_data_log = np.log(np.abs(background_removed_data))
+        background_removed_log_ave = np.mean(background_removed_data_log, axis=1)
+        print('Background removed average:', background_removed_log_ave)
+        print('Background removed average shape: ', background_removed_log_ave.shape)
+        background_removed_log_std = np.std(background_removed_data_log, axis=1)
+        print('Background removed average standard deviation:', background_removed_log_std)
+        print('Background removed average standard deviation shape: ', background_removed_log_std.shape)
+        # ax[0].plot(background_removed_ave, time)
+        # ax[0].fill_betweenx(time, background_removed_ave - background_removed_std,
+        #                     background_removed_ave + background_removed_std, alpha=0.6)
 
-        ax[0].set_xlabel('Amplitude', fontsize=20)
-        ax[0].set_ylabel('Time [ns]', fontsize=20)
-        ax[0].tick_params(labelsize=18)
-        ax[0].grid(which='major', axis='both', linestyle='-.')
-        ax[0].invert_yaxis()
-        ax[0].set_ylim(np.max(time), 0)
+        # ax[0].set_xlabel('Amplitude', fontsize=20)
+        # ax[0].set_ylabel('Time [ns]', fontsize=20)
+        # ax[0].tick_params(labelsize=18)
+        # ax[0].grid(which='major', axis='both', linestyle='-.')
+        # ax[0].invert_yaxis()
+        # ax[0].set_ylim(np.max(time), 0)
 
-        ax[1].plot(np.log(np.abs(background_removed_ave)), time)
-        ax[1].fill_betweenx(time, np.log(np.abs(background_removed_ave)) - np.abs(np.log(np.abs(background_removed_std))),
-                            np.log(np.abs(background_removed_ave)) + np.abs(np.log(np.abs(background_removed_std))), alpha=0.2)
+        ax.plot(background_removed_log_ave, time)
+        ax.fill_betweenx(time, background_removed_log_ave - background_removed_log_std,
+                            background_removed_log_ave + background_removed_log_std, alpha=0.6)
 
-        ax[1].set_xlabel('Amplitude', fontsize=20)
-        ax[1].set_ylabel('Time [ns]', fontsize=20)
-        ax[1].tick_params(labelsize=18)
-        ax[1].grid(which='major', axis='both', linestyle='-.')
-        ax[1].invert_yaxis()
-        ax[1].set_ylim(np.max(time), 0)
+        ax.set_xlabel('Log amplitude', fontsize=20)
+        ax.set_ylabel('Time [ns]', fontsize=20)
+        ax.tick_params(labelsize=18)
+        ax.grid(which='major', axis='both', linestyle='-.')
+        ax.invert_yaxis()
+        ax.set_ylim(np.max(time), 0)
 
         plt.savefig(output_dir + '/Background_removed_data.png', format='png', dpi=120)
         plt.savefig(output_dir + '/Background_removed_data.pdf', format='pdf', dpi=300)
