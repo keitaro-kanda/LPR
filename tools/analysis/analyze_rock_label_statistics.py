@@ -1324,9 +1324,9 @@ def main():
     base_dir = os.path.dirname(os.path.dirname(json_path))
     filename = os.path.splitext(os.path.basename(json_path))[0]
     output_base_dir = os.path.join(base_dir, f'label_statics/{filename}_x{horizontal_bin}_t{time_bin}')
-    if time_range:
+    if time_range and not horizontal_range:
         output_base_dir += f'/t{time_min}-{time_max}'
-    elif horizontal_range:
+    elif horizontal_range and not time_range:
         output_base_dir += f'/x{horizontal_min}-{horizontal_max}'
     elif time_range and horizontal_range:
         output_base_dir += f'/t{time_min}-{time_max}_x{horizontal_min}-{horizontal_max}'
