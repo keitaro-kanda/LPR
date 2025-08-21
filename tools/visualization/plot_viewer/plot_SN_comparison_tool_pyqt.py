@@ -387,7 +387,7 @@ class SNComparisonToolPyQt(QtWidgets.QMainWindow):
             # Create marker
             key = f"group_{self.current_group}_point_{len(self.groups[self.current_group])}"
             marker = GroupMarker(x, y, point_data, self.current_group, key, 
-                               self.on_edit_marker, self.on_delete_marker, radius=1)
+                               self.on_edit_marker, self.on_delete_marker, radius=0.1)
             self.plot_item.addItem(marker)
             self.markers[key] = marker
             
@@ -488,13 +488,11 @@ class SNComparisonToolPyQt(QtWidgets.QMainWindow):
                          bscan_log_mean + bscan_log_std, color='b', alpha=0.6)
         
         # Plot points from all groups
-        colors = ['red', 'green', 'blue', 'orange', 'purple', 'brown', 'pink', 'gray']
-        
         for i, (group_num, points) in enumerate(self.groups.items()):
             if not points:
                 continue
                 
-            color = colors[i % len(colors)]
+            color = 'k'
             
             # Extract data
             times = [point['time_ns'] for point in points]
@@ -506,8 +504,8 @@ class SNComparisonToolPyQt(QtWidgets.QMainWindow):
             std_amp = np.std(amplitudes)
             
             # Plot individual points
-            ax.scatter(amplitudes, times, c=color, s=30, alpha=0.7, 
-                      label=f'Group {group_num} points')
+            # ax.scatter(amplitudes, times, c=color, s=30, alpha=0.7, 
+            #           label=f'Group {group_num} points')
             
             # Plot group mean with error bar
             ax.errorbar(mean_amp, mean_time, xerr=std_amp, 
@@ -531,7 +529,7 @@ class SNComparisonToolPyQt(QtWidgets.QMainWindow):
             ax.set_title('SN Comparison (Full Range)', fontsize=font_large)
         
         # Add legend
-        ax.legend(fontsize=font_small, loc='lower right')
+        # ax.legend(fontsize=font_small, loc='lower right')
         
         # Save plot
         filename_png = f'SN_comparison_plot_{range_type.replace("-", "_")}.png'
