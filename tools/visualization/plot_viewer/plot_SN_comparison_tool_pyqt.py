@@ -178,8 +178,8 @@ class SNComparisonToolPyQt(QtWidgets.QMainWindow):
             try:
                 self.load_bscan_data(file_path)
                 self.setup_output_directory()
-                self.calc_background_data()
                 self.setup_plot()
+                self.auto_load_existing_data()  # 既存データの自動読み込み
                 self.save_btn.setEnabled(True)
                 self.status_bar.showMessage(f'Loaded: {os.path.basename(file_path)}')
             except Exception as e:
@@ -201,14 +201,6 @@ class SNComparisonToolPyQt(QtWidgets.QMainWindow):
         
         self.data_path = file_path
         print(f'B-scan data loaded: {self.bscan_data.shape}')
-        
-    def calc_background_data(self):
-        """Calculate background mean amplitude and standard deviation"""
-        bscan_mean = np.mean(self.bscan_data, axis=1)
-        self.background_data = bscan_mean
-        self.background_std = np.std(self.bscan_data, axis=1)
-        print(f'Background data calculated: {self.background_data.shape}')
-        print(f'Background range: min={np.min(self.background_data):.3f}, max={np.max(self.background_data):.3f}')
         
     def setup_output_directory(self):
         """Setup output directory for saving results"""
@@ -269,6 +261,68 @@ class SNComparisonToolPyQt(QtWidgets.QMainWindow):
         self.graphics_widget.addItem(colorbar, 0, 1)
         
         print('Plot setup complete')
+        
+    def auto_load_existing_data(self):
+        """B-scanファイル読み込み後にJSONファイルを自動探索して既存データを読み込む"""
+        if not self.output_dir:
+            return
+            
+        json_path = os.path.join(self.output_dir, 'point_data.json')
+        
+        if os.path.exists(json_path):
+            try:
+                self.load_existing_data(json_path)
+                self.status_bar.showMessage(
+                    f'Loaded: {os.path.basename(self.data_path)} + existing data ({len(self.groups)} groups)'
+                )
+                print(f'既存データを読み込みました: {json_path}')
+            except Exception as e:
+                QtWidgets.QMessageBox.warning(
+                    self, 'Warning', 
+                    f'既存データファイルの読み込みに失敗しました: {str(e)}'
+                )
+                print(f'既存データ読み込みエラー: {str(e)}')
+        else:
+            print(f'既存データファイルが見つかりません: {json_path}')
+    
+    def load_existing_data(self, json_path):
+        """JSONファイルから既存データを読み込んでマーカーを表示"""
+        with open(json_path, 'r', encoding='utf-8') as f:
+            json_data = json.load(f)
+        
+        # groupsデータの復元
+        for group_key, points in json_data.items():
+            if not group_key.startswith('group_'):
+                continue
+                
+            group_num = int(group_key.split('_')[1])
+            self.groups[group_num] = points
+            
+            # 各ポイントに対してマーカーを作成
+            for i, point_data in enumerate(points):
+                x = point_data['x']
+                y = point_data['time_ns']
+                
+                # マーカーキーを生成
+                key = f"group_{group_num}_point_{i+1}"
+                
+                # マーカーを作成してプロットに追加
+                marker = GroupMarker(x, y, point_data, group_num, key, 
+                                   self.on_edit_marker, self.on_delete_marker, radius=1)
+                
+                if hasattr(self, 'plot_item') and self.plot_item:
+                    self.plot_item.addItem(marker)
+                    self.markers[key] = marker
+        
+        # グループスピンボックスの最大値を更新
+        if self.groups:
+            max_group = max(self.groups.keys())
+            self.group_spinbox.setMaximum(max(max_group, 999))
+            
+        # ステータスを更新
+        self.update_status()
+        
+        print(f'読み込み完了: {len(self.groups)}グループ, 合計{sum(len(points) for points in self.groups.values())}ポイント')
         
     def toggle_click_mode(self):
         """Toggle click mode on/off"""
@@ -411,26 +465,27 @@ class SNComparisonToolPyQt(QtWidgets.QMainWindow):
             
     def generate_analysis_plots(self):
         """Generate background analysis and comparison plots"""
-        # Calculate time array
-        time_array = np.arange(0, len(self.background_data) * sample_interval / 1e-9, 
+        # Calculate time array from bscan_data
+        time_array = np.arange(0, self.bscan_data.shape[0] * sample_interval / 1e-9, 
                               sample_interval / 1e-9)
         
         # Generate plots: full range and 0-200ns
-        self.create_comparison_plot(time_array, self.background_data, self.background_std, "full")
-        self.create_comparison_plot(time_array, self.background_data, self.background_std, "0-200ns")
-        
-    def create_comparison_plot(self, time_array, background_data, background_std, range_type="full"):
+        self.create_comparison_plot(time_array, self.bscan_data, "full")
+        self.create_comparison_plot(time_array, self.bscan_data, "0-200ns")
+
+    def create_comparison_plot(self, time_array, bscan_data, range_type="full"):
         """Create comparison plot using matplotlib"""
         fig, ax = plt.subplots(figsize=(6, 10), tight_layout=True)
         
         # Convert to log scale, avoiding log(0)
-        background_log = np.log(np.abs(background_data) + 1e-10)
-        background_std_log = np.log(np.abs(background_std) + 1e-10)
+        bscan_log = np.log(np.abs(bscan_data))
+        bscan_log_mean = np.mean(bscan_log, axis=1)
+        bscan_log_std = np.std(bscan_log, axis=1)
         
         # Plot background data
-        ax.plot(background_log, time_array, 'b-', linewidth=2, label='Background log amplitude')
-        ax.fill_betweenx(time_array, background_log - background_std_log, 
-                        background_log + background_std_log, color='b', alpha=0.6)
+        ax.plot(bscan_log_mean, time_array, 'b-', linewidth=2, label='Background log amplitude')
+        ax.fill_betweenx(time_array, bscan_log_mean - bscan_log_std,
+                         bscan_log_mean + bscan_log_std, color='b', alpha=0.6)
         
         # Plot points from all groups
         colors = ['red', 'green', 'blue', 'orange', 'purple', 'brown', 'pink', 'gray']
