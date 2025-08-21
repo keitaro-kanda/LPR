@@ -462,11 +462,33 @@ class SNComparisonToolPyQt(QtWidgets.QMainWindow):
             
         except Exception as e:
             QtWidgets.QMessageBox.critical(self, 'Error', f'Failed to save/analyze: {str(e)}')
-       
+    
+    def calculate_time_shifted_amplitude(self, time_array, mean_time, mean_amp):
+        """mean_amp : in log scale
+        """
+        shifted_amp_array = np.zeros_like(time_array)
+        
+        # physical parameters
+        epsilon_r = 4.5  # Relative permittivity of lunar regolith used in Zhang et al. (2024)
+        tan_delta = 4.4e-3 # Dong et al. (2021)
+        frequency = 500e6  # Frequency in Hz
+        epsilon_0 = 8.85e-12
+        mu_0 = 1.26e-6
+        c = 3e8  # Speed of light in vacuum
+
+
+        loss_rate = 2 * np.pi * frequency * np.sqrt(mu_0 * epsilon_0 * epsilon_r / 2 \
+                                                    * (np.sqrt(1 + tan_delta**2) - 1))
+        shifted_amp_array = 4 * np.log(mean_time / time_array + 1e-10) \
+                                - 2 * loss_rate * c / np.sqrt(epsilon_r) * (time_array - mean_time) * 1e-9 + mean_amp
+        """timeがnsで与えられている"""
+
+        return shifted_amp_array
+    
     def generate_analysis_plots(self):
         """Generate background analysis and comparison plots"""
         # Calculate time array from bscan_data
-        time_array = np.arange(0, self.bscan_data.shape[0] * sample_interval / 1e-9, 
+        time_array = np.arange(0, self.bscan_data.shape[0] * sample_interval / 1e-9,
                               sample_interval / 1e-9)
         
         # Generate plots: full range and 0-200ns
@@ -504,9 +526,7 @@ class SNComparisonToolPyQt(QtWidgets.QMainWindow):
             std_amp = np.std(amplitudes)
             
             # Calculate time-shifted amplitude
-            shifted_amp_array = np.zeros_like(time_array)
-            shifted_amp_array = 4 * np.log(mean_time / time_array + 1e-10) + mean_amp
-            shifted_amp_std_array = 4 * np.log(mean_time / time_array + 1e-10) + std_amp
+            shifted_amp_array = self.calculate_time_shifted_amplitude(time_array, mean_time, mean_amp)
 
             # Plot group mean with error bar
             ax.errorbar(mean_amp, mean_time, xerr=std_amp, 
