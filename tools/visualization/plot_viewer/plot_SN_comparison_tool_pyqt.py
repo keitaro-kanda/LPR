@@ -462,7 +462,7 @@ class SNComparisonToolPyQt(QtWidgets.QMainWindow):
             
         except Exception as e:
             QtWidgets.QMessageBox.critical(self, 'Error', f'Failed to save/analyze: {str(e)}')
-            
+       
     def generate_analysis_plots(self):
         """Generate background analysis and comparison plots"""
         # Calculate time array from bscan_data
@@ -503,16 +503,22 @@ class SNComparisonToolPyQt(QtWidgets.QMainWindow):
             mean_amp = np.mean(amplitudes)
             std_amp = np.std(amplitudes)
             
-            # Plot individual points
-            # ax.scatter(amplitudes, times, c=color, s=30, alpha=0.7, 
-            #           label=f'Group {group_num} points')
-            
+            # Calculate time-shifted amplitude
+            shifted_amp_array = np.zeros_like(time_array)
+            shifted_amp_array = 4 * np.log(mean_time / time_array + 1e-10) + mean_amp
+            shifted_amp_std_array = 4 * np.log(mean_time / time_array + 1e-10) + std_amp
+
             # Plot group mean with error bar
             ax.errorbar(mean_amp, mean_time, xerr=std_amp, 
                        fmt='o', color=color, markersize=8, 
                        capsize=5, capthick=2, linewidth=2,
                        label=f'Group {group_num} mean±std')
-        
+
+            # Plot time-shifted amplitude
+            ax.plot(shifted_amp_array, time_array, color='gray', linestyle='--')
+            # ax.fill_betweenx(time_array, shifted_amp_array - shifted_amp_std_array,
+            #                  shifted_amp_array + shifted_amp_std_array, color='gray', alpha=0.6)
+
         # Set axis properties
         ax.set_xlabel('Log amplitude', fontsize=font_large)
         ax.set_ylabel('Time [ns]', fontsize=font_large)
@@ -522,6 +528,7 @@ class SNComparisonToolPyQt(QtWidgets.QMainWindow):
         
         # Set time range
         if range_type == "0-200ns":
+            ax.set_xlim(-5, 10)
             ax.set_ylim(200, 0)
             ax.set_title('SN Comparison (0-200ns)', fontsize=font_large)
         else:
