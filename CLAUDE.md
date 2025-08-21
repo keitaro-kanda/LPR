@@ -276,7 +276,7 @@ All tools must use these standardized physical constants and parameters:
 sample_interval = 0.312500e-9    # [s] - Time sampling interval
 trace_interval = 3.6e-2          # [m] - Spatial trace interval
 c = 299792458                    # [m/s] - Speed of light
-epsilon_r = 4.5                  # Relative permittivity of lunar regolith
+epsilon_r = 4.5                  # Relative permittivity of lunar regolith used in Zhang et al. (2024)
 reciever_time_delay = 28.203e-9  # [s] - Hardware delay
 ```
 
