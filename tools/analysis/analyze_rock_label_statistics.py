@@ -303,6 +303,7 @@ def create_time_histogram(data, bin_size_ns=10.0, output_dir='rock_statics', lab
     ax2.set_ylim(depth_min, depth_max)
     ax2.invert_yaxis()  # 深い方を下に
     ax2.tick_params(axis='y', which='major', labelsize=16)
+    ax2.set_yticks(np.arange(0, depth_max + 1, 1.0))
     
     fig.tight_layout()
     
