@@ -125,6 +125,181 @@ class CustomViewBox(pg.ViewBox):
         # その他の場合は標準処理
         super().mouseReleaseEvent(ev)
 
+def load_and_execute_plot_records(data_file_path):
+    """
+    JSONファイルから記録されたプロット情報を読み込み、自動でプロットを生成する
+    
+    Parameters:
+    -----------
+    data_file_path : str
+        B-scanデータファイルのパス
+    """
+    # JSONファイルのパスを自動生成
+    data_dir = os.path.dirname(data_file_path)
+    json_dir = os.path.join(data_dir, 'Bscan_with_Ascan')
+    json_path = os.path.join(json_dir, 'plot_records.json')
+    
+    # JSONファイルの存在確認
+    if not os.path.exists(json_path):
+        print(f'エラー: plot_records.jsonが見つかりません')
+        print(f'期待されるパス: {json_path}')
+        print('GUIモードを使用してプロットを作成してください。')
+        return
+    
+    try:
+        # JSONファイルを読み込み
+        with open(json_path, 'r', encoding='utf-8') as f:
+            records = json.load(f)
+        
+        if 'plots' not in records or len(records['plots']) == 0:
+            print('エラー: plot_records.jsonにプロット記録が見つかりません')
+            return
+        
+        print(f'JSONファイルから {len(records["plots"])} 件のプロット記録を読み込みました')
+        
+        # データファイルを読み込み
+        print("データを読み込んでいます...")
+        data = load_data(data_file_path)
+        print("データの読み込みが完了しました。")
+        
+        # 物理パラメータの設定
+        sample_interval = 0.312500e-9
+        trace_interval = 3.6e-2
+        
+        # t=0補正: x=0で最初にNaNではない値をとるインデックスを見つける
+        time_zero_index = find_time_zero_index(data)
+        
+        # Envelope計算（NaN値対応）
+        data_for_hilbert = np.nan_to_num(data, nan=0.0)
+        envelope = np.abs(hilbert(data_for_hilbert, axis=0))
+        
+        # 時間・空間軸の計算
+        x_start, x_end = 0, data.shape[1] * trace_interval
+        y_start = -time_zero_index * sample_interval / 1e-9  # 負の時間も含む
+        y_end = (data.shape[0] - time_zero_index) * sample_interval / 1e-9
+        
+        print(f"時間軸範囲: {y_start:.2f} ns ～ {y_end:.2f} ns")
+        print(f"空間軸範囲: {x_start:.2f} m ～ {x_end:.2f} m")
+        
+        # 出力ディレクトリ作成
+        output_dir = os.path.join(data_dir, 'Bscan_with_Ascan')
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # 各プロット記録に対してプロットを生成
+        for i, plot_record in enumerate(records['plots']):
+            try:
+                print(f"\nプロット {i+1}/{len(records['plots'])} を生成中...")
+                
+                # プロット範囲とA-scan位置を取得
+                bscan_range = plot_record['bscan_range']
+                x_min = bscan_range['x_min']
+                x_max = bscan_range['x_max']
+                y_min = bscan_range['y_min']
+                y_max = bscan_range['y_max']
+                ascan_position = plot_record['ascan_position']
+                
+                # ファイル名生成（既存の形式に合わせる）
+                filename = f"{x_min:.2f}_{y_min:.1f}_{x_max:.2f}_{y_max:.1f}"
+                output_path = os.path.join(output_dir, filename)
+                
+                print(f"範囲: x={x_min:.2f}-{x_max:.2f}m, y={y_min:.2f}-{y_max:.2f}ns, A-scan位置: {ascan_position:.2f}m")
+                
+                # matplotlibプロットを作成
+                create_automatic_plot(data, envelope, output_path, 
+                                    x_min, x_max, y_min, y_max, ascan_position,
+                                    sample_interval, trace_interval, time_zero_index,
+                                    x_start, x_end, y_start, y_end)
+                
+                print(f"プロット完了: {filename}.png, {filename}.pdf")
+                
+            except Exception as e:
+                print(f"プロット {i+1} の生成でエラーが発生しました: {str(e)}")
+                continue
+        
+        print(f"\n自動プロット生成が完了しました。出力先: {output_dir}")
+        
+    except json.JSONDecodeError as e:
+        print(f'エラー: JSONファイルの読み込みに失敗しました: {str(e)}')
+    except Exception as e:
+        print(f'エラー: 自動プロット生成中にエラーが発生しました: {str(e)}')
+
+def create_automatic_plot(data, envelope, output_path, x_min, x_max, y_min, y_max, ascan_position,
+                         sample_interval, trace_interval, time_zero_index,
+                         x_start, x_end, y_start, y_end):
+    """
+    自動プロットモード用のmatplotlibプロット作成関数
+    
+    Parameters:
+    -----------
+    data : np.ndarray
+        B-scanデータ
+    envelope : np.ndarray
+        エンベロープデータ
+    output_path : str
+        出力ファイルのパス（拡張子なし）
+    x_min, x_max, y_min, y_max : float
+        プロット範囲
+    ascan_position : float
+        A-scan位置
+    その他 : 物理パラメータ
+    """
+    # CLAUDE.md準拠のフォントサイズ
+    font_large = 20
+    font_medium = 18
+    font_small = 16
+    
+    # 図のセットアップ
+    _, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
+    
+    # B-scan用データ準備（転置を除去）
+    data_for_display = np.nan_to_num(data, nan=0.0)
+    
+    # B-scan表示（転置なし）
+    extent = [x_start, x_end, y_end, y_start]
+    vmax = np.nanmax(np.abs(data)) / 10
+    ax1.imshow(data_for_display, aspect='auto', extent=extent, 
+              cmap='seismic', vmin=-vmax, vmax=vmax)
+    
+    ax1.set_xlim(x_min, x_max)
+    ax1.set_ylim(y_max, y_min)  # Y軸反転
+    ax1.set_xlabel('x [m]', fontsize=font_medium)
+    ax1.set_ylabel('Time [ns]', fontsize=font_medium)
+    ax1.set_title('B-scan', fontsize=font_large)
+    ax1.tick_params(labelsize=font_small)
+    ax1.grid(True, alpha=0.3)
+    
+    # A-scan位置を示す縦線
+    ax1.axvline(x=ascan_position, color='k', linewidth=3, alpha=1.0, linestyle='--')
+
+    # A-scan表示（横軸=強度、縦軸=時間）
+    idx = int(ascan_position / trace_interval)
+    if 0 <= idx < data.shape[1]:
+        a = data[:, idx]
+        e = envelope[:, idx]
+        t = (np.arange(len(a)) - time_zero_index) * sample_interval / 1e-9
+        
+        # NaN値対応
+        valid_mask = ~np.isnan(a)
+        if np.any(valid_mask):
+            ax2.plot(a[valid_mask], t[valid_mask], 'b-', linewidth=2, label='Amplitude')
+            ax2.plot(e[valid_mask], t[valid_mask], 'r-', linewidth=2, label='Envelope')
+    
+    ax2.set_ylim(y_max, y_min)  # Y軸反転（時間軸）
+    ax2.set_xlabel('Amplitude', fontsize=font_medium)
+    ax2.set_ylabel('Time [ns]', fontsize=font_medium)
+    ax2.set_title(f'A-scan at x={ascan_position:.2f}m', fontsize=font_large)
+    ax2.tick_params(labelsize=font_small)
+    ax2.grid(True, alpha=0.3)
+    ax2.legend(fontsize=font_small)
+    
+    # レイアウト調整
+    plt.tight_layout()
+    
+    # CLAUDE.md準拠の保存
+    plt.savefig(f'{output_path}.png', dpi=120)   # Web quality
+    plt.savefig(f'{output_path}.pdf', dpi=600)   # Publication quality
+    plt.close()
+
 class BScanAScanViewer(QtWidgets.QMainWindow):
     """
     B-scanとA-scanを並べて表示し、matplotlib出力可能なビューア
@@ -221,7 +396,7 @@ class BScanAScanViewer(QtWidgets.QMainWindow):
         self.graphics_widget.clear()
         
         # カラーマップ
-        cmap = mpl.colormaps.get_cmap('viridis')
+        cmap = mpl.colormaps.get_cmap('seismic')
         lut = (cmap(np.linspace(0, 1, 256)) * 255).astype(np.uint8)
         cpg = pg.ColorMap(np.linspace(0, 1, 256), lut)
         
@@ -469,7 +644,7 @@ class BScanAScanViewer(QtWidgets.QMainWindow):
         ax1.grid(True, alpha=0.3)
         
         # A-scan位置を示す縦線
-        ax1.axvline(x=self.current_ascan_pos, color='white', linewidth=2, alpha=0.7, linestyle='--')
+        ax1.axvline(x=self.current_ascan_pos, color='k', linewidth=3, alpha=1.0, linestyle='--')
 
         # A-scan表示（横軸=強度、縦軸=時間）
         idx = int(self.current_ascan_pos / self.trace_interval)
@@ -512,12 +687,29 @@ def main():
         print('エラー: 指定されたファイルが存在しません')
         sys.exit(1)
     
+    # モード選択
     print()
+    print('実行モードを選択してください:')
+    print('1: GUIモード（インタラクティブ表示）')
+    print('2: 自動プロットモード（JSONファイルから自動生成）')
+    mode_choice = input('選択 (1-2): ').strip()
     
-    app = QtWidgets.QApplication(sys.argv)
-    viewer = BScanAScanViewer(bscan_path)
-    viewer.show()
-    sys.exit(app.exec_())
+    if mode_choice == '1':
+        # GUIモード
+        print()
+        app = QtWidgets.QApplication(sys.argv)
+        viewer = BScanAScanViewer(bscan_path)
+        viewer.show()
+        sys.exit(app.exec_())
+        
+    elif mode_choice == '2':
+        # 自動プロットモード
+        print()
+        load_and_execute_plot_records(bscan_path)
+        
+    else:
+        print('無効な選択です。プログラムを終了します。')
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
