@@ -244,7 +244,7 @@ def single_plot(plot_data, time_zero_idx, label_keys=None, suffix=''):
     time_array = (np.arange(plot_data.shape[0]) - time_zero_idx) * sample_interval * 1e9  # [ns]
     
     # Create the main plot
-    im = ax.imshow(plot_data, aspect='auto', cmap='viridis',
+    im = ax.imshow(plot_data, aspect='auto', cmap='seismic',
                    extent=[0, plot_data.shape[1]*trace_interval, 
                           time_array[-1], time_array[0]],
                    vmin=vmin, vmax=vmax)
