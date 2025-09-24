@@ -97,8 +97,8 @@ class LabelMarker(QtWidgets.QGraphicsEllipseItem):
                 return
             self.info["label"] = new_label
 
-            # 2) ラベルが 3 または 6 の場合、time_top/bottom を入力
-            if new_label in (3, 6):
+            # 2) ラベルが 2, 3, 5, 6 の場合、time_top/bottom を入力
+            if new_label in (2, 3, 5, 6):
                 # デフォルト値を数値保証
                 default_top = self.info.get("time_top")
                 default_top = float(default_top) if isinstance(default_top, (int, float)) else 0.0
@@ -119,7 +119,7 @@ class LabelMarker(QtWidgets.QGraphicsEllipseItem):
                 self.info["time_top"] = round(t_top, 1)
                 self.info["time_bottom"] = round(t_bot, 1)
             else:
-                # 3/6 以外なら時刻情報をクリア
+                # 2,3,5,6 以外なら時刻情報をクリア
                 self.info["time_top"] = None
                 self.info["time_bottom"] = None
 
@@ -236,7 +236,7 @@ def main():
         if not ok:
             return
         tt = tb = None
-        if lab in (3, 6):
+        if lab in (2, 3, 5, 6):
             tt, ok1 = QtWidgets.QInputDialog.getDouble(None, "time_top [ns]", "Enter time_top:", 0.0, 0.0, 1e6, 1)
             if not ok1:
                 return
