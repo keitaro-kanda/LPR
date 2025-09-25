@@ -143,9 +143,25 @@ print('累積データTXT保存: RSFD_linear.txt')
 if mask2_valid.any() or mask3_valid.any():
     dump_path = os.path.join(output_dir, 'Label2-3_detail.txt')
     with open(dump_path, 'w') as f:
-        f.write('#x\t t\t time_top\t time_bottom\n')
-        for xi, ti, tp, bt in zip(x[mask2_valid | mask3_valid], t[mask2_valid | mask3_valid], time_top[mask2_valid | mask3_valid], time_bottom[mask2_valid | mask3_valid]):
-            f.write(f'{xi:.6f}\t{ti:.6f}\t{tp:.3f}\t{bt:.3f}\n')
+        f.write('#label\t x\t t\t time_top\t time_bottom\t size_cm\n')
+        
+        # Label2とLabel3のデータを統合
+        combined_mask = mask2_valid | mask3_valid
+        x_combined = x[combined_mask]
+        t_combined = t[combined_mask]
+        time_top_combined = time_top[combined_mask]
+        time_bottom_combined = time_bottom[combined_mask]
+        lab_combined = lab[combined_mask]
+        
+        # サイズを計算
+        size_cm_combined = (time_bottom_combined - time_top_combined) * 1e-9 * c / np.sqrt(er) * 0.5 * 100  # [cm]
+        
+        # サイズの昇順でソート
+        sort_indices = np.argsort(size_cm_combined)
+        
+        # ソートされた順序で出力
+        for i in sort_indices:
+            f.write(f'{lab_combined[i]}\t{x_combined[i]:.6f}\t{t_combined[i]:.6f}\t{time_top_combined[i]:.3f}\t{time_bottom_combined[i]:.3f}\t{size_cm_combined[i]:.3f}\n')
     print('Label‑2-3 詳細を保存:', dump_path)
 
 # ------------------------------------------------------------------
