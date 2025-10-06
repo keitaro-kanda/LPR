@@ -54,9 +54,15 @@ else:
     output_dir = os.path.join(base_dir, f'{file_name}_full_range')
 
 os.makedirs(output_dir, exist_ok=True)
-# プロット用サブフォルダ
-output_dir_plot = os.path.join(output_dir, 'plots')
-os.makedirs(output_dir_plot, exist_ok=True)
+# プロット用サブフォルダ（カテゴリ別）
+output_dir_linear = os.path.join(output_dir, '1_non_fit')
+output_dir_power = os.path.join(output_dir, '2_power_law_fit')
+output_dir_exp = os.path.join(output_dir, '3_exponential_fit')
+output_dir_comparison = os.path.join(output_dir, '4_fit_comparison')
+os.makedirs(output_dir_linear, exist_ok=True)
+os.makedirs(output_dir_power, exist_ok=True)
+os.makedirs(output_dir_exp, exist_ok=True)
+os.makedirs(output_dir_comparison, exist_ok=True)
 
 # ------------------------------------------------------------------
 # 2. JSON 読み込み
@@ -141,21 +147,104 @@ unique_sizes_estimate_group2 = np.sort(np.unique(all_sizes_cm_estimamte_group2))
 cum_counts_estimate_group2   = np.array([(all_sizes_cm_estimamte_group2 >= s).sum() for s in unique_sizes_estimate_group2], dtype=int)
 
 # ------------------------------------------------------------------
-# 6. 線形‑線形プロット保存
+# 6. 汎用プロット関数の定義
 # ------------------------------------------------------------------
-plt.figure(figsize=(8, 6))
-plt.plot(unique_sizes_traditional, cum_counts_traditional, marker='o', linestyle='-', linewidth=1.5)
-plt.xlabel('Rock size [cm]', fontsize=20)
-plt.ylabel('Cumulative number of rocks', fontsize=20)
-plt.tick_params(labelsize=16)
-plt.grid(True, linestyle='--', alpha=0.5)
-plt.tight_layout()
-linear_png = os.path.join(output_dir_plot, 'RSFD_linear.png')
-linear_pdf = os.path.join(output_dir_plot, 'RSFD_linear.pdf')
-plt.savefig(linear_png, dpi=300)
-plt.savefig(linear_pdf, dpi=600)
-plt.show()
-print('線形‑線形プロット保存:', linear_png)
+def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
+                     scale_type='linear', fit_lines=None,
+                     show_plot=False, dpi_png=300, dpi_pdf=600,
+                     marker='o', linestyle='-', linewidth=1.5, color=None, label=None):
+    """
+    RSFDプロットを作成・保存する汎用関数
+
+    Parameters:
+    -----------
+    x_data, y_data : array
+        プロットするデータ
+    xlabel, ylabel : str
+        軸ラベル
+    output_path : str
+        出力パス（拡張子なし）
+    scale_type : str
+        'linear', 'semilog', 'loglog'
+    fit_lines : list of dict, optional
+        フィット曲線のリスト [{'x': x, 'y': y, 'label': label, 'color': color, 'linestyle': style}, ...]
+    show_plot : bool
+        プロット表示の有無
+    dpi_png, dpi_pdf : int
+        解像度
+    marker, linestyle, linewidth, color, label :
+        データプロットのスタイル設定
+    """
+    plt.figure(figsize=(8, 6))
+
+    # データプロット
+    if marker and linestyle:
+        plot_kwargs = {'marker': marker, 'linestyle': linestyle, 'linewidth': linewidth}
+        if color:
+            plot_kwargs['color'] = color
+        if label:
+            plot_kwargs['label'] = label
+        plt.plot(x_data, y_data, **plot_kwargs)
+    elif marker:  # scatter plot
+        scatter_kwargs = {'marker': marker}
+        if color:
+            scatter_kwargs['color'] = color
+        if label:
+            scatter_kwargs['label'] = label
+        plt.scatter(x_data, y_data, **scatter_kwargs)
+
+    # フィット曲線の追加
+    if fit_lines:
+        for fit_line in fit_lines:
+            plt.plot(fit_line['x'], fit_line['y'],
+                    linestyle=fit_line.get('linestyle', '--'),
+                    linewidth=fit_line.get('linewidth', 1.5),
+                    color=fit_line.get('color', 'red'),
+                    label=fit_line.get('label', ''))
+
+    # 軸スケール設定
+    if scale_type == 'semilog':
+        plt.yscale('log')
+    elif scale_type == 'loglog':
+        plt.xscale('log')
+        plt.yscale('log')
+
+    # 軸ラベルとグリッド
+    plt.xlabel(xlabel, fontsize=20)
+    plt.ylabel(ylabel, fontsize=20)
+    plt.tick_params(labelsize=16)
+    plt.grid(True, linestyle='--', alpha=0.5)
+
+    # 凡例（ラベルがある場合のみ）
+    if label or fit_lines:
+        plt.legend(fontsize=14)
+
+    plt.tight_layout()
+
+    # 保存
+    plt.savefig(f'{output_path}.png', dpi=dpi_png)
+    plt.savefig(f'{output_path}.pdf', dpi=dpi_pdf)
+
+    # 表示
+    if show_plot:
+        plt.show()
+    else:
+        plt.close()
+
+    print(f'プロット保存: {output_path}.png')
+
+# ------------------------------------------------------------------
+# 7. 線形プロット保存（3種類のスケール）
+# ------------------------------------------------------------------
+# 7.1 従来手法（Group2=6cm固定）
+for scale in ['linear', 'semilog', 'loglog']:
+    output_path = os.path.join(output_dir_linear, f'RSFD_linear_{scale}')
+    create_rsfd_plot(
+        unique_sizes_traditional, cum_counts_traditional,
+        'Rock size [cm]', 'Cumulative number of rocks',
+        output_path, scale_type=scale,
+        show_plot=(scale == 'linear')  # linearのみ表示
+    )
 
 # TXT保存
 with open(os.path.join(output_dir, 'RSFD_linear.txt'), 'w') as f:
@@ -173,22 +262,15 @@ if mask3_valid.any():
             f.write(f'{xi:.6f}\t{ti:.6f}\t{tp:.3f}\t{bt:.3f}\n')
     print('Label‑3 詳細を保存:', dump_path)
 
-# ------------------------------------------------------------------
-# 6-2. 線形‑線形プロット保存： Group2もサイズ推定した場合
-# ------------------------------------------------------------------
-plt.figure(figsize=(8, 6))
-plt.plot(unique_sizes_estimate_group2, cum_counts_estimate_group2, marker='o', linestyle='-', linewidth=1.5)
-plt.xlabel('Rock size [cm]', fontsize=20)
-plt.ylabel('Cumulative number of rocks', fontsize=20)
-plt.tick_params(labelsize=16)
-plt.grid(True, linestyle='--', alpha=0.5)
-plt.tight_layout()
-linear_png = os.path.join(output_dir_plot, 'RSFD_linear_estimate_group2.png')
-linear_pdf = os.path.join(output_dir_plot, 'RSFD_linear_estimate_group2.pdf')
-plt.savefig(linear_png, dpi=300)
-plt.savefig(linear_pdf, dpi=600)
-plt.show()
-print('線形‑線形プロット保存:', linear_png)
+# 7.2 Group2もサイズ推定した場合
+for scale in ['linear', 'semilog', 'loglog']:
+    output_path = os.path.join(output_dir_linear, f'RSFD_linear_estimate_group2_{scale}')
+    create_rsfd_plot(
+        unique_sizes_estimate_group2, cum_counts_estimate_group2,
+        'Rock size [cm]', 'Cumulative number of rocks',
+        output_path, scale_type=scale,
+        show_plot=(scale == 'linear')  # linearのみ表示
+    )
 
 # TXT保存
 with open(os.path.join(output_dir, 'RSFD_linear.txt'), 'w') as f:
@@ -223,7 +305,7 @@ if mask2_valid.any() or mask3_valid.any():
     print('Label‑2-3 詳細を保存:', dump_path)
 
 # ------------------------------------------------------------------
-# 7. フィッティング: べき則と指数関数
+# 8. フィッティング: べき則と指数関数
 # ------------------------------------------------------------------
 def calc_fitting(sizes, counts):
     # 対数変換
@@ -256,100 +338,103 @@ def calc_fitting(sizes, counts):
     return (k_pow, r_pow, R2_pow, N_pow_fit), (k_exp, r_exp, R2_exp, N_exp_fit), D_fit
 
 (k_pow_trad, r_pow_trad, R2_pow_trad, N_pow_fit_trad),\
-    (k_exp_trad, r_exp_trad, R2_exp_trad, N_exp_fit_trad), D_fit\
+    (k_exp_trad, r_exp_trad, R2_exp_trad, N_exp_fit_trad), D_fit_trad\
     = calc_fitting(unique_sizes_traditional, cum_counts_traditional)
 
 (k_pow_est_grp2, r_pow_est_grp2, R2_pow_est_grp2, N_pow_fit_est_grp2),\
-    (k_exp_est_grp2, r_exp_est_grp2, R2_exp_est_grp2, N_exp_fit_est_grp2), D_fit\
+    (k_exp_est_grp2, r_exp_est_grp2, R2_exp_est_grp2, N_exp_fit_est_grp2), D_fit_est_grp2\
     = calc_fitting(unique_sizes_estimate_group2, cum_counts_estimate_group2)
 
 # ------------------------------------------------------------------
-# 8. プロット: 個別フィット
+# 9. プロット: 個別フィット（3種類のスケール）
 # ------------------------------------------------------------------
-# 8.1 べき則
-plt.figure(figsize=(8, 6))
-plt.scatter(unique_sizes_traditional, cum_counts_traditional, marker='o', label='Data')
-# エラーバーつきのプロット↓
-# plt.errorbar(unique_sizes[0], cum_counts_traditional[0], xerr=[[0], [5]], fmt='o', color='black', capsize=5) # Group1
-# plt.errorbar(unique_sizes[1], cum_counts_traditional[1], xerr=[[0], [1]], fmt='o', color='black', capsize=5) # Group2
-# for i in range(2, len(unique_sizes)):
-#     plt.errorbar(unique_sizes[i], cum_counts_traditional[i], xerr=[[unique_sizes[i] -sizes_group3_min[i-2]], [sizes_group3_max[i-2] - unique_sizes[i]]], fmt='o', color='black', capsize=5) # Group3
+# 9.1 べき則フィット（従来手法）
+fit_lines_pow_trad = [{
+    'x': D_fit_trad, 'y': N_pow_fit_trad,
+    'label': f'Power-law: k={k_pow_trad:.2e}, r={r_pow_trad:.3f}, R²={R2_pow_trad:.4f}',
+    'color': 'red', 'linestyle': '--'
+}]
 
-plt.plot(D_fit, N_pow_fit_trad, linestyle='--', linewidth=1.5, color='red',
-            label=f'Power-law: k={k_pow_trad:.2e}, r={r_pow_trad:.3f}, R²={R2_pow_trad:.4f}')
-plt.xlabel('Rock size [cm]', fontsize=20)
-plt.ylabel('Cumulative number of rocks', fontsize=20)
-plt.tick_params(labelsize=16)
-plt.grid(True, linestyle='--', alpha=0.5)
-plt.legend(fontsize=14)
-plt.tight_layout()
-pow_png = os.path.join(output_dir_plot, 'RSFD_power_law_fit.png')
-plt.savefig(pow_png, dpi=300)
-plt.savefig(os.path.join(output_dir_plot, 'RSFD_power_law_fit.pdf'), dpi=600)
-plt.show()
-print('べき則フィッティングプロット保存:', pow_png)
+for scale in ['linear', 'semilog', 'loglog']:
+    output_path = os.path.join(output_dir_power, f'RSFD_power_law_fit_{scale}')
+    create_rsfd_plot(
+        unique_sizes_traditional, cum_counts_traditional,
+        'Rock size [cm]', 'Cumulative number of rocks',
+        output_path, scale_type=scale,
+        fit_lines=fit_lines_pow_trad,
+        marker='o', linestyle='', label='Data',
+        show_plot=False
+    )
 
-# 8.2 指数関数
-plt.figure(figsize=(8, 6))
-plt.scatter(unique_sizes_traditional, cum_counts_traditional, marker='o', label='Data')
-plt.plot(D_fit, N_exp_fit_trad, linestyle='--', linewidth=1.5, color='green',
-            label=f'Exponential: k={k_exp_trad:.2e}, r={r_exp_trad:.3f}, R²={R2_exp_trad:.4f}')
-plt.xlabel('Rock size [cm]', fontsize=20)
-plt.ylabel('Cumulative number of rocks', fontsize=20)
-plt.tick_params(labelsize=16)
-plt.grid(True, linestyle='--', alpha=0.5)
-plt.legend(fontsize=14)
-plt.tight_layout()
-exp_png = os.path.join(output_dir_plot, 'RSFD_exponential_fit.png')
-plt.savefig(exp_png, dpi=300)
-plt.savefig(os.path.join(output_dir_plot, 'RSFD_exponential_fit.pdf'), dpi=600)
-plt.show()
-print('指数関数フィッティングプロット保存:', exp_png)
+# 9.2 指数関数フィット（従来手法）
+fit_lines_exp_trad = [{
+    'x': D_fit_trad, 'y': N_exp_fit_trad,
+    'label': f'Exponential: k={k_exp_trad:.2e}, r={r_exp_trad:.3f}, R²={R2_exp_trad:.4f}',
+    'color': 'green', 'linestyle': '--'
+}]
+
+for scale in ['linear', 'semilog', 'loglog']:
+    output_path = os.path.join(output_dir_exp, f'RSFD_exponential_fit_{scale}')
+    create_rsfd_plot(
+        unique_sizes_traditional, cum_counts_traditional,
+        'Rock size [cm]', 'Cumulative number of rocks',
+        output_path, scale_type=scale,
+        fit_lines=fit_lines_exp_trad,
+        marker='o', linestyle='', label='Data',
+        show_plot=False
+    )
 
 # ------------------------------------------------------------------
-# 9. プロット: フィッティング比較 (滑らか)
+# 10. プロット: フィッティング比較（3種類のスケール）
 # ------------------------------------------------------------------
-plt.figure(figsize=(8, 6))
-plt.scatter(unique_sizes_traditional, cum_counts_traditional, marker='o', label='Data')
-plt.plot(D_fit, N_pow_fit_trad, linestyle='--', linewidth=1.5, color='red',
-            label=f'Power-law: k={k_pow_trad:.2e}, r={r_pow_trad:.3f}, R²={R2_pow_trad:.4f}')
-plt.plot(D_fit, N_exp_fit_trad, linestyle='--', linewidth=1.5, color='green',
-            label=f'Exponential: k={k_exp_trad:.2e}, r={r_exp_trad:.3f}, R²={R2_exp_trad:.4f}')
-plt.xlabel('Rock size [cm]', fontsize=20)
-plt.ylabel('Cumulative number of rocks', fontsize=20)
-plt.xscale('log')
-plt.yscale('log')
-plt.tick_params(labelsize=16)
-plt.grid(True, linestyle='--', alpha=0.5)
-plt.legend(fontsize=14)
-plt.tight_layout()
-comp_png = os.path.join(output_dir_plot, 'RSFD_fit_comparison.png')
-plt.savefig(comp_png, dpi=300)
-plt.savefig(os.path.join(output_dir_plot, 'RSFD_fit_comparison.pdf'), dpi=600)
-plt.show()
-print('フィッティング比較プロット保存:', comp_png)
+# 10.1 従来手法（Group2=6cm固定）
+fit_lines_comparison_trad = [
+    {
+        'x': D_fit_trad, 'y': N_pow_fit_trad,
+        'label': f'Power-law: k={k_pow_trad:.2e}, r={r_pow_trad:.3f}, R²={R2_pow_trad:.4f}',
+        'color': 'red', 'linestyle': '--'
+    },
+    {
+        'x': D_fit_trad, 'y': N_exp_fit_trad,
+        'label': f'Exponential: k={k_exp_trad:.2e}, r={r_exp_trad:.3f}, R²={R2_exp_trad:.4f}',
+        'color': 'green', 'linestyle': '--'
+    }
+]
 
-# ------------------------------------------------------------------
-# 9-2. プロット: フィッティング比較 (滑らか)： Group2もサイズ推定した場合
-# ------------------------------------------------------------------
-plt.figure(figsize=(8, 6))
-plt.scatter(unique_sizes_estimate_group2, cum_counts_estimate_group2, marker='o', label='Data')
-plt.plot(D_fit, N_pow_fit_est_grp2, linestyle='--', linewidth=1.5, color='red',
-            label=f'Power-law: k={k_pow_est_grp2:.2e}, r={r_pow_est_grp2:.3f}, R²={R2_pow_est_grp2:.4f}')
-plt.plot(D_fit, N_exp_fit_est_grp2, linestyle='--', linewidth=1.5, color='green',
-            label=f'Exponential: k={k_exp_est_grp2:.2e}, r={r_exp_est_grp2:.3f}, R²={R2_exp_est_grp2:.4f}')
-plt.xlabel('Rock size [cm]', fontsize=20)
-plt.ylabel('Cumulative number of rocks', fontsize=20)
-plt.xscale('log')
-plt.yscale('log')
-plt.tick_params(labelsize=16)
-plt.grid(True, linestyle='--', alpha=0.5)
-plt.legend(fontsize=14)
-plt.tight_layout()
-comp_png = os.path.join(output_dir_plot, 'RSFD_fit_comparison_estimate_group2.png')
-plt.savefig(comp_png, dpi=300)
-plt.savefig(os.path.join(output_dir_plot, 'RSFD_fit_comparison_estimate_group2.pdf'), dpi=600)
-plt.show()
-print('フィッティング比較プロット保存:', comp_png)
+for scale in ['linear', 'semilog', 'loglog']:
+    output_path = os.path.join(output_dir_comparison, f'RSFD_fit_comparison_{scale}')
+    create_rsfd_plot(
+        unique_sizes_traditional, cum_counts_traditional,
+        'Rock size [cm]', 'Cumulative number of rocks',
+        output_path, scale_type=scale,
+        fit_lines=fit_lines_comparison_trad,
+        marker='o', linestyle='', label='Data',
+        show_plot=(scale == 'linear')  # linearのみ表示
+    )
+
+# 10.2 Group2もサイズ推定した場合
+fit_lines_comparison_est_grp2 = [
+    {
+        'x': D_fit_est_grp2, 'y': N_pow_fit_est_grp2,
+        'label': f'Power-law: k={k_pow_est_grp2:.2e}, r={r_pow_est_grp2:.3f}, R²={R2_pow_est_grp2:.4f}',
+        'color': 'red', 'linestyle': '--'
+    },
+    {
+        'x': D_fit_est_grp2, 'y': N_exp_fit_est_grp2,
+        'label': f'Exponential: k={k_exp_est_grp2:.2e}, r={r_exp_est_grp2:.3f}, R²={R2_exp_est_grp2:.4f}',
+        'color': 'green', 'linestyle': '--'
+    }
+]
+
+for scale in ['linear', 'semilog', 'loglog']:
+    output_path = os.path.join(output_dir_comparison, f'RSFD_fit_comparison_estimate_group2_{scale}')
+    create_rsfd_plot(
+        unique_sizes_estimate_group2, cum_counts_estimate_group2,
+        'Rock size [cm]', 'Cumulative number of rocks',
+        output_path, scale_type=scale,
+        fit_lines=fit_lines_comparison_est_grp2,
+        marker='o', linestyle='', label='Data',
+        show_plot=(scale == 'linear')  # linearのみ表示
+    )
 
 print('すべて完了しました！')
