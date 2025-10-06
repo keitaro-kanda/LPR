@@ -74,7 +74,7 @@ with open(data_path, 'r') as f:
     results = json.load(f).get('results', {})
 
 x   = np.array([v['x']            for v in results.values()])
-t   = np.array([v['y']            for v in results.values()])
+y   = np.array([v['y']            for v in results.values()])
 lab = np.array([v['label']        for v in results.values()], dtype=int)
 time_top    = np.array([none_to_nan(v['time_top'])    for v in results.values()], dtype=float)
 time_bottom = np.array([none_to_nan(v['time_bottom']) for v in results.values()], dtype=float)
@@ -83,9 +83,12 @@ print('ラベルデータ読み込み完了:', len(lab), '個')
 # データ範囲フィルタリング
 original_count = len(lab)
 if time_min is not None and time_max is not None:
-    time_mask = (time_top >= time_min) & (time_top <= time_max)
+    # Group1: y値で判定、Group2-6: time_topで判定
+    mask_group1 = (lab == 1) & (y >= time_min) & (y <= time_max)
+    mask_others = (lab != 1) & (time_top >= time_min) & (time_top <= time_max)
+    time_mask = mask_group1 | mask_others
     x = x[time_mask]
-    t = t[time_mask]
+    y = y[time_mask]
     lab = lab[time_mask]
     time_top = time_top[time_mask]
     time_bottom = time_bottom[time_mask]
@@ -94,7 +97,7 @@ if time_min is not None and time_max is not None:
 if horizontal_min is not None and horizontal_max is not None:
     horizontal_mask = (x >= horizontal_min) & (x <= horizontal_max)
     x = x[horizontal_mask]
-    t = t[horizontal_mask]
+    y = y[horizontal_mask]
     lab = lab[horizontal_mask]
     time_top = time_top[horizontal_mask]
     time_bottom = time_bottom[horizontal_mask]
@@ -257,9 +260,9 @@ print('累積データTXT保存: RSFD_linear.txt')
 if mask3_valid.any():
     dump_path = os.path.join(output_dir, 'Label3_detail.txt')
     with open(dump_path, 'w') as f:
-        f.write('#x\t t\t time_top\t time_bottom\n')
-        for xi, ti, tp, bt in zip(x[mask3_valid], t[mask3_valid], time_top[mask3_valid], time_bottom[mask3_valid]):
-            f.write(f'{xi:.6f}\t{ti:.6f}\t{tp:.3f}\t{bt:.3f}\n')
+        f.write('#x\t y\t time_top\t time_bottom\n')
+        for xi, yi, tp, bt in zip(x[mask3_valid], y[mask3_valid], time_top[mask3_valid], time_bottom[mask3_valid]):
+            f.write(f'{xi:.6f}\t{yi:.6f}\t{tp:.3f}\t{bt:.3f}\n')
     print('Label‑3 詳細を保存:', dump_path)
 
 # 7.2 Group2もサイズ推定した場合
@@ -283,25 +286,25 @@ print('累積データTXT保存: RSFD_linear.txt')
 if mask2_valid.any() or mask3_valid.any():
     dump_path = os.path.join(output_dir, 'Label2-3_detail.txt')
     with open(dump_path, 'w') as f:
-        f.write('#label\t x\t t\t time_top\t time_bottom\t size_cm\n')
-        
+        f.write('#label\t x\t y\t time_top\t time_bottom\t size_cm\n')
+
         # Label2とLabel3のデータを統合
         combined_mask = mask2_valid | mask3_valid
         x_combined = x[combined_mask]
-        t_combined = t[combined_mask]
+        y_combined = y[combined_mask]
         time_top_combined = time_top[combined_mask]
         time_bottom_combined = time_bottom[combined_mask]
         lab_combined = lab[combined_mask]
-        
+
         # サイズを計算
         size_cm_combined = (time_bottom_combined - time_top_combined) * 1e-9 * c / np.sqrt(er) * 0.5 * 100  # [cm]
-        
+
         # サイズの昇順でソート
         sort_indices = np.argsort(size_cm_combined)
-        
+
         # ソートされた順序で出力
         for i in sort_indices:
-            f.write(f'{lab_combined[i]}\t{x_combined[i]:.6f}\t{t_combined[i]:.6f}\t{time_top_combined[i]:.3f}\t{time_bottom_combined[i]:.3f}\t{size_cm_combined[i]:.3f}\n')
+            f.write(f'{lab_combined[i]}\t{x_combined[i]:.6f}\t{y_combined[i]:.6f}\t{time_top_combined[i]:.3f}\t{time_bottom_combined[i]:.3f}\t{size_cm_combined[i]:.3f}\n')
     print('Label‑2-3 詳細を保存:', dump_path)
 
 # ------------------------------------------------------------------
