@@ -21,10 +21,38 @@ data_path = input().strip()
 if not (os.path.exists(data_path) and data_path.lower().endswith('.json')):
     raise FileNotFoundError('正しい .json ファイルを指定してください。')
 
+# データ範囲の入力
+print('\n=== データ範囲指定 ===')
+time_range = input('時間範囲 [ns] を入力してください（例: 50-100, Enter: 全範囲）: ').strip()
+horizontal_range = input('水平位置範囲 [m] を入力してください（例: 0-100, Enter: 全範囲）: ').strip()
+
+try:
+    if time_range:
+        time_min, time_max = map(float, time_range.split('-'))
+    else:
+        time_min, time_max = None, None
+
+    if horizontal_range:
+        horizontal_min, horizontal_max = map(float, horizontal_range.split('-'))
+    else:
+        horizontal_min, horizontal_max = None, None
+except ValueError:
+    raise ValueError('範囲の入力形式が正しくありません。例: 0-100')
+
 # 出力フォルダ
 base_dir = os.path.join(os.path.dirname(os.path.dirname(data_path)), 'RSFD')
 file_name = os.path.splitext(os.path.basename(data_path))[0]
-output_dir = os.path.join(base_dir, file_name)
+
+# 範囲指定に応じた出力ディレクトリ名
+if time_range and not horizontal_range:
+    output_dir = os.path.join(base_dir, f'{file_name}_t{time_min}-{time_max}')
+elif horizontal_range and not time_range:
+    output_dir = os.path.join(base_dir, f'{file_name}_x{horizontal_min}-{horizontal_max}')
+elif time_range and horizontal_range:
+    output_dir = os.path.join(base_dir, f'{file_name}_t{time_min}-{time_max}_x{horizontal_min}-{horizontal_max}')
+else:
+    output_dir = os.path.join(base_dir, f'{file_name}_full_range')
+
 os.makedirs(output_dir, exist_ok=True)
 # プロット用サブフォルダ
 output_dir_plot = os.path.join(output_dir, 'plots')
@@ -46,11 +74,41 @@ time_top    = np.array([none_to_nan(v['time_top'])    for v in results.values()]
 time_bottom = np.array([none_to_nan(v['time_bottom']) for v in results.values()], dtype=float)
 print('ラベルデータ読み込み完了:', len(lab), '個')
 
+# データ範囲フィルタリング
+original_count = len(lab)
+if time_min is not None and time_max is not None:
+    time_mask = (time_top >= time_min) & (time_top <= time_max)
+    x = x[time_mask]
+    t = t[time_mask]
+    lab = lab[time_mask]
+    time_top = time_top[time_mask]
+    time_bottom = time_bottom[time_mask]
+    print(f'時間範囲フィルタリング後: {len(lab)}個 (元データの{len(lab)/original_count*100:.1f}%)')
+
+if horizontal_min is not None and horizontal_max is not None:
+    horizontal_mask = (x >= horizontal_min) & (x <= horizontal_max)
+    x = x[horizontal_mask]
+    t = t[horizontal_mask]
+    lab = lab[horizontal_mask]
+    time_top = time_top[horizontal_mask]
+    time_bottom = time_bottom[horizontal_mask]
+    print(f'水平位置範囲フィルタリング後: {len(lab)}個 (元データの{len(lab)/original_count*100:.1f}%)')
+
+print(f'フィルタリング完了: {len(lab)}個のデータを使用')
+
 # ------------------------------------------------------------------
 # 3. ラベル別個数をテキスト出力
 # ------------------------------------------------------------------
 counts = {k: int(np.sum(lab == k)) for k in range(1, 7)}
 with open(os.path.join(output_dir, 'RSFD_counts_by_label.txt'), 'w') as f:
+    f.write('# RSFD Label Counts\n')
+    f.write(f'# Original data count: {original_count}\n')
+    if time_min is not None and time_max is not None:
+        f.write(f'# Time range filter: {time_min} - {time_max} ns\n')
+    if horizontal_min is not None and horizontal_max is not None:
+        f.write(f'# Horizontal range filter: {horizontal_min} - {horizontal_max} m\n')
+    f.write(f'# Filtered data count: {len(lab)} ({len(lab)/original_count*100:.1f}%)\n')
+    f.write('\n')
     for k, v in counts.items():
         f.write(f'Label {k}: {v}\n')
 
