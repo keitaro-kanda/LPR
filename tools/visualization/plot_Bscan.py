@@ -53,7 +53,7 @@ print('プロット範囲を限定しますか？（y/n、デフォルト：n）
 use_plot_range = input().strip().lower().startswith('y')
 plot_range = None
 if use_plot_range:
-    print('プロット範囲を入力してください（x_start x_end y_start y_end）[m, m, ns, ns]:')
+    print('プロット範囲を入力してください。入力形式: x_min x_max y_min y_max')
     try:
         x0, x1, y0, y1 = map(float, input().split())
         plot_range = [x0, x1, y0, y1]
