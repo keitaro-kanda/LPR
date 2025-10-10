@@ -21,10 +21,31 @@ data_path = input().strip()
 if not (os.path.exists(data_path) and data_path.lower().endswith('.json')):
     raise FileNotFoundError('正しい .json ファイルを指定してください。')
 
+# モード選択
+print('\n=== データ範囲モード選択 ===')
+print('1: 全範囲のデータを使用')
+print('2: 特定の時間・距離範囲のデータのみを使用')
+print('3: 特定の時間・距離範囲のデータのみを取り除いて使用')
+mode = input('モードを選択してください (1/2/3): ').strip()
+
+if mode not in ['1', '2', '3']:
+    raise ValueError('モードは1, 2, 3のいずれかを選択してください。')
+
 # データ範囲の入力
-print('\n=== データ範囲指定 ===')
-time_range = input('時間範囲 [ns] を入力してください（例: 50-100, Enter: 全範囲）: ').strip()
-horizontal_range = input('水平位置範囲 [m] を入力してください（例: 0-100, Enter: 全範囲）: ').strip()
+if mode == '1':
+    # モード1: 全範囲使用
+    time_range = ''
+    horizontal_range = ''
+    print('全範囲のデータを使用します。')
+else:
+    # モード2/3: 範囲入力
+    print('\n=== データ範囲指定 ===')
+    if mode == '2':
+        print('指定した範囲のデータのみを使用します。')
+    else:  # mode == '3'
+        print('指定した範囲のデータを除外します。')
+    time_range = input('時間範囲 [ns] を入力してください（例: 50-100, Enter: 指定なし）: ').strip()
+    horizontal_range = input('水平位置範囲 [m] を入力してください（例: 0-100, Enter: 指定なし）: ').strip()
 
 try:
     if time_range:
@@ -44,14 +65,29 @@ base_dir = os.path.join(os.path.dirname(os.path.dirname(data_path)), 'RSFD')
 file_name = os.path.splitext(os.path.basename(data_path))[0]
 
 # 範囲指定に応じた出力ディレクトリ名
-if time_range and not horizontal_range:
-    output_dir = os.path.join(base_dir, f'{file_name}_t{time_min}-{time_max}')
-elif horizontal_range and not time_range:
-    output_dir = os.path.join(base_dir, f'{file_name}_x{horizontal_min}-{horizontal_max}')
-elif time_range and horizontal_range:
-    output_dir = os.path.join(base_dir, f'{file_name}_t{time_min}-{time_max}_x{horizontal_min}-{horizontal_max}')
-else:
+if mode == '1':
+    # モード1: 全範囲
     output_dir = os.path.join(base_dir, f'{file_name}_full_range')
+elif mode == '2':
+    # モード2: 特定範囲のみ使用（既存の命名）
+    if time_range and not horizontal_range:
+        output_dir = os.path.join(base_dir, f'{file_name}_t{time_min}-{time_max}')
+    elif horizontal_range and not time_range:
+        output_dir = os.path.join(base_dir, f'{file_name}_x{horizontal_min}-{horizontal_max}')
+    elif time_range and horizontal_range:
+        output_dir = os.path.join(base_dir, f'{file_name}_t{time_min}-{time_max}_x{horizontal_min}-{horizontal_max}')
+    else:
+        output_dir = os.path.join(base_dir, f'{file_name}_full_range')
+elif mode == '3':
+    # モード3: 特定範囲を除外
+    if time_range and not horizontal_range:
+        output_dir = os.path.join(base_dir, f'{file_name}_remove_t{time_min}-{time_max}')
+    elif horizontal_range and not time_range:
+        output_dir = os.path.join(base_dir, f'{file_name}_remove_x{horizontal_min}-{horizontal_max}')
+    elif time_range and horizontal_range:
+        output_dir = os.path.join(base_dir, f'{file_name}_remove_t{time_min}-{time_max}_x{horizontal_min}-{horizontal_max}')
+    else:
+        output_dir = os.path.join(base_dir, f'{file_name}_full_range')
 
 os.makedirs(output_dir, exist_ok=True)
 # プロット用サブフォルダ（カテゴリ別）
@@ -87,21 +123,39 @@ if time_min is not None and time_max is not None:
     mask_group1 = (lab == 1) & (y >= time_min) & (y <= time_max)
     mask_others = (lab != 1) & (time_top >= time_min) & (time_top <= time_max)
     time_mask = mask_group1 | mask_others
+
+    # モード3の場合は論理反転（指定範囲を除外）
+    if mode == '3':
+        time_mask = ~time_mask
+
     x = x[time_mask]
     y = y[time_mask]
     lab = lab[time_mask]
     time_top = time_top[time_mask]
     time_bottom = time_bottom[time_mask]
-    print(f'時間範囲フィルタリング後: {len(lab)}個 (元データの{len(lab)/original_count*100:.1f}%)')
+
+    if mode == '2':
+        print(f'時間範囲フィルタリング後: {len(lab)}個 (元データの{len(lab)/original_count*100:.1f}%)')
+    elif mode == '3':
+        print(f'時間範囲除外後: {len(lab)}個 (元データの{len(lab)/original_count*100:.1f}%)')
 
 if horizontal_min is not None and horizontal_max is not None:
     horizontal_mask = (x >= horizontal_min) & (x <= horizontal_max)
+
+    # モード3の場合は論理反転（指定範囲を除外）
+    if mode == '3':
+        horizontal_mask = ~horizontal_mask
+
     x = x[horizontal_mask]
     y = y[horizontal_mask]
     lab = lab[horizontal_mask]
     time_top = time_top[horizontal_mask]
     time_bottom = time_bottom[horizontal_mask]
-    print(f'水平位置範囲フィルタリング後: {len(lab)}個 (元データの{len(lab)/original_count*100:.1f}%)')
+
+    if mode == '2':
+        print(f'水平位置範囲フィルタリング後: {len(lab)}個 (元データの{len(lab)/original_count*100:.1f}%)')
+    elif mode == '3':
+        print(f'水平位置範囲除外後: {len(lab)}個 (元データの{len(lab)/original_count*100:.1f}%)')
 
 print(f'フィルタリング完了: {len(lab)}個のデータを使用')
 
@@ -112,10 +166,23 @@ counts = {k: int(np.sum(lab == k)) for k in range(1, 7)}
 with open(os.path.join(output_dir, 'RSFD_counts_by_label.txt'), 'w') as f:
     f.write('# RSFD Label Counts\n')
     f.write(f'# Original data count: {original_count}\n')
-    if time_min is not None and time_max is not None:
-        f.write(f'# Time range filter: {time_min} - {time_max} ns\n')
-    if horizontal_min is not None and horizontal_max is not None:
-        f.write(f'# Horizontal range filter: {horizontal_min} - {horizontal_max} m\n')
+
+    # モードに応じたフィルタ情報の記録
+    if mode == '1':
+        f.write('# Mode: Full range (no filtering)\n')
+    elif mode == '2':
+        f.write('# Mode: Use only specified range\n')
+        if time_min is not None and time_max is not None:
+            f.write(f'# Time range filter: {time_min} - {time_max} ns\n')
+        if horizontal_min is not None and horizontal_max is not None:
+            f.write(f'# Horizontal range filter: {horizontal_min} - {horizontal_max} m\n')
+    elif mode == '3':
+        f.write('# Mode: Remove specified range\n')
+        if time_min is not None and time_max is not None:
+            f.write(f'# Removed time range: {time_min} - {time_max} ns\n')
+        if horizontal_min is not None and horizontal_max is not None:
+            f.write(f'# Removed horizontal range: {horizontal_min} - {horizontal_max} m\n')
+
     f.write(f'# Filtered data count: {len(lab)} ({len(lab)/original_count*100:.1f}%)\n')
     f.write('\n')
     for k, v in counts.items():
