@@ -100,6 +100,14 @@ os.makedirs(output_dir_power, exist_ok=True)
 os.makedirs(output_dir_exp, exist_ok=True)
 os.makedirs(output_dir_comparison, exist_ok=True)
 
+# プロット用サブフォルダ（Group2-3専用）
+output_dir_power_2_3 = os.path.join(output_dir, '5_power_law_fit_2-3')
+output_dir_exp_2_3 = os.path.join(output_dir, '6_exponential_fit_2-3')
+output_dir_comparison_2_3 = os.path.join(output_dir, '7_fit_comparison_2-3')
+os.makedirs(output_dir_power_2_3, exist_ok=True)
+os.makedirs(output_dir_exp_2_3, exist_ok=True)
+os.makedirs(output_dir_comparison_2_3, exist_ok=True)
+
 # ------------------------------------------------------------------
 # 2. JSON 読み込み
 # ------------------------------------------------------------------
@@ -203,6 +211,7 @@ sizes_group3_max = (time_bottom[mask3_valid] - time_top[mask3_valid]) * 1e-9 * c
 sizes_group3_min = (time_bottom[mask3_valid] - time_top[mask3_valid]) * 1e-9 * c / np.sqrt(15) * 0.5 * 100  # [cm] # group3のエラー範囲
 all_sizes_cm_traditional = np.concatenate([size_label1, size_label2, sizes_group3])
 all_sizes_cm_estimamte_group2 = np.concatenate([size_label1, sizes_group2, sizes_group3]) # Group2も式で計算した場合
+all_sizes_cm_group2_3 = np.concatenate([sizes_group2, sizes_group3]) # Group2-3のみ（推定手法）
 #all_sizes_cm = sizes_group3 # Group3のみだとどうなる？の検証
 if all_sizes_cm_traditional.size == 0:
     raise RuntimeError('有効なラベル1–3が見つかりませんでした。')
@@ -215,6 +224,9 @@ cum_counts_traditional   = np.array([(all_sizes_cm_traditional >= s).sum() for s
 
 unique_sizes_estimate_group2 = np.sort(np.unique(all_sizes_cm_estimamte_group2))
 cum_counts_estimate_group2   = np.array([(all_sizes_cm_estimamte_group2 >= s).sum() for s in unique_sizes_estimate_group2], dtype=int)
+
+unique_sizes_group2_3 = np.sort(np.unique(all_sizes_cm_group2_3))
+cum_counts_group2_3   = np.array([(all_sizes_cm_group2_3 >= s).sum() for s in unique_sizes_group2_3], dtype=int)
 
 # ------------------------------------------------------------------
 # 6. 汎用プロット関数の定義
@@ -415,6 +427,10 @@ def calc_fitting(sizes, counts):
     (k_exp_est_grp2, r_exp_est_grp2, R2_exp_est_grp2, N_exp_fit_est_grp2), D_fit_est_grp2\
     = calc_fitting(unique_sizes_estimate_group2, cum_counts_estimate_group2)
 
+(k_pow_grp2_3, r_pow_grp2_3, R2_pow_grp2_3, N_pow_fit_grp2_3),\
+    (k_exp_grp2_3, r_exp_grp2_3, R2_exp_grp2_3, N_exp_fit_grp2_3), D_fit_grp2_3\
+    = calc_fitting(unique_sizes_group2_3, cum_counts_group2_3)
+
 # ------------------------------------------------------------------
 # 9. プロット: 個別フィット（3種類のスケール）
 # ------------------------------------------------------------------
@@ -506,5 +522,76 @@ for scale in ['linear', 'semilog', 'loglog']:
         marker='o', linestyle='', label='Data',
         show_plot=(scale == 'linear')  # linearのみ表示
     )
+
+# ------------------------------------------------------------------
+# 11. プロット: Group2-3のみのフィッティング（3種類のスケール）
+# ------------------------------------------------------------------
+# 11.1 べき則フィット（Group2-3のみ）
+fit_lines_pow_grp2_3 = [{
+    'x': D_fit_grp2_3, 'y': N_pow_fit_grp2_3,
+    'label': f'Power-law: k={k_pow_grp2_3:.2e}, r={r_pow_grp2_3:.3f}, R²={R2_pow_grp2_3:.4f}',
+    'color': 'red', 'linestyle': '--'
+}]
+
+for scale in ['linear', 'semilog', 'loglog']:
+    output_path = os.path.join(output_dir_power_2_3, f'RSFD_power_law_fit_group2-3_{scale}')
+    create_rsfd_plot(
+        unique_sizes_group2_3, cum_counts_group2_3,
+        'Rock size [cm]', 'Cumulative number of rocks',
+        output_path, scale_type=scale,
+        fit_lines=fit_lines_pow_grp2_3,
+        marker='o', linestyle='', label='Data (Group2-3)',
+        show_plot=False
+    )
+
+# 11.2 指数関数フィット（Group2-3のみ）
+fit_lines_exp_grp2_3 = [{
+    'x': D_fit_grp2_3, 'y': N_exp_fit_grp2_3,
+    'label': f'Exponential: k={k_exp_grp2_3:.2e}, r={r_exp_grp2_3:.3f}, R²={R2_exp_grp2_3:.4f}',
+    'color': 'green', 'linestyle': '--'
+}]
+
+for scale in ['linear', 'semilog', 'loglog']:
+    output_path = os.path.join(output_dir_exp_2_3, f'RSFD_exponential_fit_group2-3_{scale}')
+    create_rsfd_plot(
+        unique_sizes_group2_3, cum_counts_group2_3,
+        'Rock size [cm]', 'Cumulative number of rocks',
+        output_path, scale_type=scale,
+        fit_lines=fit_lines_exp_grp2_3,
+        marker='o', linestyle='', label='Data (Group2-3)',
+        show_plot=False
+    )
+
+# 11.3 フィッティング比較（Group2-3のみ）
+fit_lines_comparison_grp2_3 = [
+    {
+        'x': D_fit_grp2_3, 'y': N_pow_fit_grp2_3,
+        'label': f'Power-law: k={k_pow_grp2_3:.2e}, r={r_pow_grp2_3:.3f}, R²={R2_pow_grp2_3:.4f}',
+        'color': 'red', 'linestyle': '--'
+    },
+    {
+        'x': D_fit_grp2_3, 'y': N_exp_fit_grp2_3,
+        'label': f'Exponential: k={k_exp_grp2_3:.2e}, r={r_exp_grp2_3:.3f}, R²={R2_exp_grp2_3:.4f}',
+        'color': 'green', 'linestyle': '--'
+    }
+]
+
+for scale in ['linear', 'semilog', 'loglog']:
+    output_path = os.path.join(output_dir_comparison_2_3, f'RSFD_fit_comparison_group2-3_{scale}')
+    create_rsfd_plot(
+        unique_sizes_group2_3, cum_counts_group2_3,
+        'Rock size [cm]', 'Cumulative number of rocks',
+        output_path, scale_type=scale,
+        fit_lines=fit_lines_comparison_grp2_3,
+        marker='o', linestyle='', label='Data (Group2-3)',
+        show_plot=(scale == 'linear')  # linearのみ表示
+    )
+
+# TXT保存（Group2-3）
+with open(os.path.join(output_dir, 'RSFD_linear_group2-3.txt'), 'w') as f:
+    f.write('# size_cm\tcumulative_count\n')
+    for s, n in zip(unique_sizes_group2_3, cum_counts_group2_3):
+        f.write(f'{s:.3f}\t{n}\n')
+print('Group2-3累積データTXT保存: RSFD_linear_group2-3.txt')
 
 print('すべて完了しました！')
