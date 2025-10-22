@@ -79,8 +79,8 @@ def calculate_peaks_for_single_trace(trace_idx, data, envelop_data, time_zero_in
     # 各トレースのピークインデックスを検出
     peaks_in_Ascan = []
     for i in range(1, len(envelope) - 1):
-        # 局所最大値検出（振幅閾値 > 95パーセンタイル）
-        if envelope[i-1] < envelope[i] > envelope[i+1] and envelope[i] > np.percentile(envelope, 95):
+        # 局所最大値検出（振幅閾値 > 85パーセンタイル）
+        if envelope[i-1] < envelope[i] > envelope[i+1] and envelope[i] > np.percentile(envelope, 85):
             peaks_in_Ascan.append(i)
 
     # 各ピークについてFWHM計算と分解可能性判定
@@ -508,8 +508,11 @@ def main():
     ascan.showGrid(True, True)
     ascan.setYRange(y_start, y_end)
     ascan.invertY(True)
-    pen = pg.mkPen('w', width=2)
-    pen2 = pg.mkPen('r', width=2)
+    # 背景を白に設定
+    ascan.getViewBox().setBackgroundColor('w')
+    # 波形を黒、envelopeを青に設定
+    pen = pg.mkPen('k', width=2)  # 黒: Amplitude
+    pen2 = pg.mkPen('b', width=2)  # 青: Envelope
     c1 = pg.PlotCurveItem(pen=pen)
     c2 = pg.PlotCurveItem(pen=pen2)
     ascan.addItem(c1)
@@ -520,24 +523,6 @@ def main():
 
     # ピーク検出用の表示要素を保持するリスト
     peak_markers = []
-
-    def detect_peaks_in_range(xpos):
-        """A-scan表示位置の±2.5m範囲でピーク検出（キャッシュ使用）"""
-        # 検出範囲の計算
-        x_min = max(0, xpos - 2.5)
-        x_max = min(x_end, xpos + 2.5)
-
-        # トレースインデックスに変換
-        idx_min = int(x_min / trace_interval)
-        idx_max = int(x_max / trace_interval)
-
-        # 範囲内のトレースからキャッシュを集約
-        all_peaks = []
-        for trace_idx in range(idx_min, min(idx_max + 1, data.shape[1])):
-            peaks = get_peaks_for_trace(trace_idx, data, envelop, time_zero_index, sample_interval, peak_cache)
-            all_peaks.extend(peaks)
-
-        return all_peaks
 
     def update_ascan():
         nonlocal peak_markers
@@ -578,8 +563,8 @@ def main():
 
             ascan.setYRange(*plot.viewRange()[1])
 
-            # ピーク検出と表示（キャッシュから取得）
-            peaks = detect_peaks_in_range(xpos)
+            # ピーク検出と表示（現在のトレースのみ、キャッシュから取得）
+            peaks = get_peaks_for_trace(idx, data, envelop, time_zero_index, sample_interval, peak_cache)
             for peak_time in peaks:
                 # 赤い破線の水平線
                 hline = pg.InfiniteLine(
@@ -593,7 +578,7 @@ def main():
 
                 # ピーク時刻のテキストラベル
                 text = pg.TextItem(
-                    f"{peak_time:.1f} ns",
+                    f"{peak_time:.3f} ns",
                     color='r',
                     anchor=(0, 0.5)
                 )
