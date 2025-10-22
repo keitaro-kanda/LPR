@@ -209,6 +209,11 @@ sizes_group2 = (time_bottom[mask2_valid] - time_top[mask2_valid]) * 1e-9 * c / n
 sizes_group3 = (time_bottom[mask3_valid] - time_top[mask3_valid]) * 1e-9 * c / np.sqrt(er) * 0.5 * 100  # [cm]
 sizes_group3_max = (time_bottom[mask3_valid] - time_top[mask3_valid]) * 1e-9 * c / np.sqrt(6) * 0.5 * 100  # [cm] # grpup3のエラー範囲
 sizes_group3_min = (time_bottom[mask3_valid] - time_top[mask3_valid]) * 1e-9 * c / np.sqrt(15) * 0.5 * 100  # [cm] # group3のエラー範囲
+
+# サイズ値を小数点以下3桁に丸めて、浮動小数点の微小誤差を排除
+sizes_group2 = np.round(sizes_group2, decimals=3)
+sizes_group3 = np.round(sizes_group3, decimals=3)
+
 all_sizes_cm_traditional = np.concatenate([size_label1, size_label2, sizes_group3])
 all_sizes_cm_estimamte_group2 = np.concatenate([size_label1, sizes_group2, sizes_group3]) # Group2も式で計算した場合
 all_sizes_cm_group2_3 = np.concatenate([sizes_group2, sizes_group3]) # Group2-3のみ（推定手法）
@@ -234,7 +239,8 @@ cum_counts_group2_3   = np.array([(all_sizes_cm_group2_3 >= s).sum() for s in un
 def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
                      scale_type='linear', fit_lines=None,
                      show_plot=False, dpi_png=300, dpi_pdf=600,
-                     marker='o', linestyle='-', linewidth=1.5, color=None, label=None):
+                     marker='o', linestyle='-', linewidth=1.5, color=None, label=None,
+                     xlim=None):
     """
     RSFDプロットを作成・保存する汎用関数
 
@@ -256,6 +262,8 @@ def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
         解像度
     marker, linestyle, linewidth, color, label :
         データプロットのスタイル設定
+    xlim : tuple, optional
+        x軸範囲 (xmin, xmax)
     """
     plt.figure(figsize=(8, 6))
 
@@ -291,6 +299,10 @@ def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
         plt.xscale('log')
         plt.yscale('log')
 
+    # x軸範囲の設定（軸スケール設定の直後に実行）
+    if xlim:
+        plt.xlim(xlim)
+
     # 軸ラベルとグリッド
     plt.xlabel(xlabel, fontsize=20)
     plt.ylabel(ylabel, fontsize=20)
@@ -325,7 +337,8 @@ for scale in ['linear', 'semilog', 'loglog']:
         unique_sizes_traditional, cum_counts_traditional,
         'Rock size [cm]', 'Cumulative number of rocks',
         output_path, scale_type=scale,
-        show_plot=(scale == 'linear')  # linearのみ表示
+        show_plot=(scale == 'linear'),  # linearのみ表示
+        xlim=(0, 50)
     )
 
 # TXT保存
@@ -351,7 +364,8 @@ for scale in ['linear', 'semilog', 'loglog']:
         unique_sizes_estimate_group2, cum_counts_estimate_group2,
         'Rock size [cm]', 'Cumulative number of rocks',
         output_path, scale_type=scale,
-        show_plot=(scale == 'linear')  # linearのみ表示
+        show_plot=(scale == 'linear'),  # linearのみ表示
+        xlim=(0, 50)
     )
 
 # TXT保存
@@ -383,7 +397,7 @@ if mask2_valid.any() or mask3_valid.any():
 
         # ソートされた順序で出力
         for i in sort_indices:
-            f.write(f'{lab_combined[i]}\t{x_combined[i]:.6f}\t{y_combined[i]:.6f}\t{time_top_combined[i]:.3f}\t{time_bottom_combined[i]:.3f}\t{size_cm_combined[i]:.3f}\n')
+            f.write(f'{lab_combined[i]}\t{x_combined[i]:.6f}\t{y_combined[i]:.6f}\t{time_top_combined[i]:.3f}\t{time_bottom_combined[i]:.3f}\t{size_cm_combined[i]:.8f}\n')
     print('Label‑2-3 詳細を保存:', dump_path)
 
 # ------------------------------------------------------------------
@@ -449,7 +463,8 @@ for scale in ['linear', 'semilog', 'loglog']:
         output_path, scale_type=scale,
         fit_lines=fit_lines_pow_trad,
         marker='o', linestyle='', label='Data',
-        show_plot=False
+        show_plot=False,
+        xlim=(0, 50)
     )
 
 # 9.2 指数関数フィット（従来手法）
@@ -467,7 +482,8 @@ for scale in ['linear', 'semilog', 'loglog']:
         output_path, scale_type=scale,
         fit_lines=fit_lines_exp_trad,
         marker='o', linestyle='', label='Data',
-        show_plot=False
+        show_plot=False,
+        xlim=(0, 50)
     )
 
 # ------------------------------------------------------------------
@@ -495,7 +511,8 @@ for scale in ['linear', 'semilog', 'loglog']:
         output_path, scale_type=scale,
         fit_lines=fit_lines_comparison_trad,
         marker='o', linestyle='', label='Data',
-        show_plot=(scale == 'linear')  # linearのみ表示
+        show_plot=(scale == 'linear'),  # linearのみ表示
+        xlim=(0, 50)
     )
 
 # 10.2 Group2もサイズ推定した場合
@@ -520,7 +537,8 @@ for scale in ['linear', 'semilog', 'loglog']:
         output_path, scale_type=scale,
         fit_lines=fit_lines_comparison_est_grp2,
         marker='o', linestyle='', label='Data',
-        show_plot=(scale == 'linear')  # linearのみ表示
+        show_plot=(scale == 'linear'),  # linearのみ表示
+        xlim=(0, 50)
     )
 
 # ------------------------------------------------------------------
@@ -541,7 +559,8 @@ for scale in ['linear', 'semilog', 'loglog']:
         output_path, scale_type=scale,
         fit_lines=fit_lines_pow_grp2_3,
         marker='o', linestyle='', label='Data (Group2-3)',
-        show_plot=False
+        show_plot=False,
+        xlim=(0, 50)
     )
 
 # 11.2 指数関数フィット（Group2-3のみ）
@@ -559,7 +578,8 @@ for scale in ['linear', 'semilog', 'loglog']:
         output_path, scale_type=scale,
         fit_lines=fit_lines_exp_grp2_3,
         marker='o', linestyle='', label='Data (Group2-3)',
-        show_plot=False
+        show_plot=False,
+        xlim=(0, 50)
     )
 
 # 11.3 フィッティング比較（Group2-3のみ）
@@ -584,7 +604,8 @@ for scale in ['linear', 'semilog', 'loglog']:
         output_path, scale_type=scale,
         fit_lines=fit_lines_comparison_grp2_3,
         marker='o', linestyle='', label='Data (Group2-3)',
-        show_plot=(scale == 'linear')  # linearのみ表示
+        show_plot=(scale == 'linear'),  # linearのみ表示
+        xlim=(0, 50)
     )
 
 # TXT保存（Group2-3）
