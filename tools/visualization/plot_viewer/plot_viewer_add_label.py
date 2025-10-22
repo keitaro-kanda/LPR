@@ -7,6 +7,73 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 import matplotlib as mpl
 from scipy.signal import hilbert
 from tqdm import tqdm
+from pathlib import Path
+
+def load_path_cache():
+    """パスキャッシュを読み込む"""
+    cache_file = Path.home() / '.plot_viewer_cache.json'
+    if cache_file.exists():
+        try:
+            with open(cache_file, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"キャッシュ読み込みエラー: {e}")
+    return {}
+
+def save_path_cache(bscan_path, json_path):
+    """パスキャッシュを保存"""
+    cache_file = Path.home() / '.plot_viewer_cache.json'
+    try:
+        with open(cache_file, 'w') as f:
+            json.dump({
+                'last_bscan_path': bscan_path,
+                'last_json_path': json_path
+            }, f, indent=4)
+    except Exception as e:
+        print(f"キャッシュ保存エラー: {e}")
+
+def get_peak_cache_path(bscan_path):
+    """ピークキャッシュファイルのパスを生成"""
+    return bscan_path.replace('.txt', '_peak_cache.txt')
+
+def load_peak_cache_from_file(peak_cache_path):
+    """ピーク検出結果をファイルから読み込む"""
+    peak_cache = {}
+    if not os.path.exists(peak_cache_path):
+        return peak_cache
+
+    print(f"ピークキャッシュを読み込んでいます: {peak_cache_path}")
+    try:
+        with open(peak_cache_path, 'r') as f:
+            for line in tqdm(f, desc='ピークキャッシュ読み込み中'):
+                line = line.strip()
+                if not line or ':' not in line:
+                    continue
+                trace_id, peaks_str = line.split(':', 1)
+                trace_idx = int(trace_id.strip())
+                if peaks_str.strip():
+                    peaks = [float(p.strip()) for p in peaks_str.split(',')]
+                else:
+                    peaks = []
+                peak_cache[trace_idx] = peaks
+        print(f"ピークキャッシュの読み込みが完了しました。({len(peak_cache)} トレース)")
+    except Exception as e:
+        print(f"ピークキャッシュ読み込みエラー: {e}")
+        return {}
+    return peak_cache
+
+def save_peak_cache_to_file(peak_cache_path, peak_cache):
+    """ピーク検出結果をファイルに保存"""
+    print(f"ピークキャッシュを保存しています: {peak_cache_path}")
+    try:
+        with open(peak_cache_path, 'w') as f:
+            for trace_idx in sorted(peak_cache.keys()):
+                peaks = peak_cache[trace_idx]
+                peaks_str = ', '.join([f'{p:.3f}' for p in peaks])
+                f.write(f'{trace_idx}: {peaks_str}\n')
+        print("ピークキャッシュの保存が完了しました。")
+    except Exception as e:
+        print(f"ピークキャッシュ保存エラー: {e}")
 
 def load_data(file_path):
     print("データを読み込んでいます...")
@@ -65,10 +132,10 @@ def get_color_for_label(label):
     }
     return mapping.get(label, (255, 255, 255))
 
-def calculate_peaks_for_single_trace(trace_idx, data, envelop_data, time_zero_index, sample_interval):
+def calculate_peaks_for_single_trace(trace_idx, data, envelope_data, time_zero_index, sample_interval):
     """1トレースのピーク検出を実行"""
     Ascan = data[:, trace_idx]
-    envelope = envelop_data[:, trace_idx]
+    envelope = envelope_data[:, trace_idx]
 
     # 時間軸の計算
     time = (np.arange(data.shape[0]) - time_zero_index) * sample_interval / 1e-9
@@ -76,11 +143,14 @@ def calculate_peaks_for_single_trace(trace_idx, data, envelop_data, time_zero_in
     # 安全ガード用の最大反復回数
     max_iterations = data.shape[0]
 
+    # 平均の計算（ピーク検出基準として使用）
+    mean_amplitude = np.nanmean(envelope)
+
     # 各トレースのピークインデックスを検出
     peaks_in_Ascan = []
     for i in range(1, len(envelope) - 1):
         # 局所最大値検出（振幅閾値 > 85パーセンタイル）
-        if envelope[i-1] < envelope[i] > envelope[i+1] and envelope[i] > np.percentile(envelope, 85):
+        if envelope[i-1] < envelope[i] > envelope[i+1] and envelope[i] > mean_amplitude * 2.0:
             peaks_in_Ascan.append(i)
 
     # 各ピークについてFWHM計算と分解可能性判定
@@ -345,11 +415,34 @@ class CustomViewBox(pg.ViewBox):
             ev.ignore()
 
 def main():
-    bscan_path = input("B-scanデータファイルのパスを入力してください:").strip()
-    json_input = input("JSONファイルのパスを入力してください（空→同ディレクトリ _labels.json）:").strip()
-    if not json_input:
-        json_input = bscan_path.replace('.txt', '_labels.json')
-    print()
+    # パスキャッシュの読み込み
+    path_cache = load_path_cache()
+
+    bscan_path = None
+    json_input = None
+
+    # 前回のパスが存在する場合は使用するか確認
+    if path_cache.get('last_bscan_path') and os.path.exists(path_cache.get('last_bscan_path', '')):
+        print(f"前回使用したファイル:")
+        print(f"  B-scan: {path_cache['last_bscan_path']}")
+        print(f"  JSON: {path_cache.get('last_json_path', '')}")
+        use_cache = input("前回のファイルを使用しますか？ (y/n): ").strip().lower()
+        print()
+
+        if use_cache == 'y':
+            bscan_path = path_cache['last_bscan_path']
+            json_input = path_cache.get('last_json_path', '')
+
+    # 新規入力
+    if not bscan_path:
+        bscan_path = input("B-scanデータファイルのパスを入力してください:").strip()
+        json_input = input("JSONファイルのパスを入力してください（空→同ディレクトリ _labels.json）:").strip()
+        if not json_input:
+            json_input = bscan_path.replace('.txt', '_labels.json')
+        print()
+
+        # パスキャッシュを保存
+        save_path_cache(bscan_path, json_input)
 
     data = load_data(bscan_path)
     
@@ -377,19 +470,45 @@ def main():
 
     # ピーク検出のキャッシュ
     peak_cache = {}
+    peak_cache_path = get_peak_cache_path(bscan_path)
 
-    # ユーザーに事前計算を確認
-    precompute_choice = input("全トレースのピークを事前計算しますか？(y/n): ").strip().lower()
-    print()
+    # ピークキャッシュファイルが存在するか確認
+    if os.path.exists(peak_cache_path):
+        # B-scanファイルとキャッシュファイルの更新日時を比較
+        bscan_mtime = os.path.getmtime(bscan_path)
+        cache_mtime = os.path.getmtime(peak_cache_path)
 
-    if precompute_choice == 'y':
-        print("全トレースのピーク検出を実行中...")
-        precompute_all_peaks(data, envelop, time_zero_index, sample_interval, peak_cache)
-        print("ピーク検出が完了しました。")
+        if cache_mtime >= bscan_mtime:
+            print(f"保存済みのピークキャッシュが見つかりました: {peak_cache_path}")
+            use_cache = input("保存済みのピークキャッシュを使用しますか？ (y/n): ").strip().lower()
+            print()
+
+            if use_cache == 'y':
+                peak_cache = load_peak_cache_from_file(peak_cache_path)
+                if peak_cache:
+                    print("ピークキャッシュの読み込みが完了しました。")
+                    print()
+                else:
+                    print("キャッシュ読み込みに失敗しました。再計算します。")
+        else:
+            print("B-scanファイルがキャッシュより新しいため、再計算が必要です。")
+
+    # キャッシュがない場合は事前計算を確認
+    if not peak_cache:
+        precompute_choice = input("全トレースのピークを事前計算しますか？(y/n): ").strip().lower()
         print()
-    else:
-        print("ピークはオンデマンドで計算されます。")
-        print()
+
+        if precompute_choice == 'y':
+            print("全トレースのピーク検出を実行中...")
+            precompute_all_peaks(data, envelop, time_zero_index, sample_interval, peak_cache)
+            print("ピーク検出が完了しました。")
+            print()
+
+            # ピークキャッシュをファイルに保存
+            save_peak_cache_to_file(peak_cache_path, peak_cache)
+        else:
+            print("ピークはオンデマンドで計算されます。")
+            print()
 
     # JSON 読み込み & マイグレーション
     labels_dict = {}
@@ -580,7 +699,7 @@ def main():
                 text = pg.TextItem(
                     f"{peak_time:.3f} ns",
                     color='r',
-                    anchor=(0, 0.5)
+                    anchor=(0, 1.0)
                 )
                 text.setPos(0, peak_time)
                 ascan.addItem(text)
@@ -598,7 +717,7 @@ def main():
     data_max = np.nanmax(np.abs(data))
     if np.isnan(data_max) or data_max == 0:
         data_max = 1.0  # デフォルト値
-    
+
     colorbar = pg.ColorBarItem(values=(-data_max/10, data_max/10), colorMap=cpg)
     colorbar.setImageItem(img)
 
@@ -606,7 +725,17 @@ def main():
     win.addItem(colorbar, 0, 1)
     win.addItem(ascan, 0, 2)
     win.show()
-    sys.exit(app.exec_())
+
+    # アプリケーション終了時の処理
+    exit_code = app.exec_()
+
+    # オンデマンド計算でピークキャッシュに新しいデータがある場合は保存
+    if peak_cache and not os.path.exists(peak_cache_path):
+        save_choice = input("\n計算されたピークデータを保存しますか？ (y/n): ").strip().lower()
+        if save_choice == 'y':
+            save_peak_cache_to_file(peak_cache_path, peak_cache)
+
+    sys.exit(exit_code)
 
 if __name__ == "__main__":
     main()
