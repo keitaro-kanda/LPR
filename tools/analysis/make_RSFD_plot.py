@@ -433,7 +433,7 @@ def calc_fitting(sizes, counts):
     D_fit = np.linspace(sizes.min(), sizes.max(), 200)
     N_pow_fit = k_pow * D_fit**r_pow
     N_exp_fit = k_exp * np.exp(r_exp * D_fit)
-    return (k_pow, r_pow, R2_pow, N_pow_fit), (k_exp, r_exp, R2_exp, N_exp_fit), D_fit
+    return (k_pow, np.abs(r_pow), R2_pow, N_pow_fit), (k_exp, np.abs(r_exp), R2_exp, N_exp_fit), D_fit
 
 (k_pow_trad, r_pow_trad, R2_pow_trad, N_pow_fit_trad),\
     (k_exp_trad, r_exp_trad, R2_exp_trad, N_exp_fit_trad), D_fit_trad\
