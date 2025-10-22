@@ -171,7 +171,7 @@ def convert_time_original_to_terrain(y_original, x_position, z_profile, params):
 def convert_labels_file(input_path, output_path, z_profile, params, conversion_mode):
     """
     ラベルファイルの時刻情報を変換
-    
+
     Parameters:
     -----------
     input_path : str
@@ -187,23 +187,27 @@ def convert_labels_file(input_path, output_path, z_profile, params, conversion_m
     """
     print(f"\nファイル変換中: {os.path.basename(input_path)}")
     print(f"変換モード: {conversion_mode}")
-    
+
     # JSONファイル読み込み
     with open(input_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
-    
+
     if 'results' not in data:
         raise ValueError("JSONファイルに'results'キーが見つかりません")
-    
+
     results = data['results']
-    converted_count = 0
-    
+    converted_y_count = 0
+    converted_time_top_count = 0
+    converted_time_bottom_count = 0
+
     # 各ラベルの時刻を変換
     for key, label_data in tqdm(results.items(), desc="ラベル変換中"):
         try:
             x_pos = label_data['x']
             y_time = label_data['y']
-            
+            label_value = label_data.get('label', None)
+
+            # y座標の変換
             if conversion_mode == 'terrain_to_original':
                 # 地形補正後 → 地形補正前
                 y_converted = convert_time_terrain_to_original(y_time, x_pos, z_profile, params)
@@ -212,21 +216,46 @@ def convert_labels_file(input_path, output_path, z_profile, params, conversion_m
                 y_converted = convert_time_original_to_terrain(y_time, x_pos, z_profile, params)
             else:
                 raise ValueError(f"無効な変換モード: {conversion_mode}")
-            
+
             # 変換後の値を設定
             label_data['y'] = y_converted
-            converted_count += 1
-            
+            converted_y_count += 1
+
+            # グループ2または3の場合、time_topとtime_bottomも変換
+            if label_value in [2, 3]:
+                # time_topの変換
+                if 'time_top' in label_data and label_data['time_top'] is not None:
+                    time_top = label_data['time_top']
+                    if conversion_mode == 'terrain_to_original':
+                        time_top_converted = convert_time_terrain_to_original(time_top, x_pos, z_profile, params)
+                    else:
+                        time_top_converted = convert_time_original_to_terrain(time_top, x_pos, z_profile, params)
+                    label_data['time_top'] = time_top_converted
+                    converted_time_top_count += 1
+
+                # time_bottomの変換
+                if 'time_bottom' in label_data and label_data['time_bottom'] is not None:
+                    time_bottom = label_data['time_bottom']
+                    if conversion_mode == 'terrain_to_original':
+                        time_bottom_converted = convert_time_terrain_to_original(time_bottom, x_pos, z_profile, params)
+                    else:
+                        time_bottom_converted = convert_time_original_to_terrain(time_bottom, x_pos, z_profile, params)
+                    label_data['time_bottom'] = time_bottom_converted
+                    converted_time_bottom_count += 1
+
         except Exception as e:
             print(f"警告: ラベル {key} の変換に失敗: {e}")
             continue
-    
+
     # 変換結果を保存
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
-    
-    print(f"変換完了: {converted_count} 個のラベルを変換")
+
+    print(f"変換完了:")
+    print(f"  y座標: {converted_y_count} 個")
+    print(f"  time_top: {converted_time_top_count} 個")
+    print(f"  time_bottom: {converted_time_bottom_count} 個")
     print(f"出力ファイル: {output_path}")
 
 def main():
@@ -286,15 +315,19 @@ def main():
         
         # 出力ファイル名生成
         base_dir = os.path.dirname(input_path)
-        base_name = os.path.splitext(os.path.basename(input_path))[0]
-        
-        if conversion_mode == 'terrain_to_original':
-            suffix = '_original'
+        print("base_name:",base_dir)
+        if base_dir=='/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Processed_Data/order_0_1_3_4_5/5_Terrain_correction/echo_labels':
+            output_dir_name='/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Processed_Data/order_0_1_3_4_5/4_Gain_function/echo_labels'
+        elif base_dir=='/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Processed_Data/order_0_1_3_4_5/4_Gain_function/echo_labels':
+            output_dir_name='/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Processed_Data/order_0_1_3_4_5/5_Terrain_correction/echo_labels'
         else:
-            suffix = '_terrain_corrected'
+            output_dir_name=input("出力ディレクトリのパスを指定してください: ").strip()
         
-        output_path = os.path.join(base_dir, f"{base_name}{suffix}.json")
-        
+        file_name = os.path.splitext(os.path.basename(input_path))[0] + '.json'
+
+        output_path = os.path.join(output_dir_name, file_name)
+        print("output_path:", output_path)
+
         try:
             convert_labels_file(input_path, output_path, z_profile, params, conversion_mode)
         except Exception as e:
