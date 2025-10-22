@@ -300,7 +300,9 @@ def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
         plt.yscale('log')
 
     # x軸範囲の設定（軸スケール設定の直後に実行）
-    if xlim:
+    if xlim and scale_type == 'loglog':
+        plt.xlim(max(xlim[0], 1), xlim[1])  # logスケールで負またはゼロを避ける
+    elif xlim:
         plt.xlim(xlim)
 
     # 軸ラベルとグリッド
@@ -338,7 +340,7 @@ for scale in ['linear', 'semilog', 'loglog']:
         'Rock size [cm]', 'Cumulative number of rocks',
         output_path, scale_type=scale,
         show_plot=(scale == 'linear'),  # linearのみ表示
-        xlim=(1, 50)
+        xlim=(0, 50)
     )
 
 # TXT保存
@@ -365,7 +367,7 @@ for scale in ['linear', 'semilog', 'loglog']:
         'Rock size [cm]', 'Cumulative number of rocks',
         output_path, scale_type=scale,
         show_plot=(scale == 'linear'),  # linearのみ表示
-        xlim=(1, 50)
+        xlim=(0, 50)
     )
 
 # TXT保存
@@ -464,7 +466,7 @@ for scale in ['linear', 'semilog', 'loglog']:
         fit_lines=fit_lines_pow_trad,
         marker='o', linestyle='', label='Data',
         show_plot=False,
-        xlim=(1, 50)
+        xlim=(0, 50)
     )
 
 # 9.2 指数関数フィット（従来手法）
@@ -483,7 +485,7 @@ for scale in ['linear', 'semilog', 'loglog']:
         fit_lines=fit_lines_exp_trad,
         marker='o', linestyle='', label='Data',
         show_plot=False,
-        xlim=(1, 50)
+        xlim=(0, 50)
     )
 
 # ------------------------------------------------------------------
@@ -512,7 +514,7 @@ for scale in ['linear', 'semilog', 'loglog']:
         fit_lines=fit_lines_comparison_trad,
         marker='o', linestyle='', label='Data',
         show_plot=(scale == 'linear'),  # linearのみ表示
-        xlim=(1, 50)
+        xlim=(0, 50)
     )
 
 # 10.2 Group2もサイズ推定した場合
@@ -538,7 +540,7 @@ for scale in ['linear', 'semilog', 'loglog']:
         fit_lines=fit_lines_comparison_est_grp2,
         marker='o', linestyle='', label='Data',
         show_plot=(scale == 'linear'),  # linearのみ表示
-        xlim=(1, 50)
+        xlim=(0, 50)
     )
 
 # ------------------------------------------------------------------
@@ -560,7 +562,7 @@ for scale in ['linear', 'semilog', 'loglog']:
         fit_lines=fit_lines_pow_grp2_3,
         marker='o', linestyle='', label='Data (Group2-3)',
         show_plot=False,
-        xlim=(1, 50)
+        xlim=(0, 50)
     )
 
 # 11.2 指数関数フィット（Group2-3のみ）
@@ -579,7 +581,7 @@ for scale in ['linear', 'semilog', 'loglog']:
         fit_lines=fit_lines_exp_grp2_3,
         marker='o', linestyle='', label='Data (Group2-3)',
         show_plot=False,
-        xlim=(1, 50)
+        xlim=(0, 50)
     )
 
 # 11.3 フィッティング比較（Group2-3のみ）
@@ -605,7 +607,7 @@ for scale in ['linear', 'semilog', 'loglog']:
         fit_lines=fit_lines_comparison_grp2_3,
         marker='o', linestyle='', label='Data (Group2-3)',
         show_plot=(scale == 'linear'),  # linearのみ表示
-        xlim=(1, 50)
+        xlim=(0, 50)
     )
 
 # TXT保存（Group2-3）
