@@ -143,14 +143,22 @@ def calculate_peaks_for_single_trace(trace_idx, data, envelope_data, time_zero_i
     # 安全ガード用の最大反復回数
     max_iterations = data.shape[0]
 
-    # 平均の計算（ピーク検出基準として使用）
-    mean_amplitude = np.nanmean(envelope)
+    # 移動平均の窓サイズ
+    running_ave_window_x = 50 # samples, 約1.8 m
+    running_ave_window_t = 50 # samples, 15.6 nss
 
     # 各トレースのピークインデックスを検出
     peaks_in_Ascan = []
     for i in range(1, len(envelope) - 1):
-        # 局所最大値検出（振幅閾値 > 85パーセンタイル）
-        if envelope[i-1] < envelope[i] > envelope[i+1] and envelope[i] > mean_amplitude * 2.0:
+        # ローカル平均を計算
+        x_start_idx = max(0, trace_idx - running_ave_window_x // 2)
+        x_end_idx = min(data.shape[1], trace_idx + running_ave_window_x // 2 + 1)
+        t_start_idx = max(0, i - running_ave_window_t // 2)
+        t_end_idx = min(len(envelope), i + running_ave_window_t // 2 + 1)
+        local_mean = np.mean(envelope_data[t_start_idx:t_end_idx, x_start_idx:x_end_idx])
+
+        # 局所最大値検出
+        if envelope[i-1] < envelope[i] > envelope[i+1] and envelope[i] > local_mean * 1.5:
             peaks_in_Ascan.append(i)
 
     # 各ピークについてFWHM計算と分解可能性判定
