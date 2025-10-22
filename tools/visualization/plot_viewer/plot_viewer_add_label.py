@@ -648,6 +648,15 @@ def main():
     plot.addItem(vline)
     vline.setPos(x_end/2)
 
+    # A-scanパネル上に水平方向の時刻表示用ライン
+    hline_time = pg.InfiniteLine(angle=0, movable=True, pen=pg.mkPen('g', width=2))
+    ascan.addItem(hline_time)
+    hline_time.setPos((y_start + y_end) / 2)  # 初期位置は中央
+
+    # 時刻表示用テキストラベル
+    time_label = pg.TextItem(color='g', anchor=(1.0, 1.0))
+    ascan.addItem(time_label)
+
     # ピーク検出用の表示要素を保持するリスト
     peak_markers = []
 
@@ -707,7 +716,7 @@ def main():
                 text = pg.TextItem(
                     f"{peak_time:.3f} ns",
                     color='r',
-                    anchor=(0, 1.0)
+                    anchor=(1.0, 1.0)
                 )
                 text.setPos(0, peak_time)
                 ascan.addItem(text)
@@ -718,8 +727,16 @@ def main():
             ascan.setTitle("out of range")
             ascan.setYRange(y_start, y_end)
 
+    def update_time_label():
+        """水平ライン位置の時刻をテキストラベルに表示"""
+        time_pos = hline_time.value()
+        time_label.setText(f"Time: {time_pos:.3f} ns")
+        time_label.setPos(0, time_pos)
+
     vline.sigPositionChanged.connect(update_ascan)
+    hline_time.sigPositionChanged.connect(update_time_label)
     update_ascan()
+    update_time_label()
 
     # NaN値を考慮したカラーバー範囲設定
     data_max = np.nanmax(np.abs(data))
