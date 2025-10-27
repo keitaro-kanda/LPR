@@ -31,6 +31,46 @@ data = [
     (200, 0, 4.7, "remote", "Watkins et al., 2019, (R)")
 ]
 
+
+# Calculate correlation coefficient
+# Calculate in linear scale
+ages = np.array([d[0] for d in data])
+rsfd_values = np.array([d[2] for d in data])
+correlation_matrix = np.corrcoef(ages, rsfd_values)
+correlation_coefficient = correlation_matrix[0, 1]
+print(f"Correlation coefficient (linear scale): {correlation_coefficient}")
+# Calculate in log scale
+log_ages = np.log10(ages + 1e-6)  # avoid
+correlation_matrix_log = np.corrcoef(log_ages, rsfd_values)
+correlation_coefficient_log = correlation_matrix_log[0, 1]
+print(f"Correlation coefficient (log scale): {correlation_coefficient_log}")
+# Calculate correlation only for remote data in log scale
+remote_ages = np.array([d[0] for d in data if d[3] == "remote"])
+remote_rsfd_values = np.array([d[2] for d in data if d[3] == "remote"])
+log_remote_ages = np.log10(remote_ages + 1e-6)
+correlation_matrix_remote_log = np.corrcoef(log_remote_ages, remote_rsfd_values)
+correlation_coefficient_remote_log = correlation_matrix_remote_log[0, 1]
+print(f"Correlation coefficient for remote data only (log scale): {correlation_coefficient_remote_log}")
+# Calculate correlation only for in-situ data in log scale
+in_situ_ages = np.array([d[0] for d in data if d[3] == "in-situ"])
+in_situ_rsfd_values = np.array([d[2] for d in data if d[3] == "in-situ"])
+log_in_situ_ages = np.log10(in_situ_ages + 1e-6)
+correlation_matrix_in_situ_log = np.corrcoef(log_in_situ_ages, in_situ_rsfd_values)
+correlation_coefficient_in_situ_log = correlation_matrix_in_situ_log[0, 1]
+print(f"Correlation coefficient for in-situ data only (log scale): {correlation_coefficient_in_situ_log}")
+# Save correlation coefficients to a text file
+output_dir = "/Volumes/SSD_Kanda_SAMSUNG/RSFD_vs_age"
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+with open(os.path.join(output_dir, "correlation_coefficients.txt"), "w") as f:
+    f.write(f"Correlation coefficient (linear scale): {correlation_coefficient}\n")
+    f.write(f"Correlation coefficient (log scale): {correlation_coefficient_log}\n")
+    f.write(f"Correlation coefficient for remote data only (log scale): {correlation_coefficient_remote_log}\n")
+    f.write(f"Correlation coefficient for in-situ data only (log scale): {correlation_coefficient_in_situ_log}\n")
+print(f"Correlation coefficients saved to {output_dir}/correlation_coefficients.txt")
+
+
+
 # Add color parameter based on reference
 reference_colors = {
     "Aussel et al., 2025, (R)": "blue",
@@ -42,7 +82,7 @@ reference_colors = {
     "Watkins et al., 2019, (R)": "brown"
 }
 
-# plotting in scatter plot
+# prepare data for plotting
 ages = np.array([d[0] for d in data])
 age_errors = np.array([d[1] for d in data])
 rsfd_values = np.array([d[2] for d in data])
@@ -111,4 +151,61 @@ plt.tight_layout()
 plt.savefig(os.path.join(output_dir, "no_error_bars.png"), dpi=120)
 plt.savefig(os.path.join(output_dir, "no_error_bars.pdf"), dpi=600)
 print(f"プロットを保存しました: {output_dir}/no_error_bars.png")
+plt.show()
+
+# Plot only in-situ data
+plt.figure(figsize=(12, 8))
+for i, d in enumerate(data):
+    if d[3] == "in-situ":
+        plt.errorbar(ages[i], rsfd_values[i], xerr=age_errors[i], fmt=markers[i], label=d[4], capsize=5,
+                     color=reference_colors[d[4]])
+plt.xlabel("Age (Ma)", fontsize=18)
+plt.ylabel("Power law exponent", fontsize=18)
+plt.tick_params(axis='both', which='major', labelsize=14)
+plt.xscale('log')
+# Add legend at only one entry per reference with custom markers
+handles = []
+labels = []
+for ref, color in reference_colors.items():
+    if ref not in labels:
+        marker = 'o'  # only in-situ data
+        handles.append(plt.Line2D([], [], color=color, marker=marker, linestyle='None', markersize=8))
+        labels.append(ref)
+# Add legend outside the plot
+plt.legend(handles, labels, fontsize=14, loc='upper left', bbox_to_anchor=(1, 1))
+plt.grid()
+plt.tight_layout()
+# save
+plt.savefig(os.path.join(output_dir, "in_situ_only.png"), dpi=120)
+plt.savefig(os.path.join(output_dir, "in_situ_only.pdf"), dpi=600)
+print(f"プロットを保存しました: {output_dir}/in_situ_only.png")
+plt.show()
+
+
+# Plot only remote data
+plt.figure(figsize=(12, 8))
+for i, d in enumerate(data):
+    if d[3] == "remote":
+        plt.errorbar(ages[i], rsfd_values[i], xerr=age_errors[i], fmt=markers[i], label=d[4], capsize=5,
+                     color=reference_colors[d[4]])
+plt.xlabel("Age (Ma)", fontsize=18)
+plt.ylabel("Power law exponent", fontsize=18)
+plt.tick_params(axis='both', which='major', labelsize=14)
+plt.xscale('log')
+# Add legend at only one entry per reference with custom markers
+handles = []
+labels = []
+for ref, color in reference_colors.items():
+    if ref not in labels:
+        marker = 'x'  # only remote data
+        handles.append(plt.Line2D([], [], color=color, marker=marker, linestyle='None', markersize=8))
+        labels.append(ref)
+# Add legend outside the plot
+plt.legend(handles, labels, fontsize=14, loc='upper left', bbox_to_anchor=(1, 1))
+plt.grid()
+plt.tight_layout()
+# save
+plt.savefig(os.path.join(output_dir, "remote_only.png"), dpi=120)
+plt.savefig(os.path.join(output_dir, "remote_only.pdf"), dpi=600)
+print(f"プロットを保存しました: {output_dir}/remote_only.png")
 plt.show()
