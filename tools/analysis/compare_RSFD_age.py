@@ -23,13 +23,25 @@ data = [
     (3, 0, 2.76, "remote", "Krishna & Kumar, 2016, (R)"),
     (53.5, 26.5, 2.629, "remote", "Li et al., 2017, (R)"),
     (53.5, 26.5, 1.86, "in-situ", "Li et al., 2017, (I)"),
+    (2750, 250, 2.73, "remote", "Li et al., 2017, (R)"), # Cintala & Macbride, 1995の年代を参照
+    (2750, 250, 2.23, "in-situ", "Li et al., 2017, (I)"), # Cintala & Macbride, 1995の年代を参照
+    (3150, 50, 3.51, "remote", "Li et al., 2017, (R)"), # Cintala & Macbride, 1995の年代を参照
+    (3150, 50, 2.58, "in-situ", "Li et al., 2017, (I)"), # Cintala & Macbride, 1995の年代を参照
+    (3150, 50, 3.68, "remote", "Li et al., 2017, (R)"), # Cintala & Macbride, 1995の年代を参照
+    (3150, 50, 2.77, "in-situ", "Li et al., 2017, (I)"), # Cintala & Macbride, 1995の年代を参照
+    (500, 500, 2.44, "remote", "Li et al., 2017, (R)"), # Cintala & Macbride, 1995の年代を参照
+    (500, 500, 2.53, "in-situ", "Li et al., 2017, (I)"), # Cintala & Macbride, 1995の年代を参照
+    (2750, 250, 2.11, "in-situ", "Shoemaker & Morris, 1969, (I)"), # Cintala & Macbride, 1995の年代を参照
+    (3150, 50, 2.56, "in-situ", "Shoemaker & Morris, 1969, (I)"), # Cintala & Macbride, 1995の年代を参照
+    (3150, 50, 2.51, "in-situ", "Shoemaker & Morris, 1969, (I)"), # Cintala & Macbride, 1995の年代を参照
+    (500, 500, 1.82, "in-situ", "Shoemaker & Morris, 1969, (I)"), # Cintala & Macbride, 1995の年代を参照
+    (10, 0, 4.03, "remote", "Pajola et al., 2019, (R)"),
     (2, 0, 5.3, "remote", "Watkins et al., 2019, (R)"),
     (26, 0, 5.6, "remote", "Watkins et al., 2019, (R)"),
     (50, 0, 3.8, "remote", "Watkins et al., 2019, (R)"),
     (80, 0, 4.4, "remote", "Watkins et al., 2019, (R)"),
     (105, 0, 6.8, "remote", "Watkins et al., 2019, (R)"),
     (200, 0, 4.7, "remote", "Watkins et al., 2019, (R)"),
-    (10, 0, 4.03, "remote", "Pajola et al., 2019, (R)")
 ]
 
 
@@ -74,14 +86,15 @@ print(f"Correlation coefficients saved to {output_dir}/correlation_coefficients.
 
 # Add color parameter based on reference
 reference_colors = {
-    "Aussel et al., 2025, (R)": "blue",
-    "Cintala & Macbride, 1995, (I)": "orange",
-    "Cintala & Macbride, 1995, (R)": "orange",
-    "Krishna & Kumar, 2016, (R)": "green",
-    "Li et al., 2017, (R)": "purple",
-    "Li et al., 2017, (I)": "purple",
-    "Watkins et al., 2019, (R)": "brown",
-    "Pajola et al., 2019, (R)": "red"
+    "Aussel et al., 2025, (R)": "red",
+    "Cintala & Macbride, 1995, (I)": "green",
+    "Cintala & Macbride, 1995, (R)": "green",
+    "Krishna & Kumar, 2016, (R)": "blue",
+    "Li et al., 2017, (R)": "orange",
+    "Li et al., 2017, (I)": "orange",
+    "Watkins et al., 2019, (R)": "purple",
+    "Pajola et al., 2019, (R)": "black",
+    "Shoemaker & Morris, 1969, (I)": "brown",
 }
 
 # prepare data for plotting
@@ -97,7 +110,7 @@ markers = np.where(in_situ_flags, 'o', 'x')
 plt.figure(figsize=(12, 8))
 for i, d in enumerate(data):
     plt.errorbar(ages[i], rsfd_values[i], xerr=age_errors[i], fmt=markers[i], label=d[4], capsize=5,
-                 color=reference_colors[d[4]], markersize=8)
+                 color=reference_colors[d[4]], markersize=7)
 
 plt.xlabel("Age (Ma)", fontsize=18)
 plt.ylabel("Power law exponent", fontsize=18)
@@ -132,7 +145,7 @@ plt.show()
 plt.figure(figsize=(12, 8))
 for i, d in enumerate(data):
     plt.scatter(ages[i], rsfd_values[i], marker=markers[i], label=d[4],
-                color=reference_colors[d[4]], s=100)
+                color=reference_colors[d[4]], s=75)
 plt.xlabel("Age (Ma)", fontsize=18)
 plt.ylabel("Power law exponent", fontsize=18)
 plt.xlim(0.1, 5000)
@@ -165,7 +178,7 @@ plt.figure(figsize=(12, 8))
 for i, d in enumerate(data):
     if d[3] == "in-situ":
         plt.errorbar(ages[i], rsfd_values[i], xerr=age_errors[i], fmt=markers[i], label=d[4], capsize=5,
-                     color=reference_colors[d[4]], markersize=8)
+                     color=reference_colors[d[4]], markersize=7)
 plt.xlabel("Age (Ma)", fontsize=18)
 plt.ylabel("Power law exponent", fontsize=18)
 plt.xlim(0.1, 5000)
@@ -196,7 +209,7 @@ plt.figure(figsize=(12, 8))
 for i, d in enumerate(data):
     if d[3] == "remote":
         plt.errorbar(ages[i], rsfd_values[i], xerr=age_errors[i], fmt=markers[i], label=d[4], capsize=5,
-                     color=reference_colors[d[4]], markersize=8)
+                     color=reference_colors[d[4]], markersize=7)
 plt.xlabel("Age (Ma)", fontsize=18)
 plt.ylabel("Power law exponent", fontsize=18)
 plt.xlim(0.1, 5000)
