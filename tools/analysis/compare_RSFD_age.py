@@ -28,7 +28,8 @@ data = [
     (50, 0, 3.8, "remote", "Watkins et al., 2019, (R)"),
     (80, 0, 4.4, "remote", "Watkins et al., 2019, (R)"),
     (105, 0, 6.8, "remote", "Watkins et al., 2019, (R)"),
-    (200, 0, 4.7, "remote", "Watkins et al., 2019, (R)")
+    (200, 0, 4.7, "remote", "Watkins et al., 2019, (R)"),
+    (10, 0, 4.03, "remote", "Pajola et al., 2019, (R)")
 ]
 
 
@@ -79,7 +80,8 @@ reference_colors = {
     "Krishna & Kumar, 2016, (R)": "green",
     "Li et al., 2017, (R)": "purple",
     "Li et al., 2017, (I)": "purple",
-    "Watkins et al., 2019, (R)": "brown"
+    "Watkins et al., 2019, (R)": "brown",
+    "Pajola et al., 2019, (R)": "red"
 }
 
 # prepare data for plotting
@@ -95,10 +97,12 @@ markers = np.where(in_situ_flags, 'o', 'x')
 plt.figure(figsize=(12, 8))
 for i, d in enumerate(data):
     plt.errorbar(ages[i], rsfd_values[i], xerr=age_errors[i], fmt=markers[i], label=d[4], capsize=5,
-                 color=reference_colors[d[4]])
+                 color=reference_colors[d[4]], markersize=8)
 
 plt.xlabel("Age (Ma)", fontsize=18)
 plt.ylabel("Power law exponent", fontsize=18)
+plt.xlim(0.1, 5000)
+plt.ylim(0, 7)
 plt.tick_params(axis='both', which='major', labelsize=14)
 plt.xscale('log')
 
@@ -131,6 +135,8 @@ for i, d in enumerate(data):
                 color=reference_colors[d[4]], s=100)
 plt.xlabel("Age (Ma)", fontsize=18)
 plt.ylabel("Power law exponent", fontsize=18)
+plt.xlim(0.1, 5000)
+plt.ylim(0, 7)
 plt.tick_params(axis='both', which='major', labelsize=14)
 plt.xscale('log')
 
@@ -153,21 +159,24 @@ plt.savefig(os.path.join(output_dir, "no_error_bars.pdf"), dpi=600)
 print(f"プロットを保存しました: {output_dir}/no_error_bars.png")
 plt.show()
 
+
 # Plot only in-situ data
 plt.figure(figsize=(12, 8))
 for i, d in enumerate(data):
     if d[3] == "in-situ":
         plt.errorbar(ages[i], rsfd_values[i], xerr=age_errors[i], fmt=markers[i], label=d[4], capsize=5,
-                     color=reference_colors[d[4]])
+                     color=reference_colors[d[4]], markersize=8)
 plt.xlabel("Age (Ma)", fontsize=18)
 plt.ylabel("Power law exponent", fontsize=18)
+plt.xlim(0.1, 5000)
+plt.ylim(0, 7)
 plt.tick_params(axis='both', which='major', labelsize=14)
 plt.xscale('log')
 # Add legend at only one entry per reference with custom markers
 handles = []
 labels = []
 for ref, color in reference_colors.items():
-    if ref not in labels:
+    if ref not in labels and any(d[4] == ref and d[3] == "in-situ" for d in data):
         marker = 'o'  # only in-situ data
         handles.append(plt.Line2D([], [], color=color, marker=marker, linestyle='None', markersize=8))
         labels.append(ref)
@@ -187,16 +196,18 @@ plt.figure(figsize=(12, 8))
 for i, d in enumerate(data):
     if d[3] == "remote":
         plt.errorbar(ages[i], rsfd_values[i], xerr=age_errors[i], fmt=markers[i], label=d[4], capsize=5,
-                     color=reference_colors[d[4]])
+                     color=reference_colors[d[4]], markersize=8)
 plt.xlabel("Age (Ma)", fontsize=18)
 plt.ylabel("Power law exponent", fontsize=18)
+plt.xlim(0.1, 5000)
+plt.ylim(0, 7)
 plt.tick_params(axis='both', which='major', labelsize=14)
 plt.xscale('log')
 # Add legend at only one entry per reference with custom markers
 handles = []
 labels = []
 for ref, color in reference_colors.items():
-    if ref not in labels:
+    if ref not in labels and any(d[4] == ref and d[3] == "remote" for d in data):
         marker = 'x'  # only remote data
         handles.append(plt.Line2D([], [], color=color, marker=marker, linestyle='None', markersize=8))
         labels.append(ref)
