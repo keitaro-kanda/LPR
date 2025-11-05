@@ -106,7 +106,8 @@ def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
 
     # 凡例（ラベルがある場合のみ）
     if label or fit_lines:
-        plt.legend(fontsize=14)
+        plt.legend(fontsize=14, loc='upper center', bbox_to_anchor=(0.5, 1.15),
+                   ncol=1, frameon=True, fancybox=True, shadow=False)
 
     plt.tight_layout()
 
@@ -609,7 +610,8 @@ def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
 
     # 凡例（ラベルがある場合のみ）
     if label or fit_lines:
-        plt.legend(fontsize=14)
+        plt.legend(fontsize=14, loc='upper center', bbox_to_anchor=(0.5, 1.27),
+                   ncol=1, frameon=True, fancybox=True, shadow=False)
 
     plt.tight_layout()
 
