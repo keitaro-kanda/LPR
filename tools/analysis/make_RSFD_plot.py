@@ -13,108 +13,396 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
+from datetime import datetime
 
 # ------------------------------------------------------------------
-# 1. 入力ファイルチェック
-# ------------------------------------------------------------------
-print('検出された岩石のラベルデータファイル(.json)のパスを入力してください:')
-data_path = input().strip()
-if not (os.path.exists(data_path) and data_path.lower().endswith('.json')):
-    raise FileNotFoundError('正しい .json ファイルを指定してください。')
-
-# モード選択
-print('\n=== データ範囲モード選択 ===')
-print('1: 全範囲のデータを使用')
-print('2: 特定の時間・距離範囲のデータのみを使用')
-print('3: 特定の時間・距離範囲のデータのみを取り除いて使用')
-mode = input('モードを選択してください (1/2/3): ').strip()
-
-if mode not in ['1', '2', '3']:
-    raise ValueError('モードは1, 2, 3のいずれかを選択してください。')
-
-# データ範囲の入力
-if mode == '1':
-    # モード1: 全範囲使用
-    time_range = ''
-    horizontal_range = ''
-    print('全範囲のデータを使用します。')
-else:
-    # モード2/3: 範囲入力
-    print('\n=== データ範囲指定 ===')
-    if mode == '2':
-        print('指定した範囲のデータのみを使用します。')
-    else:  # mode == '3'
-        print('指定した範囲のデータを除外します。')
-    time_range = input('時間範囲 [ns] を入力してください（例: 50-100, Enter: 指定なし）: ').strip()
-    horizontal_range = input('水平位置範囲 [m] を入力してください（例: 0-100, Enter: 指定なし）: ').strip()
-
-try:
-    if time_range:
-        time_min, time_max = map(float, time_range.split('-'))
-    else:
-        time_min, time_max = None, None
-
-    if horizontal_range:
-        horizontal_min, horizontal_max = map(float, horizontal_range.split('-'))
-    else:
-        horizontal_min, horizontal_max = None, None
-except ValueError:
-    raise ValueError('範囲の入力形式が正しくありません。例: 0-100')
-
-# 出力フォルダ
-base_dir = os.path.join(os.path.dirname(os.path.dirname(data_path)), 'RSFD')
-file_name = os.path.splitext(os.path.basename(data_path))[0]
-
-# 範囲指定に応じた出力ディレクトリ名
-if mode == '1':
-    # モード1: 全範囲
-    output_dir = os.path.join(base_dir, f'{file_name}_full_range')
-elif mode == '2':
-    # モード2: 特定範囲のみ使用（既存の命名）
-    if time_range and not horizontal_range:
-        output_dir = os.path.join(base_dir, f'{file_name}_t{time_min}-{time_max}')
-    elif horizontal_range and not time_range:
-        output_dir = os.path.join(base_dir, f'{file_name}_x{horizontal_min}-{horizontal_max}')
-    elif time_range and horizontal_range:
-        output_dir = os.path.join(base_dir, f'{file_name}_t{time_min}-{time_max}_x{horizontal_min}-{horizontal_max}')
-    else:
-        output_dir = os.path.join(base_dir, f'{file_name}_full_range')
-elif mode == '3':
-    # モード3: 特定範囲を除外
-    if time_range and not horizontal_range:
-        output_dir = os.path.join(base_dir, f'{file_name}_remove_t{time_min}-{time_max}')
-    elif horizontal_range and not time_range:
-        output_dir = os.path.join(base_dir, f'{file_name}_remove_x{horizontal_min}-{horizontal_max}')
-    elif time_range and horizontal_range:
-        output_dir = os.path.join(base_dir, f'{file_name}_remove_t{time_min}-{time_max}_x{horizontal_min}-{horizontal_max}')
-    else:
-        output_dir = os.path.join(base_dir, f'{file_name}_full_range')
-
-os.makedirs(output_dir, exist_ok=True)
-# プロット用サブフォルダ（カテゴリ別）
-output_dir_linear = os.path.join(output_dir, '1_non_fit')
-output_dir_power = os.path.join(output_dir, '2_power_law_fit')
-output_dir_exp = os.path.join(output_dir, '3_exponential_fit')
-output_dir_comparison = os.path.join(output_dir, '4_fit_comparison')
-os.makedirs(output_dir_linear, exist_ok=True)
-os.makedirs(output_dir_power, exist_ok=True)
-os.makedirs(output_dir_exp, exist_ok=True)
-os.makedirs(output_dir_comparison, exist_ok=True)
-
-# プロット用サブフォルダ（Group2-3専用）
-output_dir_power_2_3 = os.path.join(output_dir, '5_power_law_fit_2-3')
-output_dir_exp_2_3 = os.path.join(output_dir, '6_exponential_fit_2-3')
-output_dir_comparison_2_3 = os.path.join(output_dir, '7_fit_comparison_2-3')
-os.makedirs(output_dir_power_2_3, exist_ok=True)
-os.makedirs(output_dir_exp_2_3, exist_ok=True)
-os.makedirs(output_dir_comparison_2_3, exist_ok=True)
-
-# ------------------------------------------------------------------
-# 2. JSON 読み込み
+# 補助関数定義
 # ------------------------------------------------------------------
 def none_to_nan(v):
+    """None値をnp.nanに変換"""
     return np.nan if v is None else v
 
+def format_p_value(p):
+    """p値のフォーマットを補助する"""
+    if p < 0.001:
+        return "p < 0.001"
+    else:
+        return f"p={p:.3f}"
+
+def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
+                     scale_type='linear', fit_lines=None,
+                     show_plot=False, dpi_png=300, dpi_pdf=600,
+                     marker='o', linestyle='-', linewidth=1.5, color=None, label=None,
+                     xlim=None):
+    """
+    RSFDプロットを作成・保存する汎用関数
+
+    Parameters:
+    -----------
+    x_data, y_data : array
+        プロットするデータ
+    xlabel, ylabel : str
+        軸ラベル
+    output_path : str
+        出力パス（拡張子なし）
+    scale_type : str
+        'linear', 'semilog', 'loglog'
+    fit_lines : list of dict, optional
+        フィット曲線のリスト [{'x': x, 'y': y, 'label': label, 'color': color, 'linestyle': style}, ...]
+    show_plot : bool
+        プロット表示の有無
+    dpi_png, dpi_pdf : int
+        解像度
+    marker, linestyle, linewidth, color, label :
+        データプロットのスタイル設定
+    xlim : tuple, optional
+        x軸範囲 (xmin, xmax)
+    """
+    plt.figure(figsize=(8, 6))
+
+    # データプロット
+    if marker and linestyle:
+        plot_kwargs = {'marker': marker, 'linestyle': linestyle, 'linewidth': linewidth}
+        if color:
+            plot_kwargs['color'] = color
+        if label:
+            plot_kwargs['label'] = label
+        plt.plot(x_data, y_data, **plot_kwargs)
+    elif marker:  # scatter plot
+        scatter_kwargs = {'marker': marker}
+        if color:
+            scatter_kwargs['color'] = color
+        if label:
+            scatter_kwargs['label'] = label
+        plt.scatter(x_data, y_data, **scatter_kwargs)
+
+    # フィット曲線の追加
+    if fit_lines:
+        for fit_line in fit_lines:
+            plt.plot(fit_line['x'], fit_line['y'],
+                    linestyle=fit_line.get('linestyle', '--'),
+                    linewidth=fit_line.get('linewidth', 1.5),
+                    color=fit_line.get('color', 'red'),
+                    label=fit_line.get('label', ''))
+
+    # 軸スケール設定
+    if scale_type == 'semilog':
+        plt.yscale('log')
+    elif scale_type == 'loglog':
+        plt.xscale('log')
+        plt.yscale('log')
+
+    # x軸範囲の設定（軸スケール設定の直後に実行）
+    if xlim and scale_type == 'loglog':
+        plt.xlim(max(xlim[0], 1), xlim[1])  # logスケールで負またはゼロを避ける
+    elif xlim:
+        plt.xlim(xlim)
+
+    # 軸ラベルとグリッド
+    plt.xlabel(xlabel, fontsize=20)
+    plt.ylabel(ylabel, fontsize=20)
+    plt.tick_params(labelsize=16)
+    plt.grid(True, linestyle='--', alpha=0.5)
+
+    # 凡例（ラベルがある場合のみ）
+    if label or fit_lines:
+        plt.legend(fontsize=14)
+
+    plt.tight_layout()
+
+    # 保存
+    plt.savefig(f'{output_path}.png', dpi=dpi_png)
+    plt.savefig(f'{output_path}.pdf', dpi=dpi_pdf)
+
+    # 表示
+    if show_plot:
+        plt.show()
+    else:
+        plt.close()
+
+    print(f'プロット保存: {output_path}.png')
+
+def calc_fitting(sizes, counts):
+    """べき則と指数関数のフィッティングを実行"""
+    # 対数変換
+    mask = sizes > 0
+    log_D = np.log(sizes[mask])
+    log_N = np.log(counts[mask])
+
+    # べき則フィッティング (Power-law: log N = r log D + log k)
+    X_pow = sm.add_constant(log_D)
+    model_pow = sm.OLS(log_N, X_pow)
+    results_pow = model_pow.fit()
+
+    log_k_pow, r_pow = results_pow.params
+    k_pow = np.exp(log_k_pow)
+    R2_pow = results_pow.rsquared
+    r_pow_se = results_pow.bse[1]
+    r_pow_t = results_pow.tvalues[1]
+    r_pow_p = results_pow.pvalues[1]
+    dof_pow = results_pow.df_resid
+    n_pow = int(results_pow.nobs)
+
+    # 指数関数フィッティング (Exponential: log N = rD + log k)
+    X_exp = sm.add_constant(sizes[mask])
+    model_exp = sm.OLS(log_N, X_exp)
+    results_exp = model_exp.fit()
+
+    log_k_exp, r_exp = results_exp.params
+    k_exp = np.exp(log_k_exp)
+    R2_exp = results_exp.rsquared
+    r_exp_se = results_exp.bse[1]
+    r_exp_t = results_exp.tvalues[1]
+    r_exp_p = results_exp.pvalues[1]
+    dof_exp = results_exp.df_resid
+    n_exp = int(results_exp.nobs)
+
+    # フィット曲線用に滑らかなサンプル点を生成
+    D_fit = np.linspace(sizes.min(), sizes.max(), 200)
+    N_pow_fit = k_pow * D_fit**r_pow
+    N_exp_fit = k_exp * np.exp(r_exp * D_fit)
+
+    # べき則の結果, 指数関数の結果, D_fit
+    return (k_pow, np.abs(r_pow), R2_pow, N_pow_fit, r_pow_t, r_pow_p, r_pow_se, n_pow, dof_pow), \
+           (k_exp, np.abs(r_exp), R2_exp, N_exp_fit, r_exp_t, r_exp_p, r_exp_se, n_exp, dof_exp), \
+           D_fit
+
+def save_processing_config(config_path, data_path, mode, time_range, horizontal_range,
+                           time_min, time_max, horizontal_min, horizontal_max, output_dir):
+    """処理設定をJSONファイルに保存"""
+    # 既存の設定ファイルを読み込み
+    if os.path.exists(config_path):
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+    else:
+        config = {
+            "label_file": data_path,
+            "processing_history": []
+        }
+
+    # 新しい処理記録を追加
+    new_record = {
+        "id": len(config["processing_history"]) + 1,
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "mode": mode,
+        "time_range": time_range,
+        "horizontal_range": horizontal_range,
+        "time_min": time_min,
+        "time_max": time_max,
+        "horizontal_min": horizontal_min,
+        "horizontal_max": horizontal_max,
+        "output_dir": output_dir
+    }
+    config["processing_history"].append(new_record)
+
+    # JSONファイルに保存
+    with open(config_path, 'w', encoding='utf-8') as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+
+    print(f'処理設定を保存: {config_path}')
+
+def load_and_select_config():
+    """設定ファイルを読み込み、ユーザーに選択させる"""
+    print('\n検出された岩石のラベルデータファイル(.json)のパスを入力してください:')
+    data_path = input().strip()
+    if not (os.path.exists(data_path) and data_path.lower().endswith('.json')):
+        raise FileNotFoundError('正しい .json ファイルを指定してください。')
+
+    # 設定ファイルのパス
+    base_dir = os.path.join(os.path.dirname(os.path.dirname(data_path)), 'RSFD')
+    config_path = os.path.join(base_dir, 'processing_config.json')
+
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(f'設定ファイルが見つかりません: {config_path}\n先に新規データ処理を実行してください。')
+
+    # 設定ファイルを読み込み
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = json.load(f)
+
+    if not config["processing_history"]:
+        raise ValueError('処理履歴が空です。')
+
+    # 処理履歴を表示
+    print('\n=== 処理履歴 ===')
+    for record in config["processing_history"]:
+        print(f'ID: {record["id"]}')
+        print(f'  日時: {record["timestamp"]}')
+        print(f'  モード: {record["mode"]}')
+        print(f'  時間範囲: {record["time_range"] if record["time_range"] else "指定なし"}')
+        print(f'  水平位置範囲: {record["horizontal_range"] if record["horizontal_range"] else "指定なし"}')
+        print(f'  出力ディレクトリ: {record["output_dir"]}')
+        print()
+
+    # ユーザーに選択させる
+    selected_id = int(input('再作成する処理のIDを入力してください: ').strip())
+
+    # 選択した処理記録を取得
+    selected_record = None
+    for record in config["processing_history"]:
+        if record["id"] == selected_id:
+            selected_record = record
+            break
+
+    if selected_record is None:
+        raise ValueError(f'ID {selected_id} の処理記録が見つかりません。')
+
+    return data_path, selected_record
+
+# ------------------------------------------------------------------
+# 1. 起動モード選択
+# ------------------------------------------------------------------
+print('=== RSFD Plot Generator ===')
+print('1: 新規データ処理')
+print('2: 記録ファイルから既存プロットを再作成')
+startup_mode = input('モードを選択してください (1/2): ').strip()
+
+if startup_mode not in ['1', '2']:
+    raise ValueError('モードは1または2を選択してください。')
+
+# ------------------------------------------------------------------
+# 2. 入力ファイルチェック（モード1の場合）
+# ------------------------------------------------------------------
+if startup_mode == '1':
+    print('\n検出された岩石のラベルデータファイル(.json)のパスを入力してください:')
+    data_path = input().strip()
+    if not (os.path.exists(data_path) and data_path.lower().endswith('.json')):
+        raise FileNotFoundError('正しい .json ファイルを指定してください。')
+
+    # モード選択
+    print('\n=== データ範囲モード選択 ===')
+    print('1: 全範囲のデータを使用')
+    print('2: 特定の時間・距離範囲のデータのみを使用')
+    print('3: 特定の時間・距離範囲のデータのみを取り除いて使用')
+    mode = input('モードを選択してください (1/2/3): ').strip()
+
+    if mode not in ['1', '2', '3']:
+        raise ValueError('モードは1, 2, 3のいずれかを選択してください。')
+
+    # データ範囲の入力
+    if mode == '1':
+        # モード1: 全範囲使用
+        time_range = ''
+        horizontal_range = ''
+        print('全範囲のデータを使用します。')
+    else:
+        # モード2/3: 範囲入力
+        print('\n=== データ範囲指定 ===')
+        if mode == '2':
+            print('指定した範囲のデータのみを使用します。')
+        else:  # mode == '3'
+            print('指定した範囲のデータを除外します。')
+        time_range = input('時間範囲 [ns] を入力してください（例: 50-100, Enter: 指定なし）: ').strip()
+        horizontal_range = input('水平位置範囲 [m] を入力してください（例: 0-100, Enter: 指定なし）: ').strip()
+
+    try:
+        if time_range:
+            time_min, time_max = map(float, time_range.split('-'))
+        else:
+            time_min, time_max = None, None
+
+        if horizontal_range:
+            horizontal_min, horizontal_max = map(float, horizontal_range.split('-'))
+        else:
+            horizontal_min, horizontal_max = None, None
+    except ValueError:
+        raise ValueError('範囲の入力形式が正しくありません。例: 0-100')
+
+    # 出力フォルダ
+    base_dir = os.path.join(os.path.dirname(os.path.dirname(data_path)), 'RSFD')
+    file_name = os.path.splitext(os.path.basename(data_path))[0]
+
+    # 範囲指定に応じた出力ディレクトリ名
+    if mode == '1':
+        # モード1: 全範囲
+        output_dir = os.path.join(base_dir, f'{file_name}_full_range')
+    elif mode == '2':
+        # モード2: 特定範囲のみ使用（既存の命名）
+        if time_range and not horizontal_range:
+            output_dir = os.path.join(base_dir, f'{file_name}_t{time_min}-{time_max}')
+        elif horizontal_range and not time_range:
+            output_dir = os.path.join(base_dir, f'{file_name}_x{horizontal_min}-{horizontal_max}')
+        elif time_range and horizontal_range:
+            output_dir = os.path.join(base_dir, f'{file_name}_t{time_min}-{time_max}_x{horizontal_min}-{horizontal_max}')
+        else:
+            output_dir = os.path.join(base_dir, f'{file_name}_full_range')
+    elif mode == '3':
+        # モード3: 特定範囲を除外
+        if time_range and not horizontal_range:
+            output_dir = os.path.join(base_dir, f'{file_name}_remove_t{time_min}-{time_max}')
+        elif horizontal_range and not time_range:
+            output_dir = os.path.join(base_dir, f'{file_name}_remove_x{horizontal_min}-{horizontal_max}')
+        elif time_range and horizontal_range:
+            output_dir = os.path.join(base_dir, f'{file_name}_remove_t{time_min}-{time_max}_x{horizontal_min}-{horizontal_max}')
+        else:
+            output_dir = os.path.join(base_dir, f'{file_name}_full_range')
+
+    os.makedirs(output_dir, exist_ok=True)
+    # プロット用サブフォルダ（カテゴリ別）
+    output_dir_linear = os.path.join(output_dir, '1_non_fit')
+    output_dir_power = os.path.join(output_dir, '2_power_law_fit')
+    output_dir_exp = os.path.join(output_dir, '3_exponential_fit')
+    output_dir_comparison = os.path.join(output_dir, '4_fit_comparison')
+    os.makedirs(output_dir_linear, exist_ok=True)
+    os.makedirs(output_dir_power, exist_ok=True)
+    os.makedirs(output_dir_exp, exist_ok=True)
+    os.makedirs(output_dir_comparison, exist_ok=True)
+
+    # プロット用サブフォルダ（Group2-3専用）
+    output_dir_power_2_3 = os.path.join(output_dir, '5_power_law_fit_2-3')
+    output_dir_exp_2_3 = os.path.join(output_dir, '6_exponential_fit_2-3')
+    output_dir_comparison_2_3 = os.path.join(output_dir, '7_fit_comparison_2-3')
+    os.makedirs(output_dir_power_2_3, exist_ok=True)
+    os.makedirs(output_dir_exp_2_3, exist_ok=True)
+    os.makedirs(output_dir_comparison_2_3, exist_ok=True)
+
+else:  # startup_mode == '2'
+    # 設定ファイルから読み込み
+    data_path, selected_record = load_and_select_config()
+
+    # 変数を復元
+    mode = selected_record['mode']
+    time_range = selected_record['time_range']
+    horizontal_range = selected_record['horizontal_range']
+    time_min = selected_record['time_min']
+    time_max = selected_record['time_max']
+    horizontal_min = selected_record['horizontal_min']
+    horizontal_max = selected_record['horizontal_max']
+    output_dir = selected_record['output_dir']
+
+    # base_dirとfile_nameを復元
+    base_dir = os.path.dirname(output_dir)
+    file_name = os.path.splitext(os.path.basename(data_path))[0]
+
+    print(f'\n=== 再作成モード ===')
+    print(f'データファイル: {data_path}')
+    print(f'モード: {mode}')
+    print(f'時間範囲: {time_range if time_range else "指定なし"}')
+    print(f'水平位置範囲: {horizontal_range if horizontal_range else "指定なし"}')
+    print(f'出力ディレクトリ: {output_dir}\n')
+
+    # 出力ディレクトリを再作成
+    os.makedirs(output_dir, exist_ok=True)
+    # プロット用サブフォルダ（カテゴリ別）
+    output_dir_linear = os.path.join(output_dir, '1_non_fit')
+    output_dir_power = os.path.join(output_dir, '2_power_law_fit')
+    output_dir_exp = os.path.join(output_dir, '3_exponential_fit')
+    output_dir_comparison = os.path.join(output_dir, '4_fit_comparison')
+    os.makedirs(output_dir_linear, exist_ok=True)
+    os.makedirs(output_dir_power, exist_ok=True)
+    os.makedirs(output_dir_exp, exist_ok=True)
+    os.makedirs(output_dir_comparison, exist_ok=True)
+
+    # プロット用サブフォルダ（Group2-3専用）
+    output_dir_power_2_3 = os.path.join(output_dir, '5_power_law_fit_2-3')
+    output_dir_exp_2_3 = os.path.join(output_dir, '6_exponential_fit_2-3')
+    output_dir_comparison_2_3 = os.path.join(output_dir, '7_fit_comparison_2-3')
+    os.makedirs(output_dir_power_2_3, exist_ok=True)
+    os.makedirs(output_dir_exp_2_3, exist_ok=True)
+    os.makedirs(output_dir_comparison_2_3, exist_ok=True)
+
+# ------------------------------------------------------------------
+# 共通処理: JSON 読み込み
+# ------------------------------------------------------------------
 with open(data_path, 'r') as f:
     results = json.load(f).get('results', {})
 
@@ -347,7 +635,7 @@ for scale in ['linear', 'semilog', 'loglog']:
         unique_sizes_traditional, cum_counts_traditional,
         'Rock size [cm]', 'Cumulative number of rocks',
         output_path, scale_type=scale,
-        show_plot=(scale == 'linear'),  # linearのみ表示
+        show_plot=False,  # linearのみ表示
         xlim=(0, 50)
     )
 
@@ -545,7 +833,7 @@ for scale in ['linear', 'semilog', 'loglog']:
         output_path, scale_type=scale,
         fit_lines=fit_lines_comparison_trad,
         marker='o', linestyle='', label='Data',
-        show_plot=(scale == 'linear'),  # linearのみ表示
+        show_plot=False,  # linearのみ表示
         xlim=(0, 50)
     )
 
@@ -573,7 +861,7 @@ for scale in ['linear', 'semilog', 'loglog']:
         output_path, scale_type=scale,
         fit_lines=fit_lines_comparison_est_grp2,
         marker='o', linestyle='', label='Data',
-        show_plot=(scale == 'linear'),  # linearのみ表示
+        show_plot=False,  # linearのみ表示
         xlim=(0, 50)
     )
 
@@ -681,4 +969,14 @@ with open(summary_file_path, 'w') as f:
 
 print(f'フィッティングサマリー保存: {summary_file_path}')
 
-print('すべて完了しました！')
+# ------------------------------------------------------------------
+# 13. 設定ファイルの保存（新規処理の場合のみ）
+# ------------------------------------------------------------------
+if startup_mode == '1':
+    config_path = os.path.join(base_dir, 'processing_config.json')
+    save_processing_config(
+        config_path, data_path, mode, time_range, horizontal_range,
+        time_min, time_max, horizontal_min, horizontal_max, output_dir
+    )
+
+print('\nすべて完了しました！')
