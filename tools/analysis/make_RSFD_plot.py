@@ -12,6 +12,7 @@ import json
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import statsmodels.api as sm
 
 # ------------------------------------------------------------------
 # 1. 入力ファイルチェック
@@ -236,6 +237,13 @@ cum_counts_group2_3   = np.array([(all_sizes_cm_group2_3 >= s).sum() for s in un
 # ------------------------------------------------------------------
 # 6. 汎用プロット関数の定義
 # ------------------------------------------------------------------
+def format_p_value(p):
+    """p値のフォーマットを補助する"""
+    if p < 0.001:
+        return "p < 0.001"
+    else:
+        return f"p={p:.3f}"
+
 def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
                      scale_type='linear', fit_lines=None,
                      show_plot=False, dpi_png=300, dpi_pdf=600,
@@ -411,49 +419,72 @@ def calc_fitting(sizes, counts):
     log_D = np.log(sizes[mask])
     log_N = np.log(counts[mask])
 
-    # 7.1 べき則フィッティング
-    r_pow, log_k_pow = np.polyfit(log_D, log_N, 1)
-    k_pow = np.exp(log_k_pow)
-    # R^2 計算用予測値
-    N_pred_pow = k_pow * sizes**r_pow
-    ss_res_pow = np.sum((counts - N_pred_pow)**2)
-    ss_tot     = np.sum((counts - np.mean(counts))**2)
-    R2_pow     = 1 - ss_res_pow / ss_tot
+    # 7.1 べき則フィッティング (Power-law: log N = r log D + log k)
+    # 定数項 (切片) のために X に '1' の列を追加
+    X_pow = sm.add_constant(log_D)
+    # OLSモデルの実行
+    model_pow = sm.OLS(log_N, X_pow)
+    results_pow = model_pow.fit()
 
-    # 7.2 指数関数フィッティング
-    slope_exp, log_k_exp = np.polyfit(sizes, log_N, 1)
-    r_exp = slope_exp
+    # パラメータを results_pow から抽出
+    log_k_pow, r_pow = results_pow.params
+    k_pow = np.exp(log_k_pow)
+    R2_pow = results_pow.rsquared
+    # 傾き(r) の統計量を取得
+    r_pow_se = results_pow.bse[1]
+    r_pow_t = results_pow.tvalues[1]
+    r_pow_p = results_pow.pvalues[1]
+    dof_pow = results_pow.df_resid
+    n_pow = int(results_pow.nobs)
+
+    # 7.2 指数関数フィッティング (Exponential: log N = rD + log k)
+    # 定数項 (切片) のために X に '1' の列を追加
+    X_exp = sm.add_constant(sizes[mask])
+    # OLSモデルの実行
+    model_exp = sm.OLS(log_N, X_exp)
+    results_exp = model_exp.fit()
+
+    # パラメータを results_exp から抽出
+    log_k_exp, r_exp = results_exp.params
     k_exp = np.exp(log_k_exp)
-    # R^2 計算用予測値
-    N_pred_exp = k_exp * np.exp(r_exp * sizes)
-    ss_res_exp = np.sum((counts - N_pred_exp)**2)
-    R2_exp     = 1 - ss_res_exp / ss_tot
+    R2_exp = results_exp.rsquared
+    # 傾き(r) の統計量を取得
+    r_exp_se = results_exp.bse[1]
+    r_exp_t = results_exp.tvalues[1]
+    r_exp_p = results_exp.pvalues[1]
+    dof_exp = results_exp.df_resid
+    n_exp = int(results_exp.nobs)
 
     # フィット曲線用に滑らかなサンプル点を生成
     D_fit = np.linspace(sizes.min(), sizes.max(), 200)
     N_pow_fit = k_pow * D_fit**r_pow
     N_exp_fit = k_exp * np.exp(r_exp * D_fit)
-    return (k_pow, np.abs(r_pow), R2_pow, N_pow_fit), (k_exp, np.abs(r_exp), R2_exp, N_exp_fit), D_fit
 
-(k_pow_trad, r_pow_trad, R2_pow_trad, N_pow_fit_trad),\
-    (k_exp_trad, r_exp_trad, R2_exp_trad, N_exp_fit_trad), D_fit_trad\
+    # べき則の結果, 指数関数の結果, D_fit
+    return (k_pow, np.abs(r_pow), R2_pow, N_pow_fit, r_pow_t, r_pow_p, r_pow_se, n_pow, dof_pow), \
+           (k_exp, np.abs(r_exp), R2_exp, N_exp_fit, r_exp_t, r_exp_p, r_exp_se, n_exp, dof_exp), \
+           D_fit
+
+(k_pow_trad, r_pow_trad, R2_pow_trad, N_pow_fit_trad, t_pow_trad, p_pow_trad, se_pow_trad, n_pow_trad, dof_pow_trad),\
+    (k_exp_trad, r_exp_trad, R2_exp_trad, N_exp_fit_trad, t_exp_trad, p_exp_trad, se_exp_trad, n_exp_trad, dof_exp_trad), D_fit_trad\
     = calc_fitting(unique_sizes_traditional, cum_counts_traditional)
 
-(k_pow_est_grp2, r_pow_est_grp2, R2_pow_est_grp2, N_pow_fit_est_grp2),\
-    (k_exp_est_grp2, r_exp_est_grp2, R2_exp_est_grp2, N_exp_fit_est_grp2), D_fit_est_grp2\
+(k_pow_est_grp2, r_pow_est_grp2, R2_pow_est_grp2, N_pow_fit_est_grp2, t_pow_est_grp2, p_pow_est_grp2, se_pow_est_grp2, n_pow_est_grp2, dof_pow_est_grp2),\
+    (k_exp_est_grp2, r_exp_est_grp2, R2_exp_est_grp2, N_exp_fit_est_grp2, t_exp_est_grp2, p_exp_est_grp2, se_exp_est_grp2, n_exp_est_grp2, dof_exp_est_grp2), D_fit_est_grp2\
     = calc_fitting(unique_sizes_estimate_group2, cum_counts_estimate_group2)
 
-(k_pow_grp2_3, r_pow_grp2_3, R2_pow_grp2_3, N_pow_fit_grp2_3),\
-    (k_exp_grp2_3, r_exp_grp2_3, R2_exp_grp2_3, N_exp_fit_grp2_3), D_fit_grp2_3\
+(k_pow_grp2_3, r_pow_grp2_3, R2_pow_grp2_3, N_pow_fit_grp2_3, t_pow_grp2_3, p_pow_grp2_3, se_pow_grp2_3, n_pow_grp2_3, dof_pow_grp2_3),\
+    (k_exp_grp2_3, r_exp_grp2_3, R2_exp_grp2_3, N_exp_fit_grp2_3, t_exp_grp2_3, p_exp_grp2_3, se_exp_grp2_3, n_exp_grp2_3, dof_exp_grp2_3), D_fit_grp2_3\
     = calc_fitting(unique_sizes_group2_3, cum_counts_group2_3)
 
 # ------------------------------------------------------------------
 # 9. プロット: 個別フィット（3種類のスケール）
 # ------------------------------------------------------------------
 # 9.1 べき則フィット（従来手法）
+p_str_pow_trad = format_p_value(p_pow_trad)  # p値の書式設定
 fit_lines_pow_trad = [{
     'x': D_fit_trad, 'y': N_pow_fit_trad,
-    'label': f'Power-law: k={k_pow_trad:.2e}, r={r_pow_trad:.3f}, R²={R2_pow_trad:.4f}',
+    'label': f'Power-law: k={k_pow_trad:.2e}, r={r_pow_trad:.3f}, R²={R2_pow_trad:.4f}, {p_str_pow_trad}',
     'color': 'red', 'linestyle': '--'
 }]
 
@@ -470,9 +501,10 @@ for scale in ['linear', 'semilog', 'loglog']:
     )
 
 # 9.2 指数関数フィット（従来手法）
+p_str_exp_trad = format_p_value(p_exp_trad)  # p値の書式設定
 fit_lines_exp_trad = [{
     'x': D_fit_trad, 'y': N_exp_fit_trad,
-    'label': f'Exponential: k={k_exp_trad:.2e}, r={r_exp_trad:.3f}, R²={R2_exp_trad:.4f}',
+    'label': f'Exponential: k={k_exp_trad:.2e}, r={r_exp_trad:.3f}, R²={R2_exp_trad:.4f}, {p_str_exp_trad}',
     'color': 'green', 'linestyle': '--'
 }]
 
@@ -495,12 +527,12 @@ for scale in ['linear', 'semilog', 'loglog']:
 fit_lines_comparison_trad = [
     {
         'x': D_fit_trad, 'y': N_pow_fit_trad,
-        'label': f'Power-law: k={k_pow_trad:.2e}, r={r_pow_trad:.3f}, R²={R2_pow_trad:.4f}',
+        'label': f'Power-law: k={k_pow_trad:.2e}, r={r_pow_trad:.3f}, R²={R2_pow_trad:.4f}, {p_str_pow_trad}',
         'color': 'red', 'linestyle': '--'
     },
     {
         'x': D_fit_trad, 'y': N_exp_fit_trad,
-        'label': f'Exponential: k={k_exp_trad:.2e}, r={r_exp_trad:.3f}, R²={R2_exp_trad:.4f}',
+        'label': f'Exponential: k={k_exp_trad:.2e}, r={r_exp_trad:.3f}, R²={R2_exp_trad:.4f}, {p_str_exp_trad}',
         'color': 'green', 'linestyle': '--'
     }
 ]
@@ -518,15 +550,17 @@ for scale in ['linear', 'semilog', 'loglog']:
     )
 
 # 10.2 Group2もサイズ推定した場合
+p_str_pow_est_grp2 = format_p_value(p_pow_est_grp2)  # p値の書式設定
+p_str_exp_est_grp2 = format_p_value(p_exp_est_grp2)
 fit_lines_comparison_est_grp2 = [
     {
         'x': D_fit_est_grp2, 'y': N_pow_fit_est_grp2,
-        'label': f'Power-law: k={k_pow_est_grp2:.2e}, r={r_pow_est_grp2:.3f}, R²={R2_pow_est_grp2:.4f}',
+        'label': f'Power-law: k={k_pow_est_grp2:.2e}, r={r_pow_est_grp2:.3f}, R²={R2_pow_est_grp2:.4f}, {p_str_pow_est_grp2}',
         'color': 'red', 'linestyle': '--'
     },
     {
         'x': D_fit_est_grp2, 'y': N_exp_fit_est_grp2,
-        'label': f'Exponential: k={k_exp_est_grp2:.2e}, r={r_exp_est_grp2:.3f}, R²={R2_exp_est_grp2:.4f}',
+        'label': f'Exponential: k={k_exp_est_grp2:.2e}, r={r_exp_est_grp2:.3f}, R²={R2_exp_est_grp2:.4f}, {p_str_exp_est_grp2}',
         'color': 'green', 'linestyle': '--'
     }
 ]
@@ -547,9 +581,10 @@ for scale in ['linear', 'semilog', 'loglog']:
 # 11. プロット: Group2-3のみのフィッティング（3種類のスケール）
 # ------------------------------------------------------------------
 # 11.1 べき則フィット（Group2-3のみ）
+p_str_pow_grp2_3 = format_p_value(p_pow_grp2_3)  # p値の書式設定
 fit_lines_pow_grp2_3 = [{
     'x': D_fit_grp2_3, 'y': N_pow_fit_grp2_3,
-    'label': f'Power-law: k={k_pow_grp2_3:.2e}, r={r_pow_grp2_3:.3f}, R²={R2_pow_grp2_3:.4f}',
+    'label': f'Power-law: k={k_pow_grp2_3:.2e}, r={r_pow_grp2_3:.3f}, R²={R2_pow_grp2_3:.4f}, {p_str_pow_grp2_3}',
     'color': 'red', 'linestyle': '--'
 }]
 
@@ -566,9 +601,10 @@ for scale in ['linear', 'semilog', 'loglog']:
     )
 
 # 11.2 指数関数フィット（Group2-3のみ）
+p_str_exp_grp2_3 = format_p_value(p_exp_grp2_3)  # p値の書式設定
 fit_lines_exp_grp2_3 = [{
     'x': D_fit_grp2_3, 'y': N_exp_fit_grp2_3,
-    'label': f'Exponential: k={k_exp_grp2_3:.2e}, r={r_exp_grp2_3:.3f}, R²={R2_exp_grp2_3:.4f}',
+    'label': f'Exponential: k={k_exp_grp2_3:.2e}, r={r_exp_grp2_3:.3f}, R²={R2_exp_grp2_3:.4f}, {p_str_exp_grp2_3}',
     'color': 'green', 'linestyle': '--'
 }]
 
@@ -588,12 +624,12 @@ for scale in ['linear', 'semilog', 'loglog']:
 fit_lines_comparison_grp2_3 = [
     {
         'x': D_fit_grp2_3, 'y': N_pow_fit_grp2_3,
-        'label': f'Power-law: k={k_pow_grp2_3:.2e}, r={r_pow_grp2_3:.3f}, R²={R2_pow_grp2_3:.4f}',
+        'label': f'Power-law: k={k_pow_grp2_3:.2e}, r={r_pow_grp2_3:.3f}, R²={R2_pow_grp2_3:.4f}, {p_str_pow_grp2_3}',
         'color': 'red', 'linestyle': '--'
     },
     {
         'x': D_fit_grp2_3, 'y': N_exp_fit_grp2_3,
-        'label': f'Exponential: k={k_exp_grp2_3:.2e}, r={r_exp_grp2_3:.3f}, R²={R2_exp_grp2_3:.4f}',
+        'label': f'Exponential: k={k_exp_grp2_3:.2e}, r={r_exp_grp2_3:.3f}, R²={R2_exp_grp2_3:.4f}, {p_str_exp_grp2_3}',
         'color': 'green', 'linestyle': '--'
     }
 ]
@@ -616,5 +652,33 @@ with open(os.path.join(output_dir, 'RSFD_linear_group2-3.txt'), 'w') as f:
     for s, n in zip(unique_sizes_group2_3, cum_counts_group2_3):
         f.write(f'{s:.3f}\t{n}\n')
 print('Group2-3累積データTXT保存: RSFD_linear_group2-3.txt')
+
+# ------------------------------------------------------------------
+# 12. フィッティングサマリーファイルの出力
+# ------------------------------------------------------------------
+summary_file_path = os.path.join(output_dir, 'RSFD_fitting_summary.txt')
+with open(summary_file_path, 'w') as f:
+    # ヘッダー (タブ区切り)
+    f.write('DataSet\tModel\tk\tr\tR_squared\tr_StdErr\tr_t_value\tr_p_value\tN_points\tDOF\n')
+
+    # 1. 従来手法 (Traditional)
+    f.write(f'Traditional\tPower\t{k_pow_trad:.4e}\t{r_pow_trad:.4f}\t{R2_pow_trad:.4f}\t'
+            f'{se_pow_trad:.4f}\t{t_pow_trad:.3f}\t{p_pow_trad:.4e}\t{n_pow_trad}\t{dof_pow_trad}\n')
+    f.write(f'Traditional\tExponential\t{k_exp_trad:.4e}\t{r_exp_trad:.4f}\t{R2_exp_trad:.4f}\t'
+            f'{se_exp_trad:.4f}\t{t_exp_trad:.3f}\t{p_exp_trad:.4e}\t{n_exp_trad}\t{dof_exp_trad}\n')
+
+    # 2. Group2 推定 (Estimate_Group2)
+    f.write(f'Estimate_Group2\tPower\t{k_pow_est_grp2:.4e}\t{r_pow_est_grp2:.4f}\t{R2_pow_est_grp2:.4f}\t'
+            f'{se_pow_est_grp2:.4f}\t{t_pow_est_grp2:.3f}\t{p_pow_est_grp2:.4e}\t{n_pow_est_grp2}\t{dof_pow_est_grp2}\n')
+    f.write(f'Estimate_Group2\tExponential\t{k_exp_est_grp2:.4e}\t{r_exp_est_grp2:.4f}\t{R2_exp_est_grp2:.4f}\t'
+            f'{se_exp_est_grp2:.4f}\t{t_exp_est_grp2:.3f}\t{p_exp_est_grp2:.4e}\t{n_exp_est_grp2}\t{dof_exp_est_grp2}\n')
+
+    # 3. Group2-3 のみ (Group2-3_Only)
+    f.write(f'Group2-3_Only\tPower\t{k_pow_grp2_3:.4e}\t{r_pow_grp2_3:.4f}\t{R2_pow_grp2_3:.4f}\t'
+            f'{se_pow_grp2_3:.4f}\t{t_pow_grp2_3:.3f}\t{p_pow_grp2_3:.4e}\t{n_pow_grp2_3}\t{dof_pow_grp2_3}\n')
+    f.write(f'Group2-3_Only\tExponential\t{k_exp_grp2_3:.4e}\t{r_exp_grp2_3:.4f}\t{R2_exp_grp2_3:.4f}\t'
+            f'{se_exp_grp2_3:.4f}\t{t_exp_grp2_3:.3f}\t{p_exp_grp2_3:.4e}\t{n_exp_grp2_3}\t{dof_exp_grp2_3}\n')
+
+print(f'フィッティングサマリー保存: {summary_file_path}')
 
 print('すべて完了しました！')
