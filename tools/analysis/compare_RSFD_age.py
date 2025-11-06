@@ -164,6 +164,52 @@ reference_colors = {
 }
 
 
+def calculate_correlation_coefficient(data, data_type, filter_type):
+    """
+    相関係数を計算する汎用関数
+
+    Parameters:
+    -----------
+    data : list of tuples
+        データセット (age, age_error, value, in-situ/remote, reference)
+    data_type : str
+        "exponent" または "const"
+    filter_type : str
+        "all", "in-situ", "remote"
+
+    Returns:
+    --------
+    float
+        相関係数
+    """
+    # フィルタリング
+    if filter_type == "all":
+        filtered_data = data
+    elif filter_type == "in-situ":
+        filtered_data = [d for d in data if d[3] == "in-situ"]
+    elif filter_type == "remote":
+        filtered_data = [d for d in data if d[3] == "remote"]
+    else:
+        filtered_data = data
+
+    # データ抽出
+    ages = np.array([d[0] for d in filtered_data])
+    values = np.array([d[2] for d in filtered_data])
+
+    # 相関係数計算
+    if data_type == "exponent":
+        # log(age) vs exponent
+        log_ages = np.log10(ages + 1e-6)
+        correlation_matrix = np.corrcoef(log_ages, values)
+    else:  # "const"
+        # log(age) vs log(const)
+        log_ages = np.log10(ages + 1e-6)
+        log_values = np.log10(values + 1e-6)
+        correlation_matrix = np.corrcoef(log_ages, log_values)
+
+    return correlation_matrix[0, 1]
+
+
 def plot_rsfd_vs_age(data, data_type, filter_type, show_error_bars, output_filename, ylabel, output_dir):
     """
     汎用RSFD vs Age プロット関数
@@ -273,6 +319,9 @@ output_dir = "/Volumes/SSD_Kanda_SAMSUNG/RSFD_vs_age"
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
+# 各プロットの相関係数を保存するリスト
+plot_correlations = []
+
 # data_exponentの4種類のプロット（汎用関数を使用）
 print("\n=== Power law exponent プロットの作成 ===")
 
@@ -286,6 +335,8 @@ plot_rsfd_vs_age(
     ylabel="Power law exponent",
     output_dir=output_dir
 )
+corr_exp_all = calculate_correlation_coefficient(data_exponent, "exponent", "all")
+plot_correlations.append(("Power law exponent", "All data", "log scale", corr_exp_all))
 
 # 2. Without error bars (all data)
 plot_rsfd_vs_age(
@@ -297,6 +348,7 @@ plot_rsfd_vs_age(
     ylabel="Power law exponent",
     output_dir=output_dir
 )
+# 相関係数は上記と同じなので追加しない
 
 # 3. In-situ only
 plot_rsfd_vs_age(
@@ -308,6 +360,8 @@ plot_rsfd_vs_age(
     ylabel="Power law exponent",
     output_dir=output_dir
 )
+corr_exp_insitu = calculate_correlation_coefficient(data_exponent, "exponent", "in-situ")
+plot_correlations.append(("Power law exponent", "In-situ only", "log scale", corr_exp_insitu))
 
 # 4. Remote only
 plot_rsfd_vs_age(
@@ -319,6 +373,8 @@ plot_rsfd_vs_age(
     ylabel="Power law exponent",
     output_dir=output_dir
 )
+corr_exp_remote = calculate_correlation_coefficient(data_exponent, "exponent", "remote")
+plot_correlations.append(("Power law exponent", "Remote only", "log scale", corr_exp_remote))
 
 # data_constの4種類のプロット（汎用関数を使用）
 print("\n=== Constant term (/km^2) プロットの作成 ===")
@@ -333,6 +389,8 @@ plot_rsfd_vs_age(
     ylabel="Constant term (/km$^2$)",
     output_dir=output_dir
 )
+corr_const_all = calculate_correlation_coefficient(data_const, "const", "all")
+plot_correlations.append(("Constant term (/km^2)", "All data", "log-log scale", corr_const_all))
 
 # 2. Without error bars (all data)
 plot_rsfd_vs_age(
@@ -344,6 +402,7 @@ plot_rsfd_vs_age(
     ylabel="Constant term (/km$^2$)",
     output_dir=output_dir
 )
+# 相関係数は上記と同じなので追加しない
 
 # 3. In-situ only
 plot_rsfd_vs_age(
@@ -355,6 +414,8 @@ plot_rsfd_vs_age(
     ylabel="Constant term (/km$^2$)",
     output_dir=output_dir
 )
+corr_const_insitu = calculate_correlation_coefficient(data_const, "const", "in-situ")
+plot_correlations.append(("Constant term (/km^2)", "In-situ only", "log-log scale", corr_const_insitu))
 
 # 4. Remote only
 plot_rsfd_vs_age(
@@ -366,5 +427,35 @@ plot_rsfd_vs_age(
     ylabel="Constant term (/km$^2$)",
     output_dir=output_dir
 )
+corr_const_remote = calculate_correlation_coefficient(data_const, "const", "remote")
+plot_correlations.append(("Constant term (/km^2)", "Remote only", "log-log scale", corr_const_remote))
 
 print("\n=== すべてのプロット作成が完了しました ===")
+
+# 各プロットの相関係数をファイルに出力
+print("\n=== 各プロットの相関係数を出力中 ===")
+with open(os.path.join(output_dir, "plot_correlation_coefficients.txt"), "w") as f:
+    f.write("=" * 70 + "\n")
+    f.write("各プロットにおける相関係数\n")
+    f.write("=" * 70 + "\n\n")
+
+    # Power law exponent
+    f.write("=== Power law exponent vs Age ===\n")
+    for data_type, filter_type, scale, corr in plot_correlations:
+        if data_type == "Power law exponent":
+            f.write(f"{filter_type} ({scale}): {corr:.6f}\n")
+
+    f.write("\n")
+
+    # Constant term
+    f.write("=== Constant term (/km^2) vs Age ===\n")
+    for data_type, filter_type, scale, corr in plot_correlations:
+        if data_type == "Constant term (/km^2)":
+            f.write(f"{filter_type} ({scale}): {corr:.6f}\n")
+
+    f.write("\n")
+    f.write("=" * 70 + "\n")
+    f.write("注: 相関係数は-1から1の範囲で、絶対値が1に近いほど強い相関を示す\n")
+    f.write("=" * 70 + "\n")
+
+print(f"各プロットの相関係数を保存しました: {output_dir}/plot_correlation_coefficients.txt")
