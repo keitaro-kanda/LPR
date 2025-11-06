@@ -12,30 +12,30 @@ data_exponent = [
     (1, 0, 4.8, "remote", "Aussel et al., 2025, (R)"), # 年代は<1 Maとの記述
     (1, 0, 4.5, "remote", "Aussel et al., 2025, (R)"), # 年代は<1 Maとの記述
     (1, 0, 4.9, "remote", "Aussel et al., 2025, (R)"), # 年代は<1 Maとの記述
-    (2750, 250, 1.779, "in-situ", "Cintala & Macbride, 1995, (I)"),
-    (2500, 250, 2.505, "remote", "Cintala & Macbride, 1995, (R)"),
-    (3150, 50, 2.559, "in-situ", "Cintala & Macbride, 1995, (I)"),
-    (3850, 50, 5.653, "remote", "Cintala & Macbride, 1995, (R)"),
-    (3150, 50, 2.286, "in-situ", "Cintala & Macbride, 1995, (I)"), # 年代はIIIと同じくらい、との記述
-    (3150, 50, 6.021, "remote", "Cintala & Macbride, 1995, (R)"), # 年代はIIIと同じくらい、との記述
-    (500, 500, 1.802, "in-situ", "Cintala & Macbride, 1995, (I)"), # 年代は100 Myrオーダーとの記述
-    (500, 500, 4.031, "remote", "Cintala & Macbride, 1995, (R)"), # 年代は100 Myrオーダーとの記述
+    (2750, 250, 1.779, "in-situ", "Cintala & McBride, 1995, (I)"),
+    (2500, 250, 2.505, "remote", "Cintala & McBride, 1995, (R)"),
+    (3150, 50, 2.559, "in-situ", "Cintala & McBride, 1995, (I)"),
+    (3850, 50, 5.653, "remote", "Cintala & McBride, 1995, (R)"),
+    (3150, 50, 2.286, "in-situ", "Cintala & McBride, 1995, (I)"), # 年代はIIIと同じくらい、との記述
+    (3150, 50, 6.021, "remote", "Cintala & McBride, 1995, (R)"), # 年代はIIIと同じくらい、との記述
+    (500, 500, 1.802, "in-situ", "Cintala & McBride, 1995, (I)"), # 年代は100 Myrオーダーとの記述
+    (500, 500, 4.031, "remote", "Cintala & McBride, 1995, (R)"), # 年代は100 Myrオーダーとの記述
     (3, 0, 2.76, "remote", "Krishna & Kumar, 2016, (R)"),
     (53.5, 26.5, 2.629, "remote", "Li et al., 2017, (R)"),
     (53.5, 26.5, 1.86, "in-situ", "Li et al., 2017, (I)"),
-    (2750, 250, 2.73, "remote", "Li et al., 2017, (R)"), # Cintala & Macbride, 1995の年代を参照
-    (2750, 250, 2.23, "in-situ", "Li et al., 2017, (I)"), # Cintala & Macbride, 1995の年代を参照
-    (3150, 50, 3.51, "remote", "Li et al., 2017, (R)"), # Cintala & Macbride, 1995の年代を参照
-    (3150, 50, 2.58, "in-situ", "Li et al., 2017, (I)"), # Cintala & Macbride, 1995の年代を参照
-    (3150, 50, 3.68, "remote", "Li et al., 2017, (R)"), # Cintala & Macbride, 1995の年代を参照
-    (3150, 50, 2.77, "in-situ", "Li et al., 2017, (I)"), # Cintala & Macbride, 1995の年代を参照
-    (500, 500, 2.44, "remote", "Li et al., 2017, (R)"), # Cintala & Macbride, 1995の年代を参照
-    (500, 500, 2.53, "in-situ", "Li et al., 2017, (I)"), # Cintala & Macbride, 1995の年代を参照
+    (2750, 250, 2.73, "remote", "Li et al., 2017, (R)"), # Cintala & McBride, 1995の年代を参照
+    (2750, 250, 2.23, "in-situ", "Li et al., 2017, (I)"), # Cintala & McBride, 1995の年代を参照
+    (3150, 50, 3.51, "remote", "Li et al., 2017, (R)"), # Cintala & McBride, 1995の年代を参照
+    (3150, 50, 2.58, "in-situ", "Li et al., 2017, (I)"), # Cintala & McBride, 1995の年代を参照
+    (3150, 50, 3.68, "remote", "Li et al., 2017, (R)"), # Cintala & McBride, 1995の年代を参照
+    (3150, 50, 2.77, "in-situ", "Li et al., 2017, (I)"), # Cintala & McBride, 1995の年代を参照
+    (500, 500, 2.44, "remote", "Li et al., 2017, (R)"), # Cintala & McBride, 1995の年代を参照
+    (500, 500, 2.53, "in-situ", "Li et al., 2017, (I)"), # Cintala & McBride, 1995の年代を参照
     (53.5, 26.5, 5.46, "remote", "Li et al., 2018, (R)"),
-    (2750, 250, 2.11, "in-situ", "Shoemaker & Morris, 1969, (I)"), # Cintala & Macbride, 1995の年代を参照
-    (3150, 50, 2.56, "in-situ", "Shoemaker & Morris, 1969, (I)"), # Cintala & Macbride, 1995の年代を参照
-    (3150, 50, 2.51, "in-situ", "Shoemaker & Morris, 1969, (I)"), # Cintala & Macbride, 1995の年代を参照
-    (500, 500, 1.82, "in-situ", "Shoemaker & Morris, 1969, (I)"), # Cintala & Macbride, 1995の年代を参照
+    (2750, 250, 2.11, "in-situ", "Shoemaker & Morris, 1969, (I)"), # Cintala & McBride, 1995の年代を参照
+    (3150, 50, 2.56, "in-situ", "Shoemaker & Morris, 1969, (I)"), # Cintala & McBride, 1995の年代を参照
+    (3150, 50, 2.51, "in-situ", "Shoemaker & Morris, 1969, (I)"), # Cintala & McBride, 1995の年代を参照
+    (500, 500, 1.82, "in-situ", "Shoemaker & Morris, 1969, (I)"), # Cintala & McBride, 1995の年代を参照
     (10, 0, 4.03, "remote", "Pajola et al., 2019, (R)"),
     (2, 0, 5.3, "remote", "Watkins et al., 2019, (R)"),
     (26, 0, 5.6, "remote", "Watkins et al., 2019, (R)"),
@@ -47,29 +47,29 @@ data_exponent = [
 
 # /km^2に統一
 data_const = [
-    (2750, 250, 79.7, "in-situ", "Cintala & Macbride, 1995, (I)"), # /100 m^2を/km^2に変換
-    (2500, 250, 5.0, "remote", "Cintala & Macbride, 1995, (R)"), # /100 m^2を/km^2に変換
-    (3150, 50, 4.9, "in-situ", "Cintala & Macbride, 1995, (I)"), # /100 m^2を/km^2に変換
-    (3850, 50, 115.4, "remote", "Cintala & Macbride, 1995, (R)"), # /100 m^2を/km^2に変換
-    (3150, 50, 15.4, "in-situ", "Cintala & Macbride, 1995, (I)"), # 年代はIIIと同じくらい、との記述, 100 m^2を/km^2に変換
-    (3150, 50, 19.2, "remote", "Cintala & Macbride, 1995, (R)"), # 年代はIIIと同じくらい、との記述, 100 m^2を/km^2に変換
-    (500, 500, 266.6, "in-situ", "Cintala & Macbride, 1995, (I)"), # 年代は100 Myrオーダーとの記述, 100 m^2を/km^2に変換
-    (500, 500, 1826.1, "remote", "Cintala & Macbride, 1995, (R)"), # 年代は100 Myrオーダーとの記述, 100 m^2を/km^2に変換
+    (2750, 250, 79.7, "in-situ", "Cintala & McBride, 1995, (I)"), # /100 m^2を/km^2に変換
+    (2500, 250, 5.0, "remote", "Cintala & McBride, 1995, (R)"), # /100 m^2を/km^2に変換
+    (3150, 50, 4.9, "in-situ", "Cintala & McBride, 1995, (I)"), # /100 m^2を/km^2に変換
+    (3850, 50, 115.4, "remote", "Cintala & McBride, 1995, (R)"), # /100 m^2を/km^2に変換
+    (3150, 50, 15.4, "in-situ", "Cintala & McBride, 1995, (I)"), # 年代はIIIと同じくらい、との記述, 100 m^2を/km^2に変換
+    (3150, 50, 19.2, "remote", "Cintala & McBride, 1995, (R)"), # 年代はIIIと同じくらい、との記述, 100 m^2を/km^2に変換
+    (500, 500, 266.6, "in-situ", "Cintala & McBride, 1995, (I)"), # 年代は100 Myrオーダーとの記述, 100 m^2を/km^2に変換
+    (500, 500, 1826.1, "remote", "Cintala & McBride, 1995, (R)"), # 年代は100 Myrオーダーとの記述, 100 m^2を/km^2に変換
     (53.5, 26.5, 0.00528e6, "remote", "Li et al., 2017, (R)"), # /m^2を/km^2に変換
     (53.5, 26.5, 0.00275e6, "in-situ", "Li et al., 2017, (I)"), # /m^2を/km^2に変換
-    (2750, 250, 0.0015e6, "remote", "Li et al., 2017, (R)"), # Cintala & Macbride, 1995の年代を参照, /m^2を/km^2に変換
-    (2750, 250, 0.00114e6, "in-situ", "Li et al., 2017, (I)"), # Cintala & Macbride, 1995の年代を参照, /m^2を/km^2に変換
-    (3150, 50, 0.962e6, "remote", "Li et al., 2017, (R)"), # Cintala & Macbride, 1995の年代を参照, /m^2を/km^2に変換
-    (3150, 50, 0.00060e6, "in-situ", "Li et al., 2017, (I)"), # Cintala & Macbride, 1995の年代を参照, /m^2を/km^2に変換
-    (3150, 50, 0.00027e6, "remote", "Li et al., 2017, (R)"), # Cintala & Macbride, 1995の年代を参照, /m^2を/km^2に変換
-    (3150, 50, 0.00016e6, "in-situ", "Li et al., 2017, (I)"), # Cintala & Macbride, 1995の年代を参照, /m^2を/km^2に変換
-    (500, 500, 0.00324e6, "remote", "Li et al., 2017, (R)"), # Cintala & Macbride, 1995の年代を参照, /m^2を/km^2に変換
-    (500, 500, 0.00311e6, "in-situ", "Li et al., 2017, (I)"), # Cintala & Macbride, 1995の年代を参照, /m^2を/km^2に変換
+    (2750, 250, 0.0015e6, "remote", "Li et al., 2017, (R)"), # Cintala & McBride, 1995の年代を参照, /m^2を/km^2に変換
+    (2750, 250, 0.00114e6, "in-situ", "Li et al., 2017, (I)"), # Cintala & McBride, 1995の年代を参照, /m^2を/km^2に変換
+    (3150, 50, 0.962e6, "remote", "Li et al., 2017, (R)"), # Cintala & McBride, 1995の年代を参照, /m^2を/km^2に変換
+    (3150, 50, 0.00060e6, "in-situ", "Li et al., 2017, (I)"), # Cintala & McBride, 1995の年代を参照, /m^2を/km^2に変換
+    (3150, 50, 0.00027e6, "remote", "Li et al., 2017, (R)"), # Cintala & McBride, 1995の年代を参照, /m^2を/km^2に変換
+    (3150, 50, 0.00016e6, "in-situ", "Li et al., 2017, (I)"), # Cintala & McBride, 1995の年代を参照, /m^2を/km^2に変換
+    (500, 500, 0.00324e6, "remote", "Li et al., 2017, (R)"), # Cintala & McBride, 1995の年代を参照, /m^2を/km^2に変換
+    (500, 500, 0.00311e6, "in-situ", "Li et al., 2017, (I)"), # Cintala & McBride, 1995の年代を参照, /m^2を/km^2に変換
     (53.5, 26.5, 5.09, "remote", "Li et al., 2018, (R)"),
-    (2750, 250, 5e8, "in-situ", "Shoemaker & Morris, 1969, (I)"), # Cintala & Macbride, 1995の年代を参照, /100 m^2を/km^2に変換
-    (3150, 50, 3.3e8, "in-situ", "Shoemaker & Morris, 1969, (I)"), # Cintala & Macbride, 1995の年代を参照, /100 m^2を/km^2に変換
-    (3150, 50, 1.25e8, "in-situ", "Shoemaker & Morris, 1969, (I)"), # Cintala & Macbride, 1995の年代を参照, /100 m^2を/km^2に変換
-    (500, 500, 7.9e7, "in-situ", "Shoemaker & Morris, 1969, (I)") # Cintala & Macbride, 1995の年代を参照, /100 m^2を/km^2に変換
+    (2750, 250, 5e8, "in-situ", "Shoemaker & Morris, 1969, (I)"), # Cintala & McBride, 1995の年代を参照, /100 m^2を/km^2に変換
+    (3150, 50, 3.3e8, "in-situ", "Shoemaker & Morris, 1969, (I)"), # Cintala & McBride, 1995の年代を参照, /100 m^2を/km^2に変換
+    (3150, 50, 1.25e8, "in-situ", "Shoemaker & Morris, 1969, (I)"), # Cintala & McBride, 1995の年代を参照, /100 m^2を/km^2に変換
+    (500, 500, 7.9e7, "in-situ", "Shoemaker & Morris, 1969, (I)") # Cintala & McBride, 1995の年代を参照, /100 m^2を/km^2に変換
 ]
 
 # Calculate correlation coefficient
@@ -152,8 +152,8 @@ print(f"Correlation coefficients saved to {output_dir}/correlation_coefficients.
 # Add color parameter based on reference
 reference_colors = {
     "Aussel et al., 2025, (R)": "red",
-    "Cintala & Macbride, 1995, (I)": "green",
-    "Cintala & Macbride, 1995, (R)": "green",
+    "Cintala & McBride, 1995, (I)": "green",
+    "Cintala & McBride, 1995, (R)": "green",
     "Krishna & Kumar, 2016, (R)": "blue",
     "Li et al., 2017, (R)": "orange",
     "Li et al., 2017, (I)": "orange",
