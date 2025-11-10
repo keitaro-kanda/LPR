@@ -14,6 +14,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
 from datetime import datetime
+from matplotlib.ticker import MultipleLocator
 
 # ------------------------------------------------------------------
 # 補助関数定義
@@ -58,7 +59,7 @@ def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
     xlim : tuple, optional
         x軸範囲 (xmin, xmax)
     """
-    plt.figure(figsize=(8, 6))
+    plt.figure(figsize=(10, 8))
 
     # データプロット
     if marker and linestyle:
@@ -104,12 +105,18 @@ def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
     plt.tick_params(labelsize=16)
     plt.grid(True, linestyle='--', alpha=0.5)
 
+    # y軸のtick設定（最大値20以下の場合は2刻みに固定）
+    ax = plt.gca()
+    ylim = ax.get_ylim()
+    if ylim[1] <= 20:
+        ax.yaxis.set_major_locator(MultipleLocator(2))
+
     # 凡例（ラベルがある場合のみ）
     if label or fit_lines:
         plt.legend(fontsize=14, loc='upper center', bbox_to_anchor=(0.5, 1.15),
                    ncol=1, frameon=True, fancybox=True, shadow=False)
 
-    plt.tight_layout()
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
 
     # 保存
     plt.savefig(f'{output_path}.png', dpi=dpi_png)
@@ -595,19 +602,25 @@ else:  # startup_mode == '2'
                     plt.xlim(max(xlim[0], 1), xlim[1])  # logスケールで負またはゼロを避ける
                 elif xlim:
                     plt.xlim(xlim)
-            
+
                 # 軸ラベルとグリッド
                 plt.xlabel(xlabel, fontsize=20)
                 plt.ylabel(ylabel, fontsize=20)
                 plt.tick_params(labelsize=16)
                 plt.grid(True, linestyle='--', alpha=0.5)
-            
+
+                # y軸のtick設定（最大値20以下の場合は2刻みに固定）
+                ax = plt.gca()
+                ylim = ax.get_ylim()
+                if ylim[1] <= 20:
+                    ax.yaxis.set_major_locator(MultipleLocator(2))
+
                 # 凡例（ラベルがある場合のみ）
                 if label or fit_lines:
                     plt.legend(fontsize=14, loc='upper center', bbox_to_anchor=(0.5, 1.27),
                                ncol=1, frameon=True, fancybox=True, shadow=False)
-            
-                plt.tight_layout()
+
+                plt.tight_layout(rect=[0, 0, 1, 0.96])
             
                 # 保存
                 plt.savefig(f'{output_path}.png', dpi=dpi_png)
@@ -1184,12 +1197,18 @@ def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
     plt.tick_params(labelsize=16)
     plt.grid(True, linestyle='--', alpha=0.5)
 
+    # y軸のtick設定（最大値20以下の場合は2刻みに固定）
+    ax = plt.gca()
+    ylim = ax.get_ylim()
+    if ylim[1] <= 20:
+        ax.yaxis.set_major_locator(MultipleLocator(2))
+
     # 凡例（ラベルがある場合のみ）
     if label or fit_lines:
         plt.legend(fontsize=14, loc='upper center', bbox_to_anchor=(0.5, 1.27),
                    ncol=1, frameon=True, fancybox=True, shadow=False)
 
-    plt.tight_layout()
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
 
     # 保存
     plt.savefig(f'{output_path}.png', dpi=dpi_png)
