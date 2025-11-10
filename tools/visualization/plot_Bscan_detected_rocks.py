@@ -64,7 +64,7 @@ def detect_json_files(data_dir):
     
     # Search in common label directories
     possible_dirs = [
-        os.path.join(data_dir, 'rock_labels'),
+        os.path.join(data_dir, 'echo_labels'),
         os.path.join(data_dir, 'labels'),
         os.path.join(data_dir, 'detection_results'),
         data_dir  # Also search in the data directory itself
@@ -269,8 +269,8 @@ def single_plot(plot_data, time_zero_idx, label_keys=None, suffix=''):
                 if np.any(mask):
                     ax.scatter(
                         x[mask], t[mask],
-                        c=col, s=50, marker='o',
-                        edgecolors='white', linewidth=1.5
+                        c=col, s=30, marker='o',
+                        edgecolors='k', linewidth=1.0
                     )
 
     # プロット範囲
