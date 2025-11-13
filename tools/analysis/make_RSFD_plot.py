@@ -706,6 +706,10 @@ else:  # startup_mode == '2'
                     sizes_group2 = (time_bottom[mask2_valid] - time_top[mask2_valid]) * 1e-9 * c / np.sqrt(er) * 0.5 * 100
                     sizes_group3 = (time_bottom[mask3_valid] - time_top[mask3_valid]) * 1e-9 * c / np.sqrt(er) * 0.5 * 100
 
+                    # サイズ値を小数点以下3桁に丸めて、浮動小数点の微小誤差を排除
+                    sizes_group2 = np.round(sizes_group2, decimals=3)
+                    sizes_group3 = np.round(sizes_group3, decimals=3)
+
                     # 1) 従来手法（Group2=6cm固定）
                     all_sizes_traditional = np.concatenate([size_label1, size_label2, sizes_group3])
                     unique_sizes_traditional, unique_counts = np.unique(all_sizes_traditional, return_counts=True)
@@ -2170,6 +2174,10 @@ else:  # mode == '4'
         c = 299_792_458
         sizes_group2 = (time_bottom[mask2_valid] - time_top[mask2_valid]) * 1e-9 * c / np.sqrt(er) * 0.5 * 100
         sizes_group3 = (time_bottom[mask3_valid] - time_top[mask3_valid]) * 1e-9 * c / np.sqrt(er) * 0.5 * 100
+
+        # サイズ値を小数点以下3桁に丸めて、浮動小数点の微小誤差を排除
+        sizes_group2 = np.round(sizes_group2, decimals=3)
+        sizes_group3 = np.round(sizes_group3, decimals=3)
 
         # 1) 従来手法（Group2=6cm固定）
         all_sizes_traditional = np.concatenate([size_label1, size_label2, sizes_group3])
