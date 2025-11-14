@@ -105,10 +105,10 @@ def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
     plt.tick_params(labelsize=16)
     plt.grid(True, linestyle='--', alpha=0.5)
 
-    # y軸のtick設定（最大値20以下の場合は2刻みに固定）
+    # y軸のtick設定（最大値1-20の場合は2刻みに固定）
     ax = plt.gca()
     ylim = ax.get_ylim()
-    if ylim[1] <= 20:
+    if 1 <= ylim[1] <= 20:
         ax.yaxis.set_major_locator(MultipleLocator(2))
 
     # 凡例（ラベルがある場合のみ）
@@ -359,10 +359,10 @@ def create_multi_range_comparison_plot(ranges_data_list, xlabel, ylabel, output_
     plt.tick_params(labelsize=16)
     plt.grid(True, linestyle='--', alpha=0.5)
 
-    # y軸のtick設定
+    # y軸のtick設定（最大値1-20の場合は2刻みに固定）
     ax = plt.gca()
     ylim = ax.get_ylim()
-    if ylim[1] <= 20:
+    if 1 <= ylim[1] <= 20:
         ax.yaxis.set_major_locator(MultipleLocator(2))
 
     # 凡例
@@ -1190,10 +1190,10 @@ else:  # startup_mode == '2'
                     plt.tick_params(labelsize=16)
                     plt.grid(True, linestyle='--', alpha=0.5)
 
-                    # y軸のtick設定（最大値20以下の場合は2刻みに固定）
+                    # y軸のtick設定（最大値1-20の場合は2刻みに固定）
                     ax = plt.gca()
                     ylim = ax.get_ylim()
-                    if ylim[1] <= 20:
+                    if 1 <= ylim[1] <= 20:
                         ax.yaxis.set_major_locator(MultipleLocator(2))
 
                     # 凡例（ラベルがある場合のみ）
@@ -1768,11 +1768,11 @@ if mode != '4':
         plt.ylabel(ylabel, fontsize=20)
         plt.tick_params(labelsize=16)
         plt.grid(True, linestyle='--', alpha=0.5)
-    
-        # y軸のtick設定（最大値20以下の場合は2刻みに固定）
+
+        # y軸のtick設定（最大値1-20の場合は2刻みに固定）
         ax = plt.gca()
         ylim = ax.get_ylim()
-        if ylim[1] <= 20:
+        if 1 <= ylim[1] <= 20:
             ax.yaxis.set_major_locator(MultipleLocator(2))
     
         # 凡例（ラベルがある場合のみ）
