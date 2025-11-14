@@ -553,32 +553,36 @@ if startup_mode == '1':
         # モード1-3: Group2-3専用のディレクトリのみ作成
         # プロット用サブフォルダ（Group2-3専用）
         output_dir_power_2_3 = os.path.join(output_dir, '1_power_law_fit_2-3')
-        output_dir_exp_2_3 = os.path.join(output_dir, '2_exponential_fit_2-3')
-        output_dir_comparison_2_3 = os.path.join(output_dir, '3_fit_comparison_2-3')
         os.makedirs(output_dir_power_2_3, exist_ok=True)
-        os.makedirs(output_dir_exp_2_3, exist_ok=True)
-        os.makedirs(output_dir_comparison_2_3, exist_ok=True)
 
         # 面積規格化用サブフォルダ
         output_dir_area_normalized_est = os.path.join(output_dir, '4_area_normalized_fit_estimate_group2')
         output_dir_area_normalized_2_3 = os.path.join(output_dir, '5_area_normalized_fit_group2-3')
         os.makedirs(output_dir_area_normalized_est, exist_ok=True)
         os.makedirs(output_dir_area_normalized_2_3, exist_ok=True)
+
+        # Group比較用サブフォルダ
+        output_dir_group_comparison = os.path.join(output_dir, '6_group_comparison')
+        output_dir_group_comparison_area = os.path.join(output_dir, '7_group_comparison_area_normalized')
+        os.makedirs(output_dir_group_comparison, exist_ok=True)
+        os.makedirs(output_dir_group_comparison_area, exist_ok=True)
     else:
         # モード4: Group2-3専用の比較プロット用ディレクトリのみ作成
         # Group2-3専用ディレクトリ
         output_dir_power_2_3 = os.path.join(output_dir, '1_power_law_comparison_2-3')
-        output_dir_exp_2_3 = os.path.join(output_dir, '2_exponential_comparison_2-3')
-        output_dir_comparison_2_3 = os.path.join(output_dir, '3_both_fit_comparison_2-3')
         os.makedirs(output_dir_power_2_3, exist_ok=True)
-        os.makedirs(output_dir_exp_2_3, exist_ok=True)
-        os.makedirs(output_dir_comparison_2_3, exist_ok=True)
 
         # 面積規格化用ディレクトリ
         output_dir_area_normalized_est = os.path.join(output_dir, '4_area_normalized_comparison_estimate_group2')
         output_dir_area_normalized_2_3 = os.path.join(output_dir, '5_area_normalized_comparison_group2-3')
         os.makedirs(output_dir_area_normalized_est, exist_ok=True)
         os.makedirs(output_dir_area_normalized_2_3, exist_ok=True)
+
+        # Group比較用ディレクトリ
+        output_dir_group_comparison = os.path.join(output_dir, '6_group_comparison')
+        output_dir_group_comparison_area = os.path.join(output_dir, '7_group_comparison_area_normalized')
+        os.makedirs(output_dir_group_comparison, exist_ok=True)
+        os.makedirs(output_dir_group_comparison_area, exist_ok=True)
 
 else:  # startup_mode == '2'
     # 設定ファイルから全ての処理履歴を読み込み
@@ -619,32 +623,36 @@ else:  # startup_mode == '2'
                 # モード1-3: Group2-3専用のディレクトリのみ作成
                 # プロット用サブフォルダ（Group2-3専用）
                 output_dir_power_2_3 = os.path.join(output_dir, '1_power_law_fit_2-3')
-                output_dir_exp_2_3 = os.path.join(output_dir, '2_exponential_fit_2-3')
-                output_dir_comparison_2_3 = os.path.join(output_dir, '3_fit_comparison_2-3')
                 os.makedirs(output_dir_power_2_3, exist_ok=True)
-                os.makedirs(output_dir_exp_2_3, exist_ok=True)
-                os.makedirs(output_dir_comparison_2_3, exist_ok=True)
 
                 # 面積規格化用サブフォルダ
                 output_dir_area_normalized_est = os.path.join(output_dir, '4_area_normalized_fit_estimate_group2')
                 output_dir_area_normalized_2_3 = os.path.join(output_dir, '5_area_normalized_fit_group2-3')
                 os.makedirs(output_dir_area_normalized_est, exist_ok=True)
                 os.makedirs(output_dir_area_normalized_2_3, exist_ok=True)
+
+                # Group比較用サブフォルダ
+                output_dir_group_comparison = os.path.join(output_dir, '6_group_comparison')
+                output_dir_group_comparison_area = os.path.join(output_dir, '7_group_comparison_area_normalized')
+                os.makedirs(output_dir_group_comparison, exist_ok=True)
+                os.makedirs(output_dir_group_comparison_area, exist_ok=True)
             else:
                 # モード4: Group2-3専用の比較プロット用ディレクトリのみ作成
                 # Group2-3専用ディレクトリ
                 output_dir_power_2_3 = os.path.join(output_dir, '1_power_law_comparison_2-3')
-                output_dir_exp_2_3 = os.path.join(output_dir, '2_exponential_comparison_2-3')
-                output_dir_comparison_2_3 = os.path.join(output_dir, '3_both_fit_comparison_2-3')
                 os.makedirs(output_dir_power_2_3, exist_ok=True)
-                os.makedirs(output_dir_exp_2_3, exist_ok=True)
-                os.makedirs(output_dir_comparison_2_3, exist_ok=True)
 
                 # 面積規格化用ディレクトリ
                 output_dir_area_normalized_est = os.path.join(output_dir, '4_area_normalized_comparison_estimate_group2')
                 output_dir_area_normalized_2_3 = os.path.join(output_dir, '5_area_normalized_comparison_group2-3')
                 os.makedirs(output_dir_area_normalized_est, exist_ok=True)
                 os.makedirs(output_dir_area_normalized_2_3, exist_ok=True)
+
+                # Group比較用ディレクトリ
+                output_dir_group_comparison = os.path.join(output_dir, '6_group_comparison')
+                output_dir_group_comparison_area = os.path.join(output_dir, '7_group_comparison_area_normalized')
+                os.makedirs(output_dir_group_comparison, exist_ok=True)
+                os.makedirs(output_dir_group_comparison_area, exist_ok=True)
 
                 # モード4用の変数を復元
                 num_ranges = selected_record.get('num_ranges', 1)
@@ -953,15 +961,6 @@ else:  # startup_mode == '2'
                     create_multi_range_comparison_plot(
                         power_data_grp2_3, 'Rock size [cm]', 'Cumulative number of rocks',
                         output_path, scale_type=scale, fit_type='Power-law',
-                        show_plot=False, xlim=(0, 50)
-                    )
-
-                exp_data_grp2_3 = [d for d in all_ranges_data_grp2_3 if 'fit_type' in d and d['fit_type'] == 'exponential']
-                for scale in ['linear', 'semilog', 'loglog']:
-                    output_path = os.path.join(output_dir_exp_2_3, f'RSFD_exponential_comparison_group2-3_{scale}')
-                    create_multi_range_comparison_plot(
-                        exp_data_grp2_3, 'Rock size [cm]', 'Cumulative number of rocks',
-                        output_path, scale_type=scale, fit_type='Exponential',
                         show_plot=False, xlim=(0, 50)
                     )
 
@@ -1385,53 +1384,63 @@ else:  # startup_mode == '2'
                     show_plot=False,
                     xlim=(0, 50)
                 )
-            
-            # 11.2 指数関数フィット（Group2-3のみ）
-            p_str_exp_grp2_3 = format_p_value(p_exp_grp2_3)  # p値の書式設定
-            fit_lines_exp_grp2_3 = [{
-                'x': D_fit_grp2_3, 'y': N_exp_fit_grp2_3,
-                'label': f'Exponential: k={k_exp_grp2_3:.2e}, r={r_exp_grp2_3:.3f}, R²={R2_exp_grp2_3:.4f}, {p_str_exp_grp2_3}',
-                'color': 'green', 'linestyle': '--'
-            }]
-            
+
+            # 11.2 Group比較プロット（Group1-3 vs Group2-3、area normalizeなし）
             for scale in ['linear', 'semilog', 'loglog']:
-                output_path = os.path.join(output_dir_exp_2_3, f'RSFD_exponential_fit_group2-3_{scale}')
-                create_rsfd_plot(
-                    unique_sizes_group2_3, cum_counts_group2_3,
-                    'Rock size [cm]', 'Cumulative number of rocks',
-                    output_path, scale_type=scale,
-                    fit_lines=fit_lines_exp_grp2_3,
-                    marker='o', linestyle='', label='Data (Group2-3)',
-                    show_plot=False,
-                    xlim=(0, 50)
-                )
-            
-            # 11.3 フィッティング比較（Group2-3のみ）
-            fit_lines_comparison_grp2_3 = [
-                {
-                    'x': D_fit_grp2_3, 'y': N_pow_fit_grp2_3,
-                    'label': f'Power-law: k={k_pow_grp2_3:.2e}, r={r_pow_grp2_3:.3f}, R²={R2_pow_grp2_3:.4f}, {p_str_pow_grp2_3}',
-                    'color': 'red', 'linestyle': '--'
-                },
-                {
-                    'x': D_fit_grp2_3, 'y': N_exp_fit_grp2_3,
-                    'label': f'Exponential: k={k_exp_grp2_3:.2e}, r={r_exp_grp2_3:.3f}, R²={R2_exp_grp2_3:.4f}, {p_str_exp_grp2_3}',
-                    'color': 'green', 'linestyle': '--'
-                }
-            ]
-            
-            for scale in ['linear', 'semilog', 'loglog']:
-                output_path = os.path.join(output_dir_comparison_2_3, f'RSFD_fit_comparison_group2-3_{scale}')
-                create_rsfd_plot(
-                    unique_sizes_group2_3, cum_counts_group2_3,
-                    'Rock size [cm]', 'Cumulative number of rocks',
-                    output_path, scale_type=scale,
-                    fit_lines=fit_lines_comparison_grp2_3,
-                    marker='o', linestyle='', label='Data (Group2-3)',
-                    show_plot=(scale == 'linear'),  # linearのみ表示
-                    xlim=(0, 50)
-                )
-            
+                output_path = os.path.join(output_dir_group_comparison, f'RSFD_group_comparison_{scale}')
+
+                plt.figure(figsize=(10, 8))
+
+                # データ点（Group1-3のみ表示）
+                plt.plot(unique_sizes_estimate_group2, cum_counts_estimate_group2,
+                        marker='o', linestyle='', color='black', label='Data')
+
+                # Group 1-3のフィット線
+                plt.plot(D_fit_est_grp2, N_pow_fit_est_grp2,
+                        linestyle='--', linewidth=1.5, color='blue',
+                        label=f'Group1-3 fit: k={k_pow_est_grp2:.2e}, r={r_pow_est_grp2:.3f}, R²={R2_pow_est_grp2:.4f}, {p_str_pow_est_grp2}')
+
+                # Group 2-3のフィット線
+                plt.plot(D_fit_grp2_3, N_pow_fit_grp2_3,
+                        linestyle='--', linewidth=1.5, color='red',
+                        label=f'Group2-3 fit: k={k_pow_grp2_3:.2e}, r={r_pow_grp2_3:.3f}, R²={R2_pow_grp2_3:.4f}, {p_str_pow_grp2_3}')
+
+                # 軸スケール設定
+                if scale == 'semilog':
+                    plt.yscale('log')
+                elif scale == 'loglog':
+                    plt.xscale('log')
+                    plt.yscale('log')
+
+                # x軸範囲
+                if scale == 'loglog':
+                    plt.xlim(max(0, 1), 50)
+                else:
+                    plt.xlim(0, 50)
+
+                # 軸ラベルとグリッド
+                plt.xlabel('Rock size [cm]', fontsize=20)
+                plt.ylabel('Cumulative number of rocks', fontsize=20)
+                plt.tick_params(labelsize=16)
+                plt.grid(True, linestyle='--', alpha=0.5)
+
+                # y軸のtick設定（最大値1-20の場合は2刻みに固定）
+                ax = plt.gca()
+                ylim = ax.get_ylim()
+                if 1 <= ylim[1] <= 20:
+                    ax.yaxis.set_major_locator(MultipleLocator(2))
+
+                # 凡例
+                plt.legend(fontsize=12, loc='upper right', frameon=True, fancybox=True, shadow=False)
+                plt.tight_layout()
+
+                # 保存
+                plt.savefig(f'{output_path}.png', dpi=300)
+                plt.savefig(f'{output_path}.pdf', dpi=600)
+                plt.close()
+
+                print(f'Group比較プロット保存: {output_path}.png')
+
             # TXT保存（Group2-3）
             with open(os.path.join(output_dir, 'RSFD_linear_group2-3.txt'), 'w') as f:
                 f.write('# size_cm\tcumulative_count\n')
@@ -1508,6 +1517,64 @@ else:  # startup_mode == '2'
                 for s, n in zip(unique_sizes_group2_3, cum_counts_area_2_3):
                     f.write(f'{s:.3f}\t{n:.6f}\n')
             print('面積規格化Group2-3累積データTXT保存: RSFD_area_normalized_group2-3.txt')
+
+            # ------------------------------------------------------------------
+            # 11.6 Group比較プロット（Group1-3 vs Group2-3、area normalizeあり）
+            # ------------------------------------------------------------------
+            for scale in ['linear', 'semilog', 'loglog']:
+                output_path = os.path.join(output_dir_group_comparison_area, f'RSFD_group_comparison_area_normalized_{scale}')
+
+                plt.figure(figsize=(10, 8))
+
+                # データ点（Group1-3のみ表示、面積規格化）
+                plt.plot(unique_sizes_estimate_group2, cum_counts_area_est,
+                        marker='o', linestyle='', color='black', label='Data')
+
+                # Group 1-3のフィット線（面積規格化）
+                plt.plot(D_fit_area_est, N_pow_fit_area_est,
+                        linestyle='--', linewidth=1.5, color='blue',
+                        label=f'Group1-3 fit: k={k_pow_area_est:.2e}, r={r_pow_area_est:.3f}, R²={R2_pow_area_est:.4f}, {p_str_pow_area_est}')
+
+                # Group 2-3のフィット線（面積規格化）
+                plt.plot(D_fit_area_2_3, N_pow_fit_area_2_3,
+                        linestyle='--', linewidth=1.5, color='red',
+                        label=f'Group2-3 fit: k={k_pow_area_2_3:.2e}, r={r_pow_area_2_3:.3f}, R²={R2_pow_area_2_3:.4f}, {p_str_pow_area_2_3}')
+
+                # 軸スケール設定
+                if scale == 'semilog':
+                    plt.yscale('log')
+                elif scale == 'loglog':
+                    plt.xscale('log')
+                    plt.yscale('log')
+
+                # x軸範囲
+                if scale == 'loglog':
+                    plt.xlim(max(0, 1), 50)
+                else:
+                    plt.xlim(0, 50)
+
+                # 軸ラベルとグリッド
+                plt.xlabel('Rock size [cm]', fontsize=20)
+                plt.ylabel('Cumulative number of rocks /m²', fontsize=20)
+                plt.tick_params(labelsize=16)
+                plt.grid(True, linestyle='--', alpha=0.5)
+
+                # y軸のtick設定（最大値1-20の場合は2刻みに固定）
+                ax = plt.gca()
+                ylim = ax.get_ylim()
+                if 1 <= ylim[1] <= 20:
+                    ax.yaxis.set_major_locator(MultipleLocator(2))
+
+                # 凡例
+                plt.legend(fontsize=12, loc='upper right', frameon=True, fancybox=True, shadow=False)
+                plt.tight_layout()
+
+                # 保存
+                plt.savefig(f'{output_path}.png', dpi=300)
+                plt.savefig(f'{output_path}.pdf', dpi=600)
+                plt.close()
+
+                print(f'Group比較プロット（面積規格化）保存: {output_path}.png')
 
             # ------------------------------------------------------------------
             # 12. フィッティングサマリーファイルの出力
@@ -1941,52 +2008,63 @@ if mode != '4':
             xlim=(0, 50)
         )
 
-    # 9.2 指数関数フィット（Group2-3のみ）
-    p_str_exp_grp2_3 = format_p_value(p_exp_grp2_3)  # p値の書式設定
-    fit_lines_exp_grp2_3 = [{
-        'x': D_fit_grp2_3, 'y': N_exp_fit_grp2_3,
-        'label': f'Exponential: k={k_exp_grp2_3:.2e}, r={r_exp_grp2_3:.3f}, R²={R2_exp_grp2_3:.4f}, {p_str_exp_grp2_3}',
-        'color': 'green', 'linestyle': '--'
-    }]
 
+    # 9.2 Group比較プロット（Group1-3 vs Group2-3、area normalizeなし）
     for scale in ['linear', 'semilog', 'loglog']:
-        output_path = os.path.join(output_dir_exp_2_3, f'RSFD_exponential_fit_group2-3_{scale}')
-        create_rsfd_plot(
-            unique_sizes_group2_3, cum_counts_group2_3,
-            'Rock size [cm]', 'Cumulative number of rocks',
-            output_path, scale_type=scale,
-            fit_lines=fit_lines_exp_grp2_3,
-            marker='o', linestyle='', label='Data (Group2-3)',
-            show_plot=False,
-            xlim=(0, 50)
-        )
+        output_path = os.path.join(output_dir_group_comparison, f'RSFD_group_comparison_{scale}')
 
-    # 9.3 フィッティング比較（Group2-3のみ）
-    fit_lines_comparison_grp2_3 = [
-        {
-            'x': D_fit_grp2_3, 'y': N_pow_fit_grp2_3,
-            'label': f'Power-law: k={k_pow_grp2_3:.2e}, r={r_pow_grp2_3:.3f}, R²={R2_pow_grp2_3:.4f}, {p_str_pow_grp2_3}',
-            'color': 'red', 'linestyle': '--'
-        },
-        {
-            'x': D_fit_grp2_3, 'y': N_exp_fit_grp2_3,
-            'label': f'Exponential: k={k_exp_grp2_3:.2e}, r={r_exp_grp2_3:.3f}, R²={R2_exp_grp2_3:.4f}, {p_str_exp_grp2_3}',
-            'color': 'green', 'linestyle': '--'
-        }
-    ]
-    
-    for scale in ['linear', 'semilog', 'loglog']:
-        output_path = os.path.join(output_dir_comparison_2_3, f'RSFD_fit_comparison_group2-3_{scale}')
-        create_rsfd_plot(
-            unique_sizes_group2_3, cum_counts_group2_3,
-            'Rock size [cm]', 'Cumulative number of rocks',
-            output_path, scale_type=scale,
-            fit_lines=fit_lines_comparison_grp2_3,
-            marker='o', linestyle='', label='Data (Group2-3)',
-            show_plot=(scale == 'linear'),  # linearのみ表示
-            xlim=(0, 50)
-        )
-    
+        plt.figure(figsize=(10, 8))
+
+        # データ点（Group1-3のみ表示）
+        plt.plot(unique_sizes_estimate_group2, cum_counts_estimate_group2,
+                marker='o', linestyle='', color='black', label='Data')
+
+        # Group 1-3のフィット線
+        plt.plot(D_fit_est_grp2, N_pow_fit_est_grp2,
+                linestyle='--', linewidth=1.5, color='blue',
+                label=f'Group1-3 fit: k={k_pow_est_grp2:.2e}, r={r_pow_est_grp2:.3f}, R²={R2_pow_est_grp2:.4f}, {p_str_pow_est_grp2}')
+
+        # Group 2-3のフィット線
+        plt.plot(D_fit_grp2_3, N_pow_fit_grp2_3,
+                linestyle='--', linewidth=1.5, color='red',
+                label=f'Group2-3 fit: k={k_pow_grp2_3:.2e}, r={r_pow_grp2_3:.3f}, R²={R2_pow_grp2_3:.4f}, {p_str_pow_grp2_3}')
+
+        # 軸スケール設定
+        if scale == 'semilog':
+            plt.yscale('log')
+        elif scale == 'loglog':
+            plt.xscale('log')
+            plt.yscale('log')
+
+        # x軸範囲
+        if scale == 'loglog':
+            plt.xlim(max(0, 1), 50)
+        else:
+            plt.xlim(0, 50)
+
+        # 軸ラベルとグリッド
+        plt.xlabel('Rock size [cm]', fontsize=20)
+        plt.ylabel('Cumulative number of rocks', fontsize=20)
+        plt.tick_params(labelsize=16)
+        plt.grid(True, linestyle='--', alpha=0.5)
+
+        # y軸のtick設定（最大値1-20の場合は2刻みに固定）
+        ax = plt.gca()
+        ylim = ax.get_ylim()
+        if 1 <= ylim[1] <= 20:
+            ax.yaxis.set_major_locator(MultipleLocator(2))
+
+        # 凡例
+        plt.legend(fontsize=12, loc='upper right', frameon=True, fancybox=True, shadow=False)
+        plt.tight_layout()
+
+        # 保存
+        plt.savefig(f'{output_path}.png', dpi=300)
+        plt.savefig(f'{output_path}.pdf', dpi=600)
+        plt.close()
+
+        print(f'Group比較プロット保存: {output_path}.png')
+
     # TXT保存（Group2-3）
     with open(os.path.join(output_dir, 'RSFD_linear_group2-3.txt'), 'w') as f:
         f.write('# size_cm\tcumulative_count\n')
@@ -2063,6 +2141,64 @@ if mode != '4':
         for s, n in zip(unique_sizes_group2_3, cum_counts_area_2_3):
             f.write(f'{s:.3f}\t{n:.6f}\n')
     print('面積規格化Group2-3累積データTXT保存: RSFD_area_normalized_group2-3.txt')
+
+    # ------------------------------------------------------------------
+    # 9.6 Group比較プロット（Group1-3 vs Group2-3、area normalizeあり）
+    # ------------------------------------------------------------------
+    for scale in ['linear', 'semilog', 'loglog']:
+        output_path = os.path.join(output_dir_group_comparison_area, f'RSFD_group_comparison_area_normalized_{scale}')
+
+        plt.figure(figsize=(10, 8))
+
+        # データ点（Group1-3のみ表示、面積規格化）
+        plt.plot(unique_sizes_estimate_group2, cum_counts_area_est,
+                marker='o', linestyle='', color='black', label='Data')
+
+        # Group 1-3のフィット線（面積規格化）
+        plt.plot(D_fit_area_est, N_pow_fit_area_est,
+                linestyle='--', linewidth=1.5, color='blue',
+                label=f'Group1-3 fit: k={k_pow_area_est:.2e}, r={r_pow_area_est:.3f}, R²={R2_pow_area_est:.4f}, {p_str_pow_area_est}')
+
+        # Group 2-3のフィット線（面積規格化）
+        plt.plot(D_fit_area_2_3, N_pow_fit_area_2_3,
+                linestyle='--', linewidth=1.5, color='red',
+                label=f'Group2-3 fit: k={k_pow_area_2_3:.2e}, r={r_pow_area_2_3:.3f}, R²={R2_pow_area_2_3:.4f}, {p_str_pow_area_2_3}')
+
+        # 軸スケール設定
+        if scale == 'semilog':
+            plt.yscale('log')
+        elif scale == 'loglog':
+            plt.xscale('log')
+            plt.yscale('log')
+
+        # x軸範囲
+        if scale == 'loglog':
+            plt.xlim(max(0, 1), 50)
+        else:
+            plt.xlim(0, 50)
+
+        # 軸ラベルとグリッド
+        plt.xlabel('Rock size [cm]', fontsize=20)
+        plt.ylabel('Cumulative number of rocks /m²', fontsize=20)
+        plt.tick_params(labelsize=16)
+        plt.grid(True, linestyle='--', alpha=0.5)
+
+        # y軸のtick設定（最大値1-20の場合は2刻みに固定）
+        ax = plt.gca()
+        ylim = ax.get_ylim()
+        if 1 <= ylim[1] <= 20:
+            ax.yaxis.set_major_locator(MultipleLocator(2))
+
+        # 凡例
+        plt.legend(fontsize=12, loc='upper right', frameon=True, fancybox=True, shadow=False)
+        plt.tight_layout()
+
+        # 保存
+        plt.savefig(f'{output_path}.png', dpi=300)
+        plt.savefig(f'{output_path}.pdf', dpi=600)
+        plt.close()
+
+        print(f'Group比較プロット（面積規格化）保存: {output_path}.png')
 
     # ------------------------------------------------------------------
     # 12. フィッティングサマリーファイルの出力
@@ -2408,15 +2544,6 @@ else:  # mode == '4'
         create_multi_range_comparison_plot(
             power_data_grp2_3, 'Rock size [cm]', 'Cumulative number of rocks',
             output_path, scale_type=scale, fit_type='Power-law',
-            show_plot=False, xlim=(0, 50)
-        )
-
-    exp_data_grp2_3 = [d for d in all_ranges_data_grp2_3 if 'fit_type' in d and d['fit_type'] == 'exponential']
-    for scale in ['linear', 'semilog', 'loglog']:
-        output_path = os.path.join(output_dir_exp_2_3, f'RSFD_exponential_comparison_group2-3_{scale}')
-        create_multi_range_comparison_plot(
-            exp_data_grp2_3, 'Rock size [cm]', 'Cumulative number of rocks',
-            output_path, scale_type=scale, fit_type='Exponential',
             show_plot=False, xlim=(0, 50)
         )
 
