@@ -5,6 +5,7 @@ import numpy as np
 import pyqtgraph as pg
 from PyQt5 import QtCore, QtGui, QtWidgets
 import matplotlib as mpl
+import matplotlib.pyplot as plt
 from scipy.signal import hilbert
 import math
 
@@ -187,22 +188,92 @@ def main():
         """アプリケーション終了時にx_positionでソートしてIDを振り直して保存"""
         if not measurements:
             return
-            
+
         # x_positionで昇順ソート
         sorted_measurements = sorted(measurements, key=lambda m: m["x_position"])
-        
+
         # IDを1から振り直し
         for i, measurement in enumerate(sorted_measurements, 1):
             measurement["id"] = i
-        
+
         data_to_save = {
             "measurements": sorted_measurements
         }
-        
+
         with open(json_output, 'w') as f:
             json.dump(data_to_save, f, indent=4)
         print(f"測定データを最終保存しました（x_position昇順でID振り直し）: {json_output}")
         print(f"保存件数: {len(sorted_measurements)}件")
+
+        # 深さプロファイル画像を出力
+        save_depth_profile_image(sorted_measurements)
+
+    def save_depth_profile_image(sorted_measurements):
+        """深さプロファイルをB-scan上にプロットした画像を出力"""
+        if not sorted_measurements:
+            return
+
+        print("深さプロファイル画像を作成中...")
+
+        # 出力ファイルパス
+        output_path_png = json_output.replace('.json', '_profile.png')
+        output_path_pdf = json_output.replace('.json', '_profile.pdf')
+
+        # matplotlib でB-scanと測定プロファイルを描画
+        _, ax = plt.subplots(figsize=(16, 6))
+
+        # B-scanデータを表示
+        data_for_display = np.nan_to_num(data, nan=0.0)
+        im = ax.imshow(
+            data_for_display,
+            cmap='viridis',
+            aspect='auto',
+            extent=[x_start, x_end, y_end, y_start],
+            vmin=-np.nanmax(np.abs(data))/10,
+            vmax=np.nanmax(np.abs(data))/10
+        )
+
+        # 測定プロファイルをプロット
+        for measurement in sorted_measurements:
+            x_pos = measurement["x_position"]
+            start_time = measurement["start_time_ns"]
+            end_time = measurement["end_time_ns"]
+            depth = measurement["depth_m"]
+            time_diff = measurement["time_diff_ns"]
+
+            # 始点と終点をプロット
+            ax.plot([x_pos, x_pos], [end_time, start_time], 'ro-', linewidth=2, markersize=6)
+
+            # ラベルを追加（深度m、時間ns）
+            label_text = f"{depth:.2f} m \n({time_diff:.1f} ns)"
+            ax.text(
+                x_pos, end_time*1.5, label_text,
+                color='red', fontsize=10, fontweight='bold',
+                ha='center', va='bottom',
+                bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor='red', alpha=0.8)
+            )
+
+        # 軸ラベルとタイトル
+        ax.set_xlabel('Time [ns]', fontsize=14)
+        ax.set_ylabel('x [m]', fontsize=14)
+        ax.set_title(f'Depth Profile - {os.path.basename(bscan_path)}', fontsize=16)
+        ax.grid(True, alpha=0.3)
+        ax.invert_yaxis()
+
+        # カラーバー
+        cbar = plt.colorbar(im, ax=ax)
+        cbar.set_label('Amplitude', fontsize=12)
+
+        plt.tight_layout()
+
+        # 画像を保存
+        plt.savefig(output_path_png, dpi=300, bbox_inches='tight')
+        plt.savefig(output_path_pdf, dpi=600, bbox_inches='tight')
+        plt.close()
+
+        print(f"深さプロファイル画像を保存しました:")
+        print(f"  PNG: {output_path_png}")
+        print(f"  PDF: {output_path_pdf}")
 
     def calculate_depth(time_diff_ns):
         """時間差から深さを計算"""
