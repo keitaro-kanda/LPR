@@ -95,7 +95,7 @@ def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
 
     # x軸範囲の設定（軸スケール設定の直後に実行）
     if xlim and scale_type == 'loglog':
-        plt.xlim(max(xlim[0], 1), xlim[1])  # logスケールで負またはゼロを避ける
+        plt.xlim(max(xlim[0], 0.5), xlim[1])  # logスケールで負またはゼロを避ける
     elif xlim:
         plt.xlim(xlim)
 
@@ -349,7 +349,7 @@ def create_multi_range_comparison_plot(ranges_data_list, xlabel, ylabel, output_
 
     # x軸範囲の設定
     if xlim and scale_type == 'loglog':
-        plt.xlim(max(xlim[0], 1), xlim[1])
+        plt.xlim(max(xlim[0], 0.5), xlim[1])
     elif xlim:
         plt.xlim(xlim)
 
@@ -1414,7 +1414,7 @@ else:  # startup_mode == '2'
 
                 # x軸範囲
                 if scale == 'loglog':
-                    plt.xlim(max(0, 1), 50)
+                    plt.xlim(max(0, 0.5), 50)
                 else:
                     plt.xlim(0, 50)
 
@@ -1549,7 +1549,7 @@ else:  # startup_mode == '2'
 
                 # x軸範囲
                 if scale == 'loglog':
-                    plt.xlim(max(0, 1), 50)
+                    plt.xlim(max(0, 0.5), 50)
                 else:
                     plt.xlim(0, 50)
 
@@ -1826,7 +1826,7 @@ if mode != '4':
     
         # x軸範囲の設定（軸スケール設定の直後に実行）
         if xlim and scale_type == 'loglog':
-            plt.xlim(max(xlim[0], 1), xlim[1])  # logスケールで負またはゼロを避ける
+            plt.xlim(max(xlim[0], 0.5), xlim[1])  # logスケールで負またはゼロを避ける
         elif xlim:
             plt.xlim(xlim)
     
@@ -2038,7 +2038,7 @@ if mode != '4':
 
         # x軸範囲
         if scale == 'loglog':
-            plt.xlim(max(0, 1), 50)
+            plt.xlim(max(0, 0.5), 50)
         else:
             plt.xlim(0, 50)
 
@@ -2173,7 +2173,7 @@ if mode != '4':
 
         # x軸範囲
         if scale == 'loglog':
-            plt.xlim(max(0, 1), 50)
+            plt.xlim(max(0, 0.5), 50)
         else:
             plt.xlim(0, 50)
 
