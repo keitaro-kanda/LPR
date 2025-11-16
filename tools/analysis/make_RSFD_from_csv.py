@@ -54,6 +54,8 @@ if not np.any(valid):
 D = diam[valid] * 100 # m → cm
 N = cum_n[valid]
 
+D_over_8cm = D[D > 8.0] # 8 cm未満は分解能の制約から数を過小評価している（Di+2021, 3.3章）
+
 # ------------------------------------------------------------------
 # 3. 線形‑線形プロット
 # ------------------------------------------------------------------
@@ -102,6 +104,25 @@ ss_res_exp = np.sum((N - (k_exp * np.exp(r_exp * D)))**2)
 R2_exp = 1 - ss_res_exp/ss_tot
 
 # ------------------------------------------------------------------
+# 4.2. 8 cm以上のデータにべき乗フィッティング
+# ------------------------------------------------------------------
+log_D_over_8cm = np.log(D_over_8cm)
+log_N_over_8cm = np.log(N[D > 8.0])
+ss_tot = np.sum((N - np.mean(N))**2)
+
+# べき則: log-log 回帰
+r_pow_over_8cm, log_k_pow_over_8cm = np.polyfit(log_D_over_8cm, log_N_over_8cm, 1)
+k_pow_over_8cm = np.exp(log_k_pow_over_8cm)
+# フィット曲線
+D_fit_over_8cm = np.linspace(D_over_8cm.min(), D_over_8cm.max(), 1000)
+N_pow_fit_over_8cm = k_pow_over_8cm * D_fit_over_8cm**r_pow_over_8cm
+# 決定係数 R^2
+ss_res_pow_over_8cm = np.sum((N[D > 8.0] - (k_pow_over_8cm * D_over_8cm**r_pow_over_8cm))**2)
+R2_pow_over_8cm = 1 - ss_res_pow_over_8cm/ss_tot
+
+
+
+# ------------------------------------------------------------------
 # 5. プロット: べき則フィッティング
 # ------------------------------------------------------------------
 plt.figure(figsize=(8,6))
@@ -117,6 +138,26 @@ plt.tight_layout()
 pow_png = os.path.join(plot_dir, 'RSFD_csv_pow_fit.png')
 plt.savefig(pow_png, dpi=300)
 plt.savefig(os.path.join(plot_dir, 'RSFD_csv_pow_fit.pdf'), dpi=600)
+plt.show()
+print('べき則フィットプロット保存:', pow_png)
+
+
+# ------------------------------------------------------------------
+# 5.2. プロット: 8 cm以上のべき則フィッティング
+# ------------------------------------------------------------------
+plt.figure(figsize=(8,6))
+plt.scatter(D_over_8cm, N[D > 8.0], marker='o', label='Data')
+plt.plot(D_fit_over_8cm, N_pow_fit_over_8cm, linestyle='--', linewidth=1.5, color='red',
+         label=f'Power-law: k={k_pow_over_8cm:.2e}, r={r_pow_over_8cm:.3f}, R²={R2_pow_over_8cm:.4f}')
+plt.xlabel('Rock size (cm)', fontsize=16)
+plt.ylabel('Cumulative number', fontsize=16)
+plt.tick_params(labelsize=12)
+plt.grid(True, linestyle='--', alpha=0.5)
+plt.legend(fontsize=12)
+plt.tight_layout()
+pow_png = os.path.join(plot_dir, 'RSFD_csv_pow_fit_over_8cm.png')
+plt.savefig(pow_png, dpi=300)
+plt.savefig(os.path.join(plot_dir, 'RSFD_csv_pow_fit_over_8cm.pdf'), dpi=600)
 plt.show()
 print('べき則フィットプロット保存:', pow_png)
 
