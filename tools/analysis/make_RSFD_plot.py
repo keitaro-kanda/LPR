@@ -1179,7 +1179,7 @@ else:  # startup_mode == '2'
                 
                     # x軸範囲の設定（軸スケール設定の直後に実行）
                     if xlim and scale_type == 'loglog':
-                        plt.xlim(max(xlim[0], 1), xlim[1])  # logスケールで負またはゼロを避ける
+                        plt.xlim(max(xlim[0], 0.5), xlim[1])  # logスケールで負またはゼロを避ける
                     elif xlim:
                         plt.xlim(xlim)
 
