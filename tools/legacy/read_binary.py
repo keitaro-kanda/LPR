@@ -184,6 +184,9 @@ ECHO_dir = os.path.join(os.path.dirname(data_folder_path), 'loaded_data_echo_pos
 os.makedirs(ECHO_dir, exist_ok=True)
 
 
+#* Check all file names in the data folder
+file_list = natsorted(os.listdir(data_folder_path))
+print(f'Total {len(file_list)} files found in the data folder.')
 
 position = []
 #* Output only the echo data as txt file
