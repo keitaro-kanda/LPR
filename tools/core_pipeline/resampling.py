@@ -42,7 +42,7 @@ if not os.path.exists(position_output_dir):
 #data_2B = np.zeros((0, 2048))
 #medf = np.zeros(0)
 
-def resampling(signal_data, position_data, sequence_id, window_num, thres_val): # input is 2D array including position data
+def resampling(signal_data, position_data, sequence_id, window_num, thres_val, rover_name): # input is 2D array including position data
     #* Do not consider first 300 datapoints
     img = signal_data[300:, :]
 
@@ -70,8 +70,13 @@ def resampling(signal_data, position_data, sequence_id, window_num, thres_val): 
     for i in range(med.shape[0] - window):
 		#* if all values are > thres
         if np.all(med[i : i + window] > thres):
+            if rover_name == 'CE-3':
+                if np.all(med[i : i + window] < 50000):  # CE-3 requires a higher threshold
+                    #* replace 0 with 1 in the output vector
+                    medf[i : i + window] = 1
             #* replace 0 with 1 in the output vector
-            medf[i : i + window] = 1
+            else:
+                medf[i : i + window] = 1
 
     idx = np.where(medf == 1)[0]
 
@@ -247,7 +252,7 @@ for ECHO_data in tqdm(natsorted(os.listdir(data_folder_path))):
     2B: Apply resampling function
     """
     if channel_name == '2B':
-        sobelx, med_denoised, med, medf, data_filtered, positions_filtered = resampling(signals, positions, sequence_id, window_num, thres_val)
+        sobelx, med_denoised, med, medf, data_filtered, positions_filtered = resampling(signals, positions, sequence_id, window_num, thres_val, rover_name)
         # data_filtered4plot = np.zeros((2048, data_filtered.shape[1]))
         # data_filtered4plot[:, :data_filtered.shape[1]] = data_filtered
 

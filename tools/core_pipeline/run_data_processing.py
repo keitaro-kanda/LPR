@@ -12,6 +12,9 @@ resampled_data_dir = input('Input data folder path (Resampled_Data>txt directory
 if not os.path.exists(resampled_data_dir):
     raise ValueError('Data folder path does not exist. Please check the path and try again.')
 
+rover_name = input('Input rover name (CE-3 or CE-4): ').strip()
+if rover_name not in ['CE-3', 'CE-4']:
+    raise ValueError('Rover name must be CE-3 or CE-4. Please check the input and try again.')
 # path_type = input('Input channel name (2A, 2B): ').strip()
 # #* Define data folder path
 # if path_type == '2A':
@@ -433,8 +436,15 @@ if function_type == 'calc':
             print('4. Applying gain function')
             prev_step = processing_order[i-1] if i > 0 else 0
             input_data = processed_data[prev_step]
-            processed_data[4] = gain(input_data, 3.4, 0.006, 500e6, dir_dict[4])
+            if rover_name == 'CE-4':
+                processed_data[4] = gain(input_data, 3.4, 0.006, 500e6, dir_dict[4])
+            else:
+                epsilon_r = 2.9 # [Dong+2017]
+                conductivity = 0.0016 # [Dong+2017]
+                tan_delta = conductivity / (2 * np.pi * 500e6 * epsilon_0 * epsilon_r) # [Dong+2017], 0.019くらいになる
+                processed_data[4] = gain(input_data, epsilon_r, tan_delta, 500e6, dir_dict[4]) # [Dong+2017]
             np.savetxt(dir_dict[4] + '/4_Bscan_gain.txt', processed_data[4], delimiter=' ')
+
             print('Finished gain function')
             print(' ')
         
