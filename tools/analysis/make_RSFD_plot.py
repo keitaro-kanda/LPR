@@ -517,6 +517,9 @@ startup_mode = input('モードを選択してください (1/2): ').strip()
 if startup_mode not in ['1', '2']:
     raise ValueError('モードは1または2を選択してください。')
 
+# プロット表示フラグ（startup_mode='2'では自動処理のため非表示）
+show_plot_flag = (startup_mode == '1')
+
 # ------------------------------------------------------------------
 # 2. 入力ファイルチェック（モード1の場合）
 # ------------------------------------------------------------------
@@ -1627,7 +1630,7 @@ else:  # startup_mode == '2'
                     output_path, scale_type=scale,
                     fit_lines=fit_lines_pow_area_est,
                     marker='o', linestyle='', label='Data (Estimate Group2, Area-normalized)',
-                    show_plot=(scale == 'linear'),
+                    show_plot=(scale == 'linear' and show_plot_flag),
                     xlim=(0, 50)
                 )
 
@@ -1662,7 +1665,7 @@ else:  # startup_mode == '2'
                     output_path, scale_type=scale,
                     fit_lines=fit_lines_pow_area_2_3,
                     marker='o', linestyle='', label='Data (Group2-3, Area-normalized)',
-                    show_plot=(scale == 'linear'),
+                    show_plot=(scale == 'linear' and show_plot_flag),
                     xlim=(0, 50)
                 )
 
@@ -2293,7 +2296,7 @@ if mode != '4':
             output_path, scale_type=scale,
             fit_lines=fit_lines_pow_area_est,
             marker='o', linestyle='', label='Data (Estimate Group2, Area-normalized)',
-            show_plot=(scale == 'linear'),
+            show_plot=(scale == 'linear' and show_plot_flag),
             xlim=(0, 50)
         )
 
@@ -2328,7 +2331,7 @@ if mode != '4':
             output_path, scale_type=scale,
             fit_lines=fit_lines_pow_area_2_3,
             marker='o', linestyle='', label='Data (Group2-3, Area-normalized)',
-            show_plot=(scale == 'linear'),
+            show_plot=(scale == 'linear' and show_plot_flag),
             xlim=(0, 50)
         )
 
