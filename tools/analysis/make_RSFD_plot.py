@@ -210,7 +210,7 @@ def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
         if label:
             legend_entries.append({
                 'label': label,
-                'color': color if color else 'default',
+                'color': color if color else 'black',
                 'linestyle': linestyle if linestyle else '',
                 'marker': marker if marker else ''
             })
@@ -1340,7 +1340,7 @@ else:  # startup_mode == '2'
                         if label:
                             legend_entries.append({
                                 'label': label,
-                                'color': color if color else 'default',
+                                'color': color if color else 'black',
                                 'linestyle': linestyle if linestyle else '',
                                 'marker': marker if marker else ''
                             })
@@ -2029,7 +2029,7 @@ if mode != '4':
             if label:
                 legend_entries.append({
                     'label': label,
-                    'color': color if color else 'default',
+                    'color': color if color else 'black',
                     'linestyle': linestyle if linestyle else '',
                     'marker': marker if marker else ''
                 })
