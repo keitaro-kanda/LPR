@@ -727,7 +727,7 @@ else:  # startup_mode == '2'
             horizontal_min = selected_record['horizontal_min']
             horizontal_max = selected_record['horizontal_max']
             output_dir = selected_record['output_dir']
-            area = selected_record.get('area', 16136)  # デフォルト値を設定
+            area = selected_record.get('area') or 16136  # デフォルト値を設定（Noneの場合も対応）
 
             # base_dirとfile_nameを復元
             base_dir = os.path.dirname(output_dir)
@@ -2692,7 +2692,7 @@ else:  # mode == '4'
         })
 
         # 4) 面積規格化 Group2推定
-        area_range = range_info.get('area', 16136)
+        area_range = range_info.get('area') or 16136
         (k_pow_area_est, r_pow_area_est, R2_pow_area_est, N_pow_fit_area_est,
          t_pow_area_est, p_pow_area_est, se_pow_area_est, n_pow_area_est, dof_pow_area_est), \
         D_fit_area_est, cum_counts_area_est = calc_fitting_area_normalized(
