@@ -30,6 +30,83 @@ def format_p_value(p):
     else:
         return f"p={p:.3f}"
 
+def save_legend_info_to_txt(output_path, legend_entries):
+    """
+    Legend情報をTXTファイルに保存
+
+    Parameters:
+    -----------
+    output_path : str
+        出力パス（拡張子なし）
+    legend_entries : list of dict
+        Legendエントリのリスト [{'label': str, 'color': str, 'linestyle': str}, ...]
+    """
+    with open(f'{output_path}_legend.txt', 'w', encoding='utf-8') as f:
+        f.write('# Legend Information\n')
+        f.write('# -------------------\n')
+        for entry in legend_entries:
+            f.write(f"Label: {entry['label']}\n")
+            if 'color' in entry:
+                f.write(f"  Color: {entry['color']}\n")
+            if 'linestyle' in entry:
+                f.write(f"  Linestyle: {entry['linestyle']}\n")
+            if 'marker' in entry:
+                f.write(f"  Marker: {entry['marker']}\n")
+            f.write('\n')
+    print(f'Legend情報保存: {output_path}_legend.txt')
+
+def save_legend_only_pdf(output_path, legend_entries):
+    """
+    Legend専用のPDFファイルを作成
+
+    Parameters:
+    -----------
+    output_path : str
+        出力パス（拡張子なし）
+    legend_entries : list of dict
+        Legendエントリのリスト [{'label': str, 'color': str, 'linestyle': str, 'marker': str}, ...]
+    """
+    fig = plt.figure(figsize=(8, len(legend_entries) * 0.5 + 1))
+    ax = fig.add_subplot(111)
+
+    # 空のプロットを作成し、legend用のハンドルを生成
+    handles = []
+    labels = []
+    for entry in legend_entries:
+        label = entry['label']
+        color = entry.get('color', 'black')
+        linestyle = entry.get('linestyle', '-')
+        marker = entry.get('marker', '')
+        linewidth = entry.get('linewidth', 1.5)
+
+        # ダミーのプロット（表示されない）
+        if marker and linestyle and linestyle != '':
+            line, = ax.plot([], [], color=color, linestyle=linestyle,
+                           marker=marker, linewidth=linewidth, label=label)
+        elif marker:
+            line, = ax.plot([], [], color=color, marker=marker,
+                           linestyle='', label=label)
+        else:
+            line, = ax.plot([], [], color=color, linestyle=linestyle,
+                           linewidth=linewidth, label=label)
+        handles.append(line)
+        labels.append(label)
+
+    # 軸を非表示にする
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.axis('off')
+
+    # Legendのみを表示
+    legend = ax.legend(handles, labels, loc='center', fontsize=14,
+                      frameon=True, fancybox=True, shadow=False)
+
+    plt.tight_layout()
+    plt.savefig(f'{output_path}_legend.pdf', dpi=600, bbox_inches='tight')
+    plt.close()
+
+    print(f'Legend専用PDF保存: {output_path}_legend.pdf')
+
 def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
                      scale_type='linear', fit_lines=None,
                      show_plot=False, dpi_png=300, dpi_pdf=600,
@@ -111,12 +188,7 @@ def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
     if 1 <= ylim[1] <= 20:
         ax.yaxis.set_major_locator(MultipleLocator(2))
 
-    # 凡例（ラベルがある場合のみ）
-    if label or fit_lines:
-        plt.legend(fontsize=14, loc='upper center', bbox_to_anchor=(0.5, 1.15),
-                   ncol=1, frameon=True, fancybox=True, shadow=False)
-
-    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    plt.tight_layout()
 
     # 保存
     plt.savefig(f'{output_path}.png', dpi=dpi_png)
@@ -129,6 +201,35 @@ def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
         plt.close()
 
     print(f'プロット保存: {output_path}.png')
+
+    # Legend情報の保存（ラベルがある場合のみ）
+    if label or fit_lines:
+        legend_entries = []
+
+        # データラベル
+        if label:
+            legend_entries.append({
+                'label': label,
+                'color': color if color else 'default',
+                'linestyle': linestyle if linestyle else '',
+                'marker': marker if marker else ''
+            })
+
+        # フィット曲線ラベル
+        if fit_lines:
+            for fit_line in fit_lines:
+                legend_entries.append({
+                    'label': fit_line.get('label', ''),
+                    'color': fit_line.get('color', 'red'),
+                    'linestyle': fit_line.get('linestyle', '--'),
+                    'linewidth': fit_line.get('linewidth', 1.5)
+                })
+
+        # TXT形式で保存
+        save_legend_info_to_txt(output_path, legend_entries)
+
+        # Legend専用PDF出力
+        save_legend_only_pdf(output_path, legend_entries)
 
 def calc_fitting(sizes, counts):
     """べき則と指数関数のフィッティングを実行"""
@@ -365,11 +466,7 @@ def create_multi_range_comparison_plot(ranges_data_list, xlabel, ylabel, output_
     if 1 <= ylim[1] <= 20:
         ax.yaxis.set_major_locator(MultipleLocator(2))
 
-    # 凡例
-    plt.legend(fontsize=12, loc='upper center', bbox_to_anchor=(0.5, 1.15),
-               ncol=1, frameon=True, fancybox=True, shadow=False)
-
-    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    plt.tight_layout()
 
     # 保存
     plt.savefig(f'{output_path}.png', dpi=dpi_png)
@@ -382,6 +479,32 @@ def create_multi_range_comparison_plot(ranges_data_list, xlabel, ylabel, output_
         plt.close()
 
     print(f'プロット保存: {output_path}.png')
+
+    # Legend情報の保存
+    legend_entries = []
+    for range_data in ranges_data_list:
+        # データプロットのエントリ
+        legend_entries.append({
+            'label': f"{range_data['label']} (Data)",
+            'color': range_data['color'],
+            'marker': 'o',
+            'linestyle': ''
+        })
+        # フィット曲線のエントリ
+        legend_entries.append({
+            'label': f"{range_data['label']} ({fit_type}: k={range_data['fit_params']['k']:.2e}, "
+                     f"r={range_data['fit_params']['r']:.3f}, R²={range_data['fit_params']['R2']:.4f}, "
+                     f"{range_data['fit_params']['p_str']})",
+            'color': range_data['color'],
+            'linestyle': '--',
+            'linewidth': 1.5
+        })
+
+    # TXT形式で保存
+    save_legend_info_to_txt(output_path, legend_entries)
+
+    # Legend専用PDF出力
+    save_legend_only_pdf(output_path, legend_entries)
 
 # ------------------------------------------------------------------
 # 1. 起動モード選択
@@ -1195,24 +1318,48 @@ else:  # startup_mode == '2'
                     if 1 <= ylim[1] <= 20:
                         ax.yaxis.set_major_locator(MultipleLocator(2))
 
-                    # 凡例（ラベルがある場合のみ）
-                    if label or fit_lines:
-                        plt.legend(fontsize=14, loc='upper center', bbox_to_anchor=(0.5, 1.27),
-                                   ncol=1, frameon=True, fancybox=True, shadow=False)
+                    plt.tight_layout()
 
-                    plt.tight_layout(rect=[0, 0, 1, 0.96])
-                
                     # 保存
                     plt.savefig(f'{output_path}.png', dpi=dpi_png)
                     plt.savefig(f'{output_path}.pdf', dpi=dpi_pdf)
-                
+
                     # 表示
                     if show_plot:
                         plt.show()
                     else:
                         plt.close()
-                
+
                     print(f'プロット保存: {output_path}.png')
+
+                    # Legend情報の保存（ラベルがある場合のみ）
+                    if label or fit_lines:
+                        legend_entries = []
+
+                        # データラベル
+                        if label:
+                            legend_entries.append({
+                                'label': label,
+                                'color': color if color else 'default',
+                                'linestyle': linestyle if linestyle else '',
+                                'marker': marker if marker else ''
+                            })
+
+                        # フィット曲線ラベル
+                        if fit_lines:
+                            for fit_line in fit_lines:
+                                legend_entries.append({
+                                    'label': fit_line.get('label', ''),
+                                    'color': fit_line.get('color', 'red'),
+                                    'linestyle': fit_line.get('linestyle', '--'),
+                                    'linewidth': fit_line.get('linewidth', 1.5)
+                                })
+
+                        # TXT形式で保存
+                        save_legend_info_to_txt(output_path, legend_entries)
+
+                        # Legend専用PDF出力
+                        save_legend_only_pdf(output_path, legend_entries)
                 
                 # ------------------------------------------------------------------
                 # 7. 従来手法（Traditional）のプロット保存
@@ -1430,8 +1577,6 @@ else:  # startup_mode == '2'
                 if 1 <= ylim[1] <= 20:
                     ax.yaxis.set_major_locator(MultipleLocator(2))
 
-                # 凡例
-                plt.legend(fontsize=12, loc='upper right', frameon=True, fancybox=True, shadow=False)
                 plt.tight_layout()
 
                 # 保存
@@ -1440,6 +1585,17 @@ else:  # startup_mode == '2'
                 plt.close()
 
                 print(f'Group比較プロット保存: {output_path}.png')
+
+                # Legend情報の保存
+                legend_entries = [
+                    {'label': 'Data', 'color': 'black', 'marker': 'o', 'linestyle': ''},
+                    {'label': f'Group1-3 fit: k={k_pow_est_grp2:.2e}, r={r_pow_est_grp2:.3f}, R²={R2_pow_est_grp2:.4f}, {p_str_pow_est_grp2}',
+                     'color': 'blue', 'linestyle': '--', 'linewidth': 1.5},
+                    {'label': f'Group2-3 fit: k={k_pow_grp2_3:.2e}, r={r_pow_grp2_3:.3f}, R²={R2_pow_grp2_3:.4f}, {p_str_pow_grp2_3}',
+                     'color': 'red', 'linestyle': '--', 'linewidth': 1.5}
+                ]
+                save_legend_info_to_txt(output_path, legend_entries)
+                save_legend_only_pdf(output_path, legend_entries)
 
             # TXT保存（Group2-3）
             with open(os.path.join(output_dir, 'RSFD_linear_group2-3.txt'), 'w') as f:
@@ -1565,8 +1721,6 @@ else:  # startup_mode == '2'
                 if 1 <= ylim[1] <= 20:
                     ax.yaxis.set_major_locator(MultipleLocator(2))
 
-                # 凡例
-                plt.legend(fontsize=12, loc='upper right', frameon=True, fancybox=True, shadow=False)
                 plt.tight_layout()
 
                 # 保存
@@ -1575,6 +1729,17 @@ else:  # startup_mode == '2'
                 plt.close()
 
                 print(f'Group比較プロット（面積規格化）保存: {output_path}.png')
+
+                # Legend情報の保存
+                legend_entries = [
+                    {'label': 'Data', 'color': 'black', 'marker': 'o', 'linestyle': ''},
+                    {'label': f'Group1-3 fit: k={k_pow_area_est:.2e}, r={r_pow_area_est:.3f}, R²={R2_pow_area_est:.4f}, {p_str_pow_area_est}',
+                     'color': 'blue', 'linestyle': '--', 'linewidth': 1.5},
+                    {'label': f'Group2-3 fit: k={k_pow_area_2_3:.2e}, r={r_pow_area_2_3:.3f}, R²={R2_pow_area_2_3:.4f}, {p_str_pow_area_2_3}',
+                     'color': 'red', 'linestyle': '--', 'linewidth': 1.5}
+                ]
+                save_legend_info_to_txt(output_path, legend_entries)
+                save_legend_only_pdf(output_path, legend_entries)
 
             # ------------------------------------------------------------------
             # 12. フィッティングサマリーファイルの出力
@@ -1841,25 +2006,49 @@ if mode != '4':
         ylim = ax.get_ylim()
         if 1 <= ylim[1] <= 20:
             ax.yaxis.set_major_locator(MultipleLocator(2))
-    
-        # 凡例（ラベルがある場合のみ）
-        if label or fit_lines:
-            plt.legend(fontsize=14, loc='upper center', bbox_to_anchor=(0.5, 1.27),
-                       ncol=1, frameon=True, fancybox=True, shadow=False)
-    
-        plt.tight_layout(rect=[0, 0, 1, 0.96])
-    
+
+        plt.tight_layout()
+
         # 保存
         plt.savefig(f'{output_path}.png', dpi=dpi_png)
         plt.savefig(f'{output_path}.pdf', dpi=dpi_pdf)
-    
+
         # 表示
         if show_plot:
             plt.show()
         else:
             plt.close()
-    
+
         print(f'プロット保存: {output_path}.png')
+
+        # Legend情報の保存（ラベルがある場合のみ）
+        if label or fit_lines:
+            legend_entries = []
+
+            # データラベル
+            if label:
+                legend_entries.append({
+                    'label': label,
+                    'color': color if color else 'default',
+                    'linestyle': linestyle if linestyle else '',
+                    'marker': marker if marker else ''
+                })
+
+            # フィット曲線ラベル
+            if fit_lines:
+                for fit_line in fit_lines:
+                    legend_entries.append({
+                        'label': fit_line.get('label', ''),
+                        'color': fit_line.get('color', 'red'),
+                        'linestyle': fit_line.get('linestyle', '--'),
+                        'linewidth': fit_line.get('linewidth', 1.5)
+                    })
+
+            # TXT形式で保存
+            save_legend_info_to_txt(output_path, legend_entries)
+
+            # Legend専用PDF出力
+            save_legend_only_pdf(output_path, legend_entries)
     
     # ------------------------------------------------------------------
     # 7. 従来手法（Traditional）のプロット保存
@@ -2054,8 +2243,6 @@ if mode != '4':
         if 1 <= ylim[1] <= 20:
             ax.yaxis.set_major_locator(MultipleLocator(2))
 
-        # 凡例
-        plt.legend(fontsize=12, loc='upper right', frameon=True, fancybox=True, shadow=False)
         plt.tight_layout()
 
         # 保存
@@ -2064,6 +2251,17 @@ if mode != '4':
         plt.close()
 
         print(f'Group比較プロット保存: {output_path}.png')
+
+        # Legend情報の保存
+        legend_entries = [
+            {'label': 'Data', 'color': 'black', 'marker': 'o', 'linestyle': ''},
+            {'label': f'Group1-3 fit: k={k_pow_est_grp2:.2e}, r={r_pow_est_grp2:.3f}, R²={R2_pow_est_grp2:.4f}, {p_str_pow_est_grp2}',
+             'color': 'blue', 'linestyle': '--', 'linewidth': 1.5},
+            {'label': f'Group2-3 fit: k={k_pow_grp2_3:.2e}, r={r_pow_grp2_3:.3f}, R²={R2_pow_grp2_3:.4f}, {p_str_pow_grp2_3}',
+             'color': 'red', 'linestyle': '--', 'linewidth': 1.5}
+        ]
+        save_legend_info_to_txt(output_path, legend_entries)
+        save_legend_only_pdf(output_path, legend_entries)
 
     # TXT保存（Group2-3）
     with open(os.path.join(output_dir, 'RSFD_linear_group2-3.txt'), 'w') as f:
@@ -2189,8 +2387,6 @@ if mode != '4':
         if 1 <= ylim[1] <= 20:
             ax.yaxis.set_major_locator(MultipleLocator(2))
 
-        # 凡例
-        plt.legend(fontsize=12, loc='upper right', frameon=True, fancybox=True, shadow=False)
         plt.tight_layout()
 
         # 保存
@@ -2199,6 +2395,17 @@ if mode != '4':
         plt.close()
 
         print(f'Group比較プロット（面積規格化）保存: {output_path}.png')
+
+        # Legend情報の保存
+        legend_entries = [
+            {'label': 'Data', 'color': 'black', 'marker': 'o', 'linestyle': ''},
+            {'label': f'Group1-3 fit: k={k_pow_area_est:.2e}, r={r_pow_area_est:.3f}, R²={R2_pow_area_est:.4f}, {p_str_pow_area_est}',
+             'color': 'blue', 'linestyle': '--', 'linewidth': 1.5},
+            {'label': f'Group2-3 fit: k={k_pow_area_2_3:.2e}, r={r_pow_area_2_3:.3f}, R²={R2_pow_area_2_3:.4f}, {p_str_pow_area_2_3}',
+             'color': 'red', 'linestyle': '--', 'linewidth': 1.5}
+        ]
+        save_legend_info_to_txt(output_path, legend_entries)
+        save_legend_only_pdf(output_path, legend_entries)
 
     # ------------------------------------------------------------------
     # 12. フィッティングサマリーファイルの出力
