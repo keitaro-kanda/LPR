@@ -352,7 +352,7 @@ def save_statistics_to_txt(output_path, grid_statistics):
     print(f'統計情報保存: {output_path}')
 
 def create_grid_subplot_comparison(grid_data_dict, fit_params_dict, num_time_bins, num_dist_bins,
-                                   xlabel, ylabel, output_path, scale_type='linear',
+                                   xlabel, ylabel, output_path, scale_type='loglog',
                                    dpi_png=300, dpi_pdf=600):
     """
     グリッド配置でsubplotを作成し、各グリッドのRSFDを表示
@@ -405,9 +405,9 @@ def create_grid_subplot_comparison(grid_data_dict, fit_params_dict, num_time_bin
         x_min, x_max, y_min, y_max = None, None, None, None
 
     # Figure作成
-    _, axes = plt.subplots(num_time_bins, num_dist_bins,
-                           figsize=(4 * num_dist_bins, 3.5 * num_time_bins),
-                           squeeze=False)
+    fig, axes = plt.subplots(num_time_bins, num_dist_bins,
+                             figsize=(4 * num_dist_bins, 3.5 * num_time_bins),
+                             squeeze=False)
 
     # 各subplotにデータをプロット
     for i in range(num_time_bins):
@@ -464,20 +464,22 @@ def create_grid_subplot_comparison(grid_data_dict, fit_params_dict, num_time_bin
                        color='gray')
                 ax.set_xticks([])
                 ax.set_yticks([])
+                # if x_min is not None and x_max is not None:
+                #     ax.set_xlim(x_min, x_max)
+                # if y_min is not None and y_max is not None:
+                #     ax.set_ylim(y_min, y_max)
 
             # グリッド表示
             ax.grid(True, linestyle='--', alpha=0.3)
 
-            # 軸ラベル（外側のみ）
-            if j == 0:
-                ax.set_ylabel(ylabel, fontsize=14)
-            if i == num_time_bins - 1:
-                ax.set_xlabel(xlabel, fontsize=14)
-
             # Tick labelサイズ
             ax.tick_params(labelsize=10)
 
-    plt.tight_layout()
+    # 全体で1つのxlabel/ylabelを配置
+    fig.text(0.5, 0.02, xlabel, ha='center', fontsize=18, fontweight='bold')
+    fig.text(0.02, 0.5, ylabel, va='center', rotation='vertical', fontsize=18, fontweight='bold')
+
+    plt.tight_layout(rect=[0.03, 0.03, 1, 1])
 
     # 保存
     plt.savefig(f'{output_path}.png', dpi=dpi_png)
@@ -544,11 +546,36 @@ if not (os.path.exists(data_path) and data_path.lower().endswith('.json')):
 # 2. グリッド分割パラメータの入力
 # ------------------------------------------------------------------
 print('\n=== グリッド分割パラメータ ===')
-time_bin_width = float(input('時間方向の分割幅 [ns] を入力してください: ').strip())
-dist_bin_width = float(input('距離方向の分割幅 [m] を入力してください: ').strip())
+print('グリッド分割の入力方法を選択してください:')
+print('1: 分割幅を入力 (時間[ns]、距離[m])')
+print('2: 分割数を入力 (時間方向の分割数、距離方向の分割数)')
+grid_input_mode = input('選択 (1 or 2): ').strip()
 
-if time_bin_width <= 0 or dist_bin_width <= 0:
-    raise ValueError('分割幅は正の値を指定してください。')
+if grid_input_mode not in ['1', '2']:
+    raise ValueError('1 または 2 を入力してください。')
+
+if grid_input_mode == '1':
+    # モード1: 分割幅を入力
+    time_bin_width = float(input('時間方向の分割幅 [ns] を入力してください: ').strip())
+    dist_bin_width = float(input('距離方向の分割幅 [m] を入力してください: ').strip())
+
+    if time_bin_width <= 0 or dist_bin_width <= 0:
+        raise ValueError('分割幅は正の値を指定してください。')
+
+    # 分割数は後で計算される
+    num_time_bins_input = None
+    num_dist_bins_input = None
+else:
+    # モード2: 分割数を入力
+    num_time_bins_input = int(input('時間方向の分割数を入力してください: ').strip())
+    num_dist_bins_input = int(input('距離方向の分割数を入力してください: ').strip())
+
+    if num_time_bins_input <= 0 or num_dist_bins_input <= 0:
+        raise ValueError('分割数は正の整数を指定してください。')
+
+    # 分割幅は後で計算される
+    time_bin_width = None
+    dist_bin_width = None
 
 # ------------------------------------------------------------------
 # 3. JSONデータ読み込み
@@ -581,14 +608,24 @@ time_max_data = np.max(time_values_all)
 dist_min_data = 0.0
 dist_max_data = np.max(x_all)
 
-# グリッド数の計算（端数を含める）
-num_time_bins = int(np.ceil((time_max_data - time_min_data) / time_bin_width))
-num_dist_bins = int(np.ceil((dist_max_data - dist_min_data) / dist_bin_width))
+# 入力モードに応じて分割数または分割幅を計算
+if grid_input_mode == '1':
+    # モード1: 分割幅から分割数を計算
+    num_time_bins = int(np.ceil((time_max_data - time_min_data) / time_bin_width))
+    num_dist_bins = int(np.ceil((dist_max_data - dist_min_data) / dist_bin_width))
+else:
+    # モード2: 分割数から分割幅を計算
+    num_time_bins = num_time_bins_input
+    num_dist_bins = num_dist_bins_input
+    time_bin_width = (time_max_data - time_min_data) / num_time_bins
+    dist_bin_width = (dist_max_data - dist_min_data) / num_dist_bins
 
 print(f'\n時間範囲: {time_min_data:.2f} - {time_max_data:.2f} ns')
 print(f'距離範囲: {dist_min_data:.2f} - {dist_max_data:.2f} m')
 print(f'時間方向分割数: {num_time_bins}')
 print(f'距離方向分割数: {num_dist_bins}')
+print(f'時間方向分割幅: {time_bin_width:.2f} ns')
+print(f'距離方向分割幅: {dist_bin_width:.2f} m')
 print(f'総グリッド数: {num_time_bins * num_dist_bins}')
 
 # 色・マーカーの組み合わせを生成
@@ -598,8 +635,13 @@ color_marker_combinations = generate_color_marker_combinations(num_time_bins, nu
 # 5. 出力ディレクトリの作成
 # ------------------------------------------------------------------
 
-base_dir = os.path.join(os.path.dirname(os.path.dirname(data_path)),
-                        f'RSFD_grid_time{time_bin_width:.0f}ns_dist{dist_bin_width:.0f}m')
+# 親ディレクトリ: RSFD_grid_comparison
+parent_dir = os.path.join(os.path.dirname(os.path.dirname(data_path)), 'RSFD_grid_comparison')
+os.makedirs(parent_dir, exist_ok=True)
+
+# サブディレクトリ: timeXXns_distOOm
+sub_dir_name = f'time{time_bin_width:.0f}ns_dist{dist_bin_width:.0f}m'
+base_dir = os.path.join(parent_dir, sub_dir_name)
 os.makedirs(base_dir, exist_ok=True)
 
 individual_dir = os.path.join(base_dir, 'individual_plots')
@@ -896,14 +938,14 @@ for i in range(num_time_bins):
 if len(all_grids_data_non_normalized) > 0:
     print('\n=== 比較プロット作成 ===')
 
-    # 非規格化 linear-linear
-    output_path_comparison = os.path.join(comparison_dir, 'comparison_linear_non_normalized')
-    create_comparison_plot(
-        all_grids_data_non_normalized,
-        'Rock Size D [cm]', 'Cumulative Number N',
-        output_path_comparison,
-        scale_type='linear'
-    )
+    # # 非規格化 linear-linear
+    # output_path_comparison = os.path.join(comparison_dir, 'comparison_linear_non_normalized')
+    # create_comparison_plot(
+    #     all_grids_data_non_normalized,
+    #     'Rock Size D [cm]', 'Cumulative Number N',
+    #     output_path_comparison,
+    #     scale_type='linear'
+    # )
 
     # 非規格化 log-log
     output_path_comparison = os.path.join(comparison_dir, 'comparison_loglog_non_normalized')
@@ -914,14 +956,14 @@ if len(all_grids_data_non_normalized) > 0:
         scale_type='loglog'
     )
 
-    # 面積規格化 linear-linear
-    output_path_comparison = os.path.join(comparison_dir, 'comparison_linear_area_normalized')
-    create_comparison_plot(
-        all_grids_data_area_normalized,
-        'Rock Size D [cm]', 'Cumulative number of rocks /m²',
-        output_path_comparison,
-        scale_type='linear'
-    )
+    # # 面積規格化 linear-linear
+    # output_path_comparison = os.path.join(comparison_dir, 'comparison_linear_area_normalized')
+    # create_comparison_plot(
+    #     all_grids_data_area_normalized,
+    #     'Rock Size D [cm]', 'Cumulative number of rocks /m²',
+    #     output_path_comparison,
+    #     scale_type='linear'
+    # )
 
     # 面積規格化 log-log
     output_path_comparison = os.path.join(comparison_dir, 'comparison_loglog_area_normalized')
