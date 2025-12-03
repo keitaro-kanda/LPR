@@ -438,22 +438,22 @@ def create_grid_subplot_comparison(grid_data_dict, fit_params_dict, num_time_bin
                 if y_min is not None and y_max is not None:
                     ax.set_ylim(y_min, y_max)
 
-                # グリッドラベルを表示（左上）
-                ax.text(0.05, 0.95, f'T{i+1}D{j+1}',
-                       transform=ax.transAxes, fontsize=9, fontweight='bold',
+                # グリッドラベルを表示（右上）
+                ax.text(0.85, 0.95, f'T{i+1}D{j+1}',
+                       transform=ax.transAxes, fontsize=10, fontweight='bold',
                        verticalalignment='top', bbox=dict(boxstyle='round',
                        facecolor='wheat', alpha=0.5))
 
-                # フィッティングパラメータを表示（右下）
+                # フィッティングパラメータを表示（右中央）
                 if fit_params:
                     k = fit_params.get('k', 0)
                     r = fit_params.get('r', 0)
                     p_str = fit_params.get('p_str', '')
 
-                    param_text = f'k={k:.2e}\nr={r:.3f}\n{p_str}'
-                    ax.text(0.95, 0.05, param_text,
-                           transform=ax.transAxes, fontsize=7,
-                           verticalalignment='bottom', horizontalalignment='right',
+                    param_text = f'k={k:.3e}\nr={r:.3f}\n{p_str}'
+                    ax.text(0.60, 0.70, param_text,
+                           transform=ax.transAxes, fontsize=10,
+                           verticalalignment='bottom', horizontalalignment='left',
                            bbox=dict(boxstyle='round', facecolor='white', alpha=0.7))
 
             else:
@@ -470,9 +470,9 @@ def create_grid_subplot_comparison(grid_data_dict, fit_params_dict, num_time_bin
 
             # 軸ラベル（外側のみ）
             if j == 0:
-                ax.set_ylabel(ylabel, fontsize=12)
+                ax.set_ylabel(ylabel, fontsize=14)
             if i == num_time_bins - 1:
-                ax.set_xlabel(xlabel, fontsize=12)
+                ax.set_xlabel(xlabel, fontsize=14)
 
             # Tick labelサイズ
             ax.tick_params(labelsize=10)
@@ -937,16 +937,6 @@ if len(all_grids_data_non_normalized) > 0:
     # ------------------------------------------------------------------
     print('\n=== グリッドsubplot比較プロット作成 ===')
 
-    # 非規格化 linear-linear
-    output_path_subplot = os.path.join(comparison_dir, 'grid_subplot_linear_non_normalized')
-    create_grid_subplot_comparison(
-        grid_data_dict_non_normalized, fit_params_dict_non_normalized,
-        num_time_bins, num_dist_bins,
-        'Rock Size D [cm]', 'Cumulative Number N',
-        output_path_subplot,
-        scale_type='linear'
-    )
-
     # 非規格化 log-log
     output_path_subplot = os.path.join(comparison_dir, 'grid_subplot_loglog_non_normalized')
     create_grid_subplot_comparison(
@@ -955,16 +945,6 @@ if len(all_grids_data_non_normalized) > 0:
         'Rock Size D [cm]', 'Cumulative Number N',
         output_path_subplot,
         scale_type='loglog'
-    )
-
-    # 面積規格化 linear-linear
-    output_path_subplot = os.path.join(comparison_dir, 'grid_subplot_linear_area_normalized')
-    create_grid_subplot_comparison(
-        grid_data_dict_area_normalized, fit_params_dict_area_normalized,
-        num_time_bins, num_dist_bins,
-        'Rock Size D [cm]', 'Cumulative Number Density N [/m²]',
-        output_path_subplot,
-        scale_type='linear'
     )
 
     # 面積規格化 log-log
