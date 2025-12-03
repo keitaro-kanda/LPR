@@ -351,6 +351,141 @@ def save_statistics_to_txt(output_path, grid_statistics):
 
     print(f'統計情報保存: {output_path}')
 
+def create_grid_subplot_comparison(grid_data_dict, fit_params_dict, num_time_bins, num_dist_bins,
+                                   xlabel, ylabel, output_path, scale_type='linear',
+                                   dpi_png=300, dpi_pdf=600):
+    """
+    グリッド配置でsubplotを作成し、各グリッドのRSFDを表示
+
+    Parameters:
+    -----------
+    grid_data_dict : dict
+        キーが(time_idx, dist_idx)のタプル、値がグリッドデータの辞書
+    fit_params_dict : dict
+        キーが(time_idx, dist_idx)のタプル、値がフィッティングパラメータの辞書
+    num_time_bins : int
+        時間方向の分割数（行数）
+    num_dist_bins : int
+        距離方向の分割数（列数）
+    xlabel, ylabel : str
+        軸ラベル
+    output_path : str
+        出力パス（拡張子なし）
+    scale_type : str
+        'linear' or 'loglog'
+    dpi_png, dpi_pdf : int
+        解像度
+    """
+    # 全データから軸範囲を計算
+    all_x_data = []
+    all_y_data = []
+    all_fit_y = []
+
+    for grid_data in grid_data_dict.values():
+        all_x_data.extend(grid_data['x_data'])
+        all_y_data.extend(grid_data['y_data'])
+        all_fit_y.extend(grid_data['fit_y'])
+
+    if len(all_x_data) > 0:
+        if scale_type == 'loglog':
+            # logスケールの場合は正の値のみ考慮
+            x_positive = [x for x in all_x_data if x > 0]
+            y_positive = [y for y in all_y_data + all_fit_y if y > 0]
+
+            if len(x_positive) > 0 and len(y_positive) > 0:
+                x_min, x_max = min(x_positive) * 0.8, max(x_positive) * 1.2
+                y_min, y_max = min(y_positive) * 0.5, max(y_positive) * 2.0
+            else:
+                x_min, x_max, y_min, y_max = None, None, None, None
+        else:
+            # linearスケールの場合
+            x_min, x_max = min(all_x_data) * 0.95, max(all_x_data) * 1.05
+            y_min, y_max = min(all_y_data + all_fit_y) * 0.95, max(all_y_data + all_fit_y) * 1.05
+    else:
+        x_min, x_max, y_min, y_max = None, None, None, None
+
+    # Figure作成
+    _, axes = plt.subplots(num_time_bins, num_dist_bins,
+                           figsize=(4 * num_dist_bins, 3.5 * num_time_bins),
+                           squeeze=False)
+
+    # 各subplotにデータをプロット
+    for i in range(num_time_bins):
+        for j in range(num_dist_bins):
+            ax = axes[i, j]
+
+            # グリッドデータの取得
+            if (i, j) in grid_data_dict:
+                grid_data = grid_data_dict[(i, j)]
+                fit_params = fit_params_dict.get((i, j), {})
+
+                # データプロット
+                ax.plot(grid_data['x_data'], grid_data['y_data'],
+                       marker='o', linestyle='-', linewidth=1.5, color='blue', markersize=4)
+
+                # フィット曲線プロット
+                ax.plot(grid_data['fit_x'], grid_data['fit_y'],
+                       linestyle='--', linewidth=1.5, color='red')
+
+                # 軸スケール設定
+                if scale_type == 'loglog':
+                    ax.set_xscale('log')
+                    ax.set_yscale('log')
+
+                # 軸範囲を統一
+                if x_min is not None and x_max is not None:
+                    ax.set_xlim(x_min, x_max)
+                if y_min is not None and y_max is not None:
+                    ax.set_ylim(y_min, y_max)
+
+                # グリッドラベルを表示（左上）
+                ax.text(0.05, 0.95, f'T{i+1}D{j+1}',
+                       transform=ax.transAxes, fontsize=9, fontweight='bold',
+                       verticalalignment='top', bbox=dict(boxstyle='round',
+                       facecolor='wheat', alpha=0.5))
+
+                # フィッティングパラメータを表示（右下）
+                if fit_params:
+                    k = fit_params.get('k', 0)
+                    r = fit_params.get('r', 0)
+                    p_str = fit_params.get('p_str', '')
+
+                    param_text = f'k={k:.2e}\nr={r:.3f}\n{p_str}'
+                    ax.text(0.95, 0.05, param_text,
+                           transform=ax.transAxes, fontsize=7,
+                           verticalalignment='bottom', horizontalalignment='right',
+                           bbox=dict(boxstyle='round', facecolor='white', alpha=0.7))
+
+            else:
+                # データがない場合は空のプロット
+                ax.text(0.5, 0.5, 'No Data',
+                       transform=ax.transAxes, fontsize=12,
+                       horizontalalignment='center', verticalalignment='center',
+                       color='gray')
+                ax.set_xticks([])
+                ax.set_yticks([])
+
+            # グリッド表示
+            ax.grid(True, linestyle='--', alpha=0.3)
+
+            # 軸ラベル（外側のみ）
+            if j == 0:
+                ax.set_ylabel(ylabel, fontsize=12)
+            if i == num_time_bins - 1:
+                ax.set_xlabel(xlabel, fontsize=12)
+
+            # Tick labelサイズ
+            ax.tick_params(labelsize=10)
+
+    plt.tight_layout()
+
+    # 保存
+    plt.savefig(f'{output_path}.png', dpi=dpi_png)
+    plt.savefig(f'{output_path}.pdf', dpi=dpi_pdf)
+    plt.close()
+
+    print(f'グリッドsubplotプロット保存: {output_path}.png')
+
 def generate_color_marker_combinations(num_time_bins, num_dist_bins):
     """
     時間範囲と距離範囲に応じた色とマーカーの組み合わせを生成
@@ -462,6 +597,7 @@ color_marker_combinations = generate_color_marker_combinations(num_time_bins, nu
 # ------------------------------------------------------------------
 # 5. 出力ディレクトリの作成
 # ------------------------------------------------------------------
+
 base_dir = os.path.join(os.path.dirname(os.path.dirname(data_path)),
                         f'RSFD_grid_time{time_bin_width:.0f}ns_dist{dist_bin_width:.0f}m')
 os.makedirs(base_dir, exist_ok=True)
@@ -479,13 +615,22 @@ print(f'\n出力ディレクトリ: {base_dir}')
 print('\n=== グリッド処理開始 ===')
 
 # 物理定数
-epsilon_r = 9.0
+epsilon_regolith = 4.5  # 月面レゴリスの比誘電率
+epsilon_rock = 9.0     # 岩石の比誘電率
 c = 299_792_458  # [m/s]
 
 # 各グリッドのデータを格納するリスト
 all_grids_data_non_normalized = []  # 非規格化
 all_grids_data_area_normalized = []  # 面積規格化
 grid_statistics = []
+
+# subplot用のグリッドデータ辞書（キー: (time_idx, dist_idx)）
+grid_data_dict_non_normalized = {}
+grid_data_dict_area_normalized = {}
+
+# subplot用のフィッティングパラメータ辞書（キー: (time_idx, dist_idx)）
+fit_params_dict_non_normalized = {}
+fit_params_dict_area_normalized = {}
 
 grid_idx = 0
 for i in range(num_time_bins):
@@ -544,8 +689,8 @@ for i in range(num_time_bins):
 
         # 面積計算（時間範囲×距離範囲）
         # 時間を距離に変換: depth = time * c / (2 * sqrt(epsilon_r))
-        depth_min = time_min * 1e-9 * c / (2 * np.sqrt(epsilon_r))
-        depth_max = time_max * 1e-9 * c / (2 * np.sqrt(epsilon_r))
+        depth_min = time_min * 1e-9 * c / (2 * np.sqrt(epsilon_regolith))
+        depth_max = time_max * 1e-9 * c / (2 * np.sqrt(epsilon_regolith))
         area = (depth_max - depth_min) * (dist_max - dist_min)
         print(f'  面積: {area:.2f} m²')
 
@@ -555,17 +700,21 @@ for i in range(num_time_bins):
         size_label1 = np.full(num_group1, 1.0)
 
         # Group2: 6cm固定
-        num_group2 = int(np.sum(lab == 2))
-        size_label2 = np.full(num_group2, 6.0)
+        mask2_valid = (lab == 2) & (~np.isnan(time_top)) & (~np.isnan(time_bottom))
+        sizes_group2 = (time_bottom[mask2_valid] - time_top[mask2_valid]) * 1e-9 * c / np.sqrt(epsilon_rock) * 0.5 * 100
+
+        # 浮動小数点誤差を排除
+        sizes_group2 = np.round(sizes_group2, decimals=3)
+        num_group2 = len(sizes_group2)
 
         # Group3: 計算値
         mask3_valid = (lab == 3) & (~np.isnan(time_top)) & (~np.isnan(time_bottom))
-        sizes_group3 = (time_bottom[mask3_valid] - time_top[mask3_valid]) * 1e-9 * c / np.sqrt(epsilon_r) * 0.5 * 100
+        sizes_group3 = (time_bottom[mask3_valid] - time_top[mask3_valid]) * 1e-9 * c / np.sqrt(epsilon_rock) * 0.5 * 100
 
         # 浮動小数点誤差を排除
         sizes_group3 = np.round(sizes_group3, decimals=3)
-
         num_group3 = len(sizes_group3)
+
         print(f'  Group1: {num_group1}, Group2: {num_group2}, Group3: {num_group3}')
 
         # データが不足している場合はスキップ
@@ -575,7 +724,7 @@ for i in range(num_time_bins):
             continue
 
         # Group1-2-3統合データ
-        all_sizes = np.concatenate([size_label1, size_label2, sizes_group3])
+        all_sizes = np.concatenate([size_label1, sizes_group2, sizes_group3])
         unique_sizes = np.sort(np.unique(all_sizes))
         cum_counts = np.array([np.sum(all_sizes >= s) for s in unique_sizes])
 
@@ -594,7 +743,7 @@ for i in range(num_time_bins):
         # 色・マーカー・透明度の取得
         style = color_marker_combinations[(i * num_dist_bins + j) % len(color_marker_combinations)]
 
-        # 非規格化データを保存
+        # 非規格化データを保存（比較プロット用リスト）
         all_grids_data_non_normalized.append({
             'x_data': unique_sizes,
             'y_data': cum_counts,
@@ -612,7 +761,23 @@ for i in range(num_time_bins):
             }
         })
 
-        # 面積規格化データを保存
+        # 非規格化データを保存（subplot用辞書）
+        grid_data_dict_non_normalized[(i, j)] = {
+            'x_data': unique_sizes,
+            'y_data': cum_counts,
+            'fit_x': D_fit,
+            'fit_y': N_pow_fit
+        }
+
+        # 非規格化フィッティングパラメータを保存（subplot用辞書）
+        fit_params_dict_non_normalized[(i, j)] = {
+            'k': k_pow,
+            'r': r_pow,
+            'R2': R2_pow,
+            'p_str': format_p_value(p_pow)
+        }
+
+        # 面積規格化データを保存（比較プロット用リスト）
         all_grids_data_area_normalized.append({
             'x_data': unique_sizes,
             'y_data': cum_counts_normalized,
@@ -629,6 +794,22 @@ for i in range(num_time_bins):
                 'p_str': format_p_value(p_pow_norm)
             }
         })
+
+        # 面積規格化データを保存（subplot用辞書）
+        grid_data_dict_area_normalized[(i, j)] = {
+            'x_data': unique_sizes,
+            'y_data': cum_counts_normalized,
+            'fit_x': D_fit_norm,
+            'fit_y': N_pow_fit_norm
+        }
+
+        # 面積規格化フィッティングパラメータを保存（subplot用辞書）
+        fit_params_dict_area_normalized[(i, j)] = {
+            'k': k_pow_norm,
+            'r': r_pow_norm,
+            'R2': R2_pow_norm,
+            'p_str': format_p_value(p_pow_norm)
+        }
 
         # 統計情報を保存
         grid_statistics.append({
@@ -686,7 +867,7 @@ for i in range(num_time_bins):
             f'grid_{i+1:02d}_{j+1:02d}_linear_area_normalized')
         create_individual_rsfd_plot(
             unique_sizes, cum_counts_normalized,
-            'Rock Size D [cm]', 'Cumulative Number Density N [/m²]',
+            'Rock Size D [cm]', 'Cumulative number of rocks /m²',
             output_path_individual,
             scale_type='linear',
             fit_line={
@@ -700,7 +881,7 @@ for i in range(num_time_bins):
             f'grid_{i+1:02d}_{j+1:02d}_loglog_area_normalized')
         create_individual_rsfd_plot(
             unique_sizes, cum_counts_normalized,
-            'Rock Size D [cm]', 'Cumulative Number Density N [/m²]',
+            'Rock Size D [cm]', 'Cumulative number of rocks /m²',
             output_path_individual,
             scale_type='loglog',
             fit_line={
@@ -737,7 +918,7 @@ if len(all_grids_data_non_normalized) > 0:
     output_path_comparison = os.path.join(comparison_dir, 'comparison_linear_area_normalized')
     create_comparison_plot(
         all_grids_data_area_normalized,
-        'Rock Size D [cm]', 'Cumulative Number Density N [/m²]',
+        'Rock Size D [cm]', 'Cumulative number of rocks /m²',
         output_path_comparison,
         scale_type='linear'
     )
@@ -746,8 +927,53 @@ if len(all_grids_data_non_normalized) > 0:
     output_path_comparison = os.path.join(comparison_dir, 'comparison_loglog_area_normalized')
     create_comparison_plot(
         all_grids_data_area_normalized,
-        'Rock Size D [cm]', 'Cumulative Number Density N [/m²]',
+        'Rock Size D [cm]', 'Cumulative number of rocks /m²',
         output_path_comparison,
+        scale_type='loglog'
+    )
+
+    # ------------------------------------------------------------------
+    # グリッドsubplot比較プロットの作成
+    # ------------------------------------------------------------------
+    print('\n=== グリッドsubplot比較プロット作成 ===')
+
+    # 非規格化 linear-linear
+    output_path_subplot = os.path.join(comparison_dir, 'grid_subplot_linear_non_normalized')
+    create_grid_subplot_comparison(
+        grid_data_dict_non_normalized, fit_params_dict_non_normalized,
+        num_time_bins, num_dist_bins,
+        'Rock Size D [cm]', 'Cumulative Number N',
+        output_path_subplot,
+        scale_type='linear'
+    )
+
+    # 非規格化 log-log
+    output_path_subplot = os.path.join(comparison_dir, 'grid_subplot_loglog_non_normalized')
+    create_grid_subplot_comparison(
+        grid_data_dict_non_normalized, fit_params_dict_non_normalized,
+        num_time_bins, num_dist_bins,
+        'Rock Size D [cm]', 'Cumulative Number N',
+        output_path_subplot,
+        scale_type='loglog'
+    )
+
+    # 面積規格化 linear-linear
+    output_path_subplot = os.path.join(comparison_dir, 'grid_subplot_linear_area_normalized')
+    create_grid_subplot_comparison(
+        grid_data_dict_area_normalized, fit_params_dict_area_normalized,
+        num_time_bins, num_dist_bins,
+        'Rock Size D [cm]', 'Cumulative Number Density N [/m²]',
+        output_path_subplot,
+        scale_type='linear'
+    )
+
+    # 面積規格化 log-log
+    output_path_subplot = os.path.join(comparison_dir, 'grid_subplot_loglog_area_normalized')
+    create_grid_subplot_comparison(
+        grid_data_dict_area_normalized, fit_params_dict_area_normalized,
+        num_time_bins, num_dist_bins,
+        'Rock Size D [cm]', 'Cumulative Number Density N [/m²]',
+        output_path_subplot,
         scale_type='loglog'
     )
 else:
