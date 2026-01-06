@@ -630,7 +630,7 @@ if rover_name == 'CE-3':
         ax.set_xlabel('Moving distance [m]', fontsize=font_medium)
         ax.set_ylabel('Time [ns]', fontsize=font_medium)
         ax.set_ylim(100, 0)  # Zoomed y-axis for CE-3 data
-
+        ax.set_yticks(np.arange(0, 101, 20))
 
         #* Add the second Y-axis
         ax2 = ax.twinx()
