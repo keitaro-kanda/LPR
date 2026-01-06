@@ -525,22 +525,30 @@ font_small = 16
 #* Plot single panel figure x
 print('----- Start plotting -----')
 print(f'Plotting single panel figure x {len(plot_data)}')
+
+# Color scale adjustment factor
+if rover_name == 'CE-4':
+    icolor_scale = 10
+else:
+    icolor_scale = 10
+
 for i in range(len(plot_data)):
     fig = plt.figure(figsize=(18, 6))
     ax = fig.add_subplot(111)
     
     # Get the processing step for this plot
     step = processing_order[i]
-    
+
+    # Plot
     if step == 4:  # Gain function
         im = ax.imshow(plot_data[i], aspect='auto', cmap='seismic',
                 extent=[0, plot_data[i].shape[1]*trace_interval, plot_data[i].shape[0]*sample_interval*1e9, 0],
-                vmin=-np.amax(np.abs(plot_data[i]))/10, vmax=np.amax(np.abs(plot_data[i]))/10
+                vmin=-np.amax(np.abs(plot_data[i]))/icolor_scale, vmax=np.amax(np.abs(plot_data[i]))/icolor_scale
                 )
     elif step == 5:  # Terrain correction
         im = ax.imshow(plot_data[i], aspect='auto', cmap='seismic',
                 extent=[0, plot_data[i].shape[1]*trace_interval, time_max*1e9, time_min*1e9],
-                vmin=-np.nanmax(np.abs(plot_data[i]))/10, vmax=np.nanmax(np.abs(plot_data[i]))/10
+                vmin=-np.nanmax(np.abs(plot_data[i]))/icolor_scale, vmax=np.nanmax(np.abs(plot_data[i]))/icolor_scale
                 )
         ax.set_yticks(np.arange(0, plot_data[i].shape[0] * sample_interval / 1e-9, 100))
     else:
@@ -553,6 +561,7 @@ for i in range(len(plot_data)):
 
     ax.set_xlabel('Moving distance [m]', fontsize=font_medium)
     ax.set_ylabel('Time [ns]', fontsize=font_medium)
+
 
     #* Add the second Y-axis
     ax2 = ax.twinx()
@@ -567,13 +576,6 @@ for i in range(len(plot_data)):
     ax2.set_ylabel(r'Depth [m] ($\varepsilon_r = 4.5$)', fontsize=font_medium)
     ax2.tick_params(axis='y', which='major', labelsize=font_small)
 
-    # #* Add colorbar
-    # delvider = axgrid1.make_axes_locatable(ax)
-    # cax = delvider.append_axes('right', size='3%', pad=0.1)
-    # cax.set_position(cax.get_position().translated(0.08, 0)) # 右に少しずらす
-    # plt.colorbar(im, cax=cax, orientation = 'vertical').set_label('Amplitude', fontsize=font_large)
-    # cax.tick_params(labelsize=font_small)
-
     # * Adjust layout for colorbar layout
     fig.subplots_adjust(bottom=0.18, right=0.9)
     ### カラーバーを右下に横向きで追加 ###
@@ -584,10 +586,80 @@ for i in range(len(plot_data)):
     ### ここまで ###
 
     #* Saving
-    plt.savefig(dir_list[i] + '/' + str(step) + '_' + title[i] + '.png', format='png', dpi=120)
-    plt.savefig(dir_list[i] + '/' + str(step) + '_' + title[i] + '.pdf', format='pdf', dpi=600)
+    if rover_name == 'CE-4':
+        plt.savefig(dir_list[i] + '/' + str(step) + '_' + title[i] + '.png', format='png', dpi=120)
+        plt.savefig(dir_list[i] + '/' + str(step) + '_' + title[i] + '.pdf', format='pdf', dpi=600)
+    elif rover_name == 'CE-3':
+        plt.savefig(dir_list[i] + '/' + str(step) + '_' + title[i] + '_full.png', format='png', dpi=120)
+        plt.savefig(dir_list[i] + '/' + str(step) + '_' + title[i] + '_full.pdf', format='pdf', dpi=600)
     print('Finished plotting', title[i])
     plt.close()
+
+
+
+# In case of CE-3, plot zoomed figure because of shallower penetration depth
+if rover_name == 'CE-3':
+    print('----- Zoomed plot for CE-3 data -----')
+    print(f'Plotting single panel figure x {len(plot_data)}')
+    for i in range(len(plot_data)):
+        fig = plt.figure(figsize=(18, 6))
+        ax = fig.add_subplot(111)
+        
+        # Get the processing step for this plot
+        step = processing_order[i]
+        
+        if step == 4:  # Gain function
+            im = ax.imshow(plot_data[i], aspect='auto', cmap='seismic',
+                    extent=[0, plot_data[i].shape[1]*trace_interval, plot_data[i].shape[0]*sample_interval*1e9, 0],
+                    vmin=-np.amax(np.abs(plot_data[i]))/icolor_scale, vmax=np.amax(np.abs(plot_data[i]))/icolor_scale
+                    )
+        elif step == 5:  # Terrain correction
+            im = ax.imshow(plot_data[i], aspect='auto', cmap='seismic',
+                    extent=[0, plot_data[i].shape[1]*trace_interval, time_max*1e9, time_min*1e9],
+                    vmin=-np.nanmax(np.abs(plot_data[i]))/icolor_scale, vmax=np.nanmax(np.abs(plot_data[i]))/icolor_scale
+                    )
+            ax.set_yticks(np.arange(0, plot_data[i].shape[0] * sample_interval / 1e-9, 100))
+        else:
+            im = ax.imshow(plot_data[i], aspect='auto', cmap='seismic',
+                        extent=[0, plot_data[i].shape[1]*trace_interval, plot_data[i].shape[0]*sample_interval*1e9, 0],
+                        vmin=-10, vmax=10
+                        )
+        ax.tick_params(axis='both', which='major', labelsize=font_small)
+        #ax.set_title(title[i], fontsize=font_large)
+
+        ax.set_xlabel('Moving distance [m]', fontsize=font_medium)
+        ax.set_ylabel('Time [ns]', fontsize=font_medium)
+        ax.set_ylim(100, 0)  # Zoomed y-axis for CE-3 data
+
+
+        #* Add the second Y-axis
+        ax2 = ax.twinx()
+        # Get the range of the original Y-axis (time)
+        t_min, t_max = ax.get_ylim()
+        # Calculate the corresponding depth range
+        # depth [m] = (time [ns] * 1e-9) * v_gpr [m/s] / 2
+        depth_min = (t_min * 1e-9) * c / np.sqrt(epsilon_r) / 2
+        depth_max = (t_max * 1e-9) * c / np.sqrt(epsilon_r) / 2
+        # 新しいY軸に深さの範囲とラベルを設定
+        ax2.set_ylim(depth_min, depth_max)
+        ax2.set_ylabel(r'Depth [m] ($\varepsilon_r = 4.5$)', fontsize=font_medium)
+        ax2.tick_params(axis='y', which='major', labelsize=font_small)
+
+        # * Adjust layout for colorbar layout
+        fig.subplots_adjust(bottom=0.18, right=0.9)
+        ### カラーバーを右下に横向きで追加 ###
+        # Figureのサイズを基準とした位置とサイズ [left, bottom, width, height]
+        cbar_ax = fig.add_axes([0.65, 0.05, 0.2, 0.05]) # [x, y, 幅, 高さ]
+        cbar = plt.colorbar(im, cax=cbar_ax, orientation='horizontal')
+        cbar.ax.tick_params(labelsize=font_small)
+        ### ここまで ###
+
+        #* Saving
+        # In case of CE-3 zoomed plot, data point if limited and dpi can be lower
+        plt.savefig(dir_list[i] + '/' + str(step) + '_' + title[i] + '_0-100.png', format='png', dpi=120)
+        plt.savefig(dir_list[i] + '/' + str(step) + '_' + title[i] + '_0-100.pdf', format='pdf', dpi=300)
+        print('Finished plotting', title[i])
+        plt.close()
 
 
 # #* plot 5 panel figure
