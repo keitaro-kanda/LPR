@@ -210,15 +210,8 @@ def plot_2A(raw_data, medf, data_filtered, sequence_id):
 total_trace_num = 0
 resampled_trace_num = 0
 
-#* Set parameters for resampling
-if rover_name == 'CE-4':
-    window_num = 16  # Number of consecutive traces to consider for resampling
-    thres_val = 25000  # Threshold value for resampling
-elif rover_name == 'CE-3':
-    window_num = 8  # Number of consecutive traces to consider for resampling
-    thres_val = 11000
-else:
-    raise ValueError('Invalid rover name. Please enter CE-3 or CE-4.')
+
+
 
 
 for ECHO_data in tqdm(natsorted(os.listdir(data_folder_path))):
@@ -252,6 +245,18 @@ for ECHO_data in tqdm(natsorted(os.listdir(data_folder_path))):
     2B: Apply resampling function
     """
     if channel_name == '2B':
+        #* Set parameters for resampling
+        if rover_name == 'CE-4':
+            window_num = 16  # Number of consecutive traces to consider for resampling
+            thres_val = 25000  # Threshold value for resampling
+        elif rover_name == 'CE-3':
+            window_num = 8  # Number of consecutive traces to consider for resampling
+            thres_val = 11000
+        else:
+            raise ValueError('Invalid rover name. Please enter CE-3 or CE-4.')
+        if rover_name == 'CE-3' and ECHO_data == 'data_0004.txt':
+            thres_val = 30000  # Special case for CE-3 data_0004
+
         sobelx, med_denoised, med, medf, data_filtered, positions_filtered = resampling(signals, positions, sequence_id, window_num, thres_val, rover_name)
         # data_filtered4plot = np.zeros((2048, data_filtered.shape[1]))
         # data_filtered4plot[:, :data_filtered.shape[1]] = data_filtered
