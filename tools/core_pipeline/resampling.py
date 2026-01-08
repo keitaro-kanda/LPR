@@ -226,6 +226,10 @@ for ECHO_data in tqdm(natsorted(os.listdir(data_folder_path))):
     raw_data = np.loadtxt(ECHO_data_path, delimiter=' ', skiprows=1) # skip the header
     positions = raw_data[:7, :] # 7: B-scan data
     signals = raw_data[7:, :] # 0-6: velocity and position data
+    # if rover_name == 'CE-3':
+    #     signals = signals[0:int(100e-9/0.3125e-9), :]  # In case of CE-3, use only first 320 samples (100 ns)
+    print('Loaded data shape is: ', raw_data.shape)
+    print('Signals shape is: ', signals.shape)
     #* Check the sequence ID
     sequence_id = ECHO_data.split('_')[-1].split('.')[0]
 
@@ -250,8 +254,8 @@ for ECHO_data in tqdm(natsorted(os.listdir(data_folder_path))):
             window_num = 16  # Number of consecutive traces to consider for resampling
             thres_val = 25000  # Threshold value for resampling
         elif rover_name == 'CE-3':
-            window_num = 4  # Number of consecutive traces to consider for resampling
-            thres_val = 12000
+            window_num = 5  # Number of consecutive traces to consider for resampling
+            thres_val = 11500
         else:
             raise ValueError('Invalid rover name. Please enter CE-3 or CE-4.')
         if rover_name == 'CE-3' and ECHO_data == 'data_0004.txt':
@@ -261,7 +265,7 @@ for ECHO_data in tqdm(natsorted(os.listdir(data_folder_path))):
         # data_filtered4plot = np.zeros((2048, data_filtered.shape[1]))
         # data_filtered4plot[:, :data_filtered.shape[1]] = data_filtered
 
-        plot_2B(raw_data, sobelx, med_denoised, med, medf, data_filtered, sequence_id, thres_val)
+        plot_2B(signals, sobelx, med_denoised, med, medf, data_filtered, sequence_id, thres_val)
         print(' ')
 
     elif channel_name == '2A':
