@@ -554,7 +554,7 @@ for i in range(len(plot_data)):
     else:
         im = ax.imshow(plot_data[i], aspect='auto', cmap='seismic',
                     extent=[0, plot_data[i].shape[1]*trace_interval, plot_data[i].shape[0]*sample_interval*1e9, 0],
-                    vmin=-10, vmax=10
+                    vmin=-20, vmax=20
                     )
     ax.tick_params(axis='both', which='major', labelsize=font_small)
     #ax.set_title(title[i], fontsize=font_large)
@@ -622,7 +622,7 @@ if rover_name == 'CE-3':
         else:
             im = ax.imshow(plot_data[i], aspect='auto', cmap='seismic',
                         extent=[0, plot_data[i].shape[1]*trace_interval, plot_data[i].shape[0]*sample_interval*1e9, 0],
-                        vmin=-10, vmax=10
+                        vmin=-20, vmax=20
                         )
         ax.tick_params(axis='both', which='major', labelsize=font_small)
         #ax.set_title(title[i], fontsize=font_large)
