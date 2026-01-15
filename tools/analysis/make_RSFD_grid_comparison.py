@@ -488,6 +488,141 @@ def create_grid_subplot_comparison(grid_data_dict, fit_params_dict, num_time_bin
 
     print(f'グリッドsubplotプロット保存: {output_path}.png')
 
+def create_bscan_with_grid_lines(bscan_data, time_bins, dist_bins, output_path,
+                                  sample_interval=0.312500e-9, trace_interval=3.6e-2,
+                                  epsilon_r=4.5, c=299792458, dpi_png=300, dpi_pdf=600):
+    """
+    B-scanプロット上にグリッド分割の境界線を表示する関数
+
+    Parameters:
+    -----------
+    bscan_data : ndarray
+        B-scanデータ（2D配列、行がサンプル、列がトレース）
+    time_bins : list of tuple
+        時間方向の分割境界 [(time_min1, time_max1), (time_min2, time_max2), ...]
+    dist_bins : list of tuple
+        距離方向の分割境界 [(dist_min1, dist_max1), (dist_min2, dist_max2), ...]
+    output_path : str
+        出力パス（拡張子なし）
+    sample_interval : float
+        サンプル間隔 [s]
+    trace_interval : float
+        トレース間隔 [m]
+    epsilon_r : float
+        比誘電率
+    c : float
+        光速 [m/s]
+    dpi_png, dpi_pdf : int
+        解像度
+    """
+    # Font size standards (plot_Bscan.pyと同じ)
+    font_large = 20
+    font_medium = 18
+    font_small = 16
+
+    # Time zero検出（最初のトレースで最初の非NaN値を探す）
+    first_trace = bscan_data[:, 0]
+    first_non_nan_idx = np.where(~np.isnan(first_trace))[0]
+    time_zero_idx = first_non_nan_idx[0] if len(first_non_nan_idx) > 0 else 0
+
+    # 時間配列の計算
+    time_array = (np.arange(bscan_data.shape[0]) - time_zero_idx) * sample_interval * 1e9  # [ns]
+
+    # vmin/vmaxの設定（plot_Bscan.pyと同じロジック）
+    vmin = -np.nanmax(np.abs(bscan_data)) / 10
+    vmax = np.nanmax(np.abs(bscan_data)) / 10
+
+    # Figure作成
+    fig = plt.figure(figsize=(18, 6))
+    ax = fig.add_subplot(111)
+
+    # B-scanプロット
+    im = ax.imshow(bscan_data, aspect='auto', cmap='seismic',
+                   extent=[0, bscan_data.shape[1] * trace_interval,
+                          time_array[-1], time_array[0]],
+                   vmin=vmin, vmax=vmax)
+
+    # グリッド範囲の取得
+    time_min_grid = min([t[0] for t in time_bins])
+    time_max_grid = max([t[1] for t in time_bins])
+    dist_min_grid = min([d[0] for d in dist_bins])
+    dist_max_grid = max([d[1] for d in dist_bins])
+
+    # プロット範囲をグリッド範囲に設定（少し余裕を持たせる）
+    time_margin = (time_max_grid - time_min_grid) * 0.05
+    dist_margin = (dist_max_grid - dist_min_grid) * 0.05
+    ax.set_xlim(dist_min_grid - dist_margin, dist_max_grid + dist_margin)
+    ax.set_ylim(time_max_grid + time_margin, time_min_grid - time_margin)
+
+    # グリッド境界線の描画（黒点線）
+    # 時間方向の境界線（水平線）
+    time_boundaries = set()
+    for t_min, t_max in time_bins:
+        time_boundaries.add(t_min)
+        time_boundaries.add(t_max)
+
+    for t_boundary in sorted(time_boundaries):
+        ax.axhline(y=t_boundary, color='black', linestyle='--', linewidth=1.5, alpha=0.8)
+
+    # 距離方向の境界線（垂直線）
+    dist_boundaries = set()
+    for d_min, d_max in dist_bins:
+        dist_boundaries.add(d_min)
+        dist_boundaries.add(d_max)
+
+    for d_boundary in sorted(dist_boundaries):
+        ax.axvline(x=d_boundary, color='black', linestyle='--', linewidth=1.5, alpha=0.8)
+
+    # グリッドラベルの表示
+    num_time_bins = len(time_bins)
+    num_dist_bins = len(dist_bins)
+
+    for i, (t_min, t_max) in enumerate(time_bins):
+        for j, (d_min, d_max) in enumerate(dist_bins):
+            # ラベル位置（グリッドの中央）
+            label_x = (d_min + d_max) / 2
+            label_y = (t_min + t_max) / 2
+
+            # ラベルテキスト
+            label_text = f'T{i+1}D{j+1}'
+
+            # ラベル描画（白背景付き）
+            ax.text(label_x, label_y, label_text,
+                   fontsize=12, fontweight='bold',
+                   horizontalalignment='center', verticalalignment='center',
+                   bbox=dict(boxstyle='round,pad=0.3', facecolor='white',
+                            edgecolor='black', alpha=0.8))
+
+    # 軸ラベルの設定
+    ax.set_xlabel('Moving distance [m]', fontsize=font_medium)
+    ax.set_ylabel('Time [ns]', fontsize=font_medium)
+    ax.tick_params(axis='both', which='major', labelsize=font_small)
+
+    # 第2Y軸（深度）の追加
+    ax2 = ax.twinx()
+    t_min_plot, t_max_plot = ax.get_ylim()
+    depth_min = (t_min_plot * 1e-9) * c / np.sqrt(epsilon_r) / 2
+    depth_max = (t_max_plot * 1e-9) * c / np.sqrt(epsilon_r) / 2
+    ax2.set_ylim(depth_min, depth_max)
+    ax2.set_ylabel(r'Depth [m] ($\varepsilon_r = 4.5$)', fontsize=font_medium)
+    ax2.tick_params(axis='y', which='major', labelsize=font_small)
+
+    # レイアウト調整とカラーバー
+    fig.subplots_adjust(bottom=0.18, right=0.9)
+    cbar_ax = fig.add_axes([0.65, 0.05, 0.2, 0.05])
+    cbar = plt.colorbar(im, cax=cbar_ax, orientation='horizontal')
+    cbar.ax.tick_params(labelsize=font_small)
+
+    plt.tight_layout(rect=[0, 0.1, 0.9, 1])
+
+    # 保存
+    plt.savefig(f'{output_path}.png', dpi=dpi_png)
+    plt.savefig(f'{output_path}.pdf', dpi=dpi_pdf)
+    plt.close()
+
+    print(f'B-scanグリッドプロット保存: {output_path}.png')
+
+
 def generate_color_marker_combinations(num_time_bins, num_dist_bins):
     """
     時間範囲と距離範囲に応じた色とマーカーの組み合わせを生成
@@ -542,6 +677,11 @@ data_path = input().strip()
 if not (os.path.exists(data_path) and data_path.lower().endswith('.json')):
     raise FileNotFoundError('正しい .json ファイルを指定してください。')
 
+print('\nB-scanデータファイル(.txt)のパスを入力してください:')
+bscan_path = input().strip()
+if not (os.path.exists(bscan_path) and bscan_path.lower().endswith('.txt')):
+    raise FileNotFoundError('正しい .txt ファイルを指定してください。')
+
 # ------------------------------------------------------------------
 # 2. グリッド分割パラメータの入力
 # ------------------------------------------------------------------
@@ -584,6 +724,11 @@ print('\nデータ読み込み中...')
 with open(data_path, 'r') as f:
     results = json.load(f).get('results', {})
 
+# B-scanデータの読み込み
+print('B-scanデータ読み込み中...')
+bscan_data = np.loadtxt(bscan_path, delimiter=' ')
+print(f'B-scan形状: {bscan_data.shape}')
+
 x_all = np.array([v['x'] for v in results.values()])
 y_all = np.array([v['y'] for v in results.values()])
 lab_all = np.array([v['label'] for v in results.values()], dtype=int)
@@ -595,18 +740,38 @@ print(f'ラベルデータ読み込み完了: {len(lab_all)}個')
 # ------------------------------------------------------------------
 # 4. グリッド範囲の計算
 # ------------------------------------------------------------------
-# 時間方向：データ全体の最小値から開始
+# 物理定数
+sample_interval = 0.312500e-9  # [s] - サンプル間隔
+trace_interval = 3.6e-2        # [m] - トレース間隔
+
+# 時間方向：最小値はB-scanから、最大値はlabel.jsonから取得
+# B-scanから時間の最小値を取得（地形補正対応）
+# 各トレースの最初の非NaN値のインデックスを取得し、最小値を計算
+print('B-scanから時間範囲を計算中...')
+first_valid_indices = []
+for col in range(bscan_data.shape[1]):
+    non_nan_idx = np.where(~np.isnan(bscan_data[:, col]))[0]
+    if len(non_nan_idx) > 0:
+        first_valid_indices.append(non_nan_idx[0])
+
+if first_valid_indices:
+    min_time_idx = min(first_valid_indices)
+else:
+    min_time_idx = 0
+    print('警告: B-scanに有効なデータが見つかりませんでした。time_min=0として処理を続行します。')
+
+time_min_data = min_time_idx * sample_interval * 1e9  # [ns]
+
+# 最大値はlabel.jsonから取得
 # Group1はy座標、Group2-3はtime_topを使用
 time_values_group1 = y_all[lab_all == 1]
 time_values_others = time_top_all[(lab_all != 1) & (~np.isnan(time_top_all))]
 time_values_all = np.concatenate([time_values_group1, time_values_others])
-
-time_min_data = np.min(time_values_all)
 time_max_data = np.max(time_values_all)
 
-# 距離方向：x=0から開始
-dist_min_data = 0.0
-dist_max_data = np.max(x_all)
+# 距離方向：B-scanから取得
+dist_min_data = 0.0  # B-scanの開始位置
+dist_max_data = bscan_data.shape[1] * trace_interval  # [m]
 
 # 入力モードに応じて分割数または分割幅を計算
 if grid_input_mode == '1':
@@ -666,6 +831,10 @@ all_grids_data_non_normalized = []  # 非規格化
 all_grids_data_area_normalized = []  # 面積規格化
 grid_statistics = []
 
+# B-scanプロット用のグリッド範囲情報
+time_bins_for_bscan = []  # [(time_min, time_max), ...]
+dist_bins_for_bscan = []  # [(dist_min, dist_max), ...]
+
 # subplot用のグリッドデータ辞書（キー: (time_idx, dist_idx)）
 grid_data_dict_non_normalized = {}
 grid_data_dict_area_normalized = {}
@@ -673,6 +842,21 @@ grid_data_dict_area_normalized = {}
 # subplot用のフィッティングパラメータ辞書（キー: (time_idx, dist_idx)）
 fit_params_dict_non_normalized = {}
 fit_params_dict_area_normalized = {}
+
+# B-scanプロット用のグリッド範囲情報を事前計算
+for i in range(num_time_bins):
+    t_min = time_min_data + i * time_bin_width
+    t_max = time_min_data + (i + 1) * time_bin_width
+    if i == num_time_bins - 1:
+        t_max = time_max_data
+    time_bins_for_bscan.append((t_min, t_max))
+
+for j in range(num_dist_bins):
+    d_min = dist_min_data + j * dist_bin_width
+    d_max = dist_min_data + (j + 1) * dist_bin_width
+    if j == num_dist_bins - 1:
+        d_max = dist_max_data
+    dist_bins_for_bscan.append((d_min, d_max))
 
 grid_idx = 0
 for i in range(num_time_bins):
@@ -997,6 +1181,21 @@ if len(all_grids_data_non_normalized) > 0:
         'Rock Size D [cm]', 'Cumulative Number Density N [/m²]',
         output_path_subplot,
         scale_type='loglog'
+    )
+
+    # ------------------------------------------------------------------
+    # B-scanプロットにグリッド境界線を表示
+    # ------------------------------------------------------------------
+    print('\n=== B-scanグリッドプロット作成 ===')
+
+    output_path_bscan = os.path.join(comparison_dir, 'bscan_with_grid')
+    create_bscan_with_grid_lines(
+        bscan_data, time_bins_for_bscan, dist_bins_for_bscan,
+        output_path_bscan,
+        sample_interval=sample_interval,
+        trace_interval=trace_interval,
+        epsilon_r=epsilon_regolith,
+        c=c
     )
 else:
     print('\n警告: 有効なグリッドデータが見つかりませんでした。')
