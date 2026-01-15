@@ -489,6 +489,7 @@ def create_grid_subplot_comparison(grid_data_dict, fit_params_dict, num_time_bin
     print(f'グリッドsubplotプロット保存: {output_path}.png')
 
 def create_bscan_with_grid_lines(bscan_data, time_bins, dist_bins, output_path,
+                                  fit_params_dict=None,
                                   sample_interval=0.312500e-9, trace_interval=3.6e-2,
                                   epsilon_r=4.5, c=299792458, dpi_png=300, dpi_pdf=600):
     """
@@ -504,6 +505,9 @@ def create_bscan_with_grid_lines(bscan_data, time_bins, dist_bins, output_path,
         距離方向の分割境界 [(dist_min1, dist_max1), (dist_min2, dist_max2), ...]
     output_path : str
         出力パス（拡張子なし）
+    fit_params_dict : dict, optional
+        フィッティングパラメータの辞書。キーは(time_idx, dist_idx)のタプル。
+        各値は{'k': float, 'r': float, 'p_value': float}を含む辞書。
     sample_interval : float
         サンプル間隔 [s]
     trace_interval : float
@@ -583,12 +587,30 @@ def create_bscan_with_grid_lines(bscan_data, time_bins, dist_bins, output_path,
             label_x = (d_min + d_max) / 2
             label_y = (t_min + t_max) / 2
 
-            # ラベルテキスト
-            label_text = f'T{i+1}D{j+1}'
+            # フィッティングパラメータの取得とラベルテキスト生成
+            if fit_params_dict and (i, j) in fit_params_dict:
+                params = fit_params_dict[(i, j)]
+                k = params['k']
+                r = params['r']
+                p_value = params['p_value']
+
+                # p<0.05の場合は赤色、それ以外は黒色
+                text_color = 'red' if p_value < 0.05 else 'black'
+
+                # p値の表示フォーマット
+                if p_value < 0.001:
+                    p_str = 'p<0.001'
+                else:
+                    p_str = f'p={p_value:.3f}'
+
+                label_text = f'T{i+1}D{j+1}\nk={k:.2e}\nr={r:.2f}\n{p_str}'
+            else:
+                text_color = 'black'
+                label_text = f'T{i+1}D{j+1}'
 
             # ラベル描画（白背景付き）
             ax.text(label_x, label_y, label_text,
-                   fontsize=12, fontweight='bold',
+                   fontsize=10, fontweight='bold', color=text_color,
                    horizontalalignment='center', verticalalignment='center',
                    bbox=dict(boxstyle='round,pad=0.3', facecolor='white',
                             edgecolor='black', alpha=0.8))
@@ -1034,7 +1056,8 @@ for i in range(num_time_bins):
             'k': k_pow_norm,
             'r': r_pow_norm,
             'R2': R2_pow_norm,
-            'p_str': format_p_value(p_pow_norm)
+            'p_str': format_p_value(p_pow_norm),
+            'p_value': p_pow_norm  # p値（数値）を追加
         }
 
         # 統計情報を保存
@@ -1192,6 +1215,7 @@ if len(all_grids_data_non_normalized) > 0:
     create_bscan_with_grid_lines(
         bscan_data, time_bins_for_bscan, dist_bins_for_bscan,
         output_path_bscan,
+        fit_params_dict=fit_params_dict_area_normalized,
         sample_interval=sample_interval,
         trace_interval=trace_interval,
         epsilon_r=epsilon_regolith,
