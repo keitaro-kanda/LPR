@@ -767,22 +767,28 @@ sample_interval = 0.312500e-9  # [s] - サンプル間隔
 trace_interval = 3.6e-2        # [m] - トレース間隔
 
 # 時間方向：最小値はB-scanから、最大値はlabel.jsonから取得
-# B-scanから時間の最小値を取得（地形補正対応）
-# 各トレースの最初の非NaN値のインデックスを取得し、最小値を計算
+# B-scanから時間の最小値を取得（地形補正対応、t<0も含む）
 print('B-scanから時間範囲を計算中...')
-first_valid_indices = []
+
+# time_zero_idx を検出（最初のトレースの最初の非NaN値）
+first_trace = bscan_data[:, 0]
+first_non_nan_idx = np.where(~np.isnan(first_trace))[0]
+time_zero_idx = first_non_nan_idx[0] if len(first_non_nan_idx) > 0 else 0
+
+# 各トレースの最初の非NaN値の時間を計算（t=0未満も含む）
+first_valid_times = []
 for col in range(bscan_data.shape[1]):
     non_nan_idx = np.where(~np.isnan(bscan_data[:, col]))[0]
     if len(non_nan_idx) > 0:
-        first_valid_indices.append(non_nan_idx[0])
+        # time_zero_idxを基準とした相対時間（負の値も含む）
+        time_ns = (non_nan_idx[0] - time_zero_idx) * sample_interval * 1e9
+        first_valid_times.append(time_ns)
 
-if first_valid_indices:
-    min_time_idx = min(first_valid_indices)
+if first_valid_times:
+    time_min_data = min(first_valid_times)  # 負の値も含めて最小値を採用
 else:
-    min_time_idx = 0
+    time_min_data = 0.0
     print('警告: B-scanに有効なデータが見つかりませんでした。time_min=0として処理を続行します。')
-
-time_min_data = min_time_idx * sample_interval * 1e9  # [ns]
 
 # 最大値はlabel.jsonから取得
 # Group1はy座標、Group2-3はtime_topを使用
@@ -826,8 +832,14 @@ color_marker_combinations = generate_color_marker_combinations(num_time_bins, nu
 parent_dir = os.path.join(os.path.dirname(os.path.dirname(data_path)), 'RSFD_grid_comparison')
 os.makedirs(parent_dir, exist_ok=True)
 
-# サブディレクトリ: timeXXns_distOOm
-sub_dir_name = f'time{time_bin_width:.0f}ns_dist{dist_bin_width:.0f}m'
+# サブディレクトリ名の決定（入力モードに応じて命名を変更）
+if grid_input_mode == '1':
+    # モード1（分割幅入力）: timeXXns_distOOm
+    sub_dir_name = f'time{time_bin_width:.0f}ns_dist{dist_bin_width:.0f}m'
+else:
+    # モード2（分割数入力）: timeX_distY
+    sub_dir_name = f'time{num_time_bins}_dist{num_dist_bins}'
+
 base_dir = os.path.join(parent_dir, sub_dir_name)
 os.makedirs(base_dir, exist_ok=True)
 
