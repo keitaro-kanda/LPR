@@ -209,9 +209,10 @@ def get_time_position(rock_data):
     return time_pos
 
 def calculate_rsfd_in_window(rock_data, sizes, time_positions,
-                              dist_min, dist_max, time_min, time_max):
+                              dist_min, dist_max, time_min, time_max,
+                              epsilon_r, c):
     """
-    指定された範囲内の岩石からRSFDパラメータを計算
+    指定された範囲内の岩石から面積規格化されたRSFDパラメータを計算
 
     Parameters:
     -----------
@@ -225,10 +226,14 @@ def calculate_rsfd_in_window(rock_data, sizes, time_positions,
         距離範囲 [m]
     time_min, time_max : float
         時間範囲 [ns]
+    epsilon_r : float
+        比誘電率
+    c : float
+        光速 [m/s]
 
     Returns:
     --------
-    tuple: (k, r, R2, p_value, num_rocks)
+    tuple: (k, r, R2, p_value, num_rocks, area)
     """
     x = rock_data['x']
 
@@ -240,17 +245,25 @@ def calculate_rsfd_in_window(rock_data, sizes, time_positions,
     filtered_sizes = sizes[mask]
     num_rocks = len(filtered_sizes)
 
+    # 面積計算（時間範囲を深度に変換）
+    depth_min = time_min * 1e-9 * c / (2 * np.sqrt(epsilon_r))
+    depth_max = time_max * 1e-9 * c / (2 * np.sqrt(epsilon_r))
+    area = (depth_max - depth_min) * (dist_max - dist_min)  # [m²]
+
     if num_rocks < 3:
-        return np.nan, np.nan, np.nan, np.nan, num_rocks
+        return np.nan, np.nan, np.nan, np.nan, num_rocks, area
 
     # 累積サイズ分布を計算
     unique_sizes = np.sort(np.unique(filtered_sizes))
     cum_counts = np.array([np.sum(filtered_sizes >= s) for s in unique_sizes])
 
-    # べき則フィッティング
-    k, r, R2, p_value = calc_fitting_power_law(unique_sizes, cum_counts)
+    # 面積で規格化
+    cum_counts_normalized = cum_counts / area
 
-    return k, r, R2, p_value, num_rocks
+    # べき則フィッティング（規格化されたカウントを使用）
+    k, r, R2, p_value = calc_fitting_power_law(unique_sizes, cum_counts_normalized)
+
+    return k, r, R2, p_value, num_rocks, area
 
 def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_positions,
                                           window_width, step_size,
@@ -309,6 +322,7 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     R2_values = []
     p_values = []
     num_rocks_list = []
+    area_list = []
 
     print(f'\n水平方向移動ウィンドウ解析: {len(window_centers)}個のウィンドウ')
 
@@ -316,9 +330,10 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
         d_min = center - window_width / 2
         d_max = center + window_width / 2
 
-        k, r, R2, p, num_rocks = calculate_rsfd_in_window(
+        k, r, R2, p, num_rocks, area = calculate_rsfd_in_window(
             rock_data, sizes, time_positions,
-            d_min, d_max, time_min_data, time_max_data
+            d_min, d_max, time_min_data, time_max_data,
+            epsilon_r, c
         )
 
         k_values.append(k)
@@ -326,6 +341,7 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
         R2_values.append(R2)
         p_values.append(p)
         num_rocks_list.append(num_rocks)
+        area_list.append(area)
 
     window_centers = np.array(window_centers)
     k_values = np.array(k_values)
@@ -370,7 +386,7 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     ax1.set_ylabel('Time [ns]', fontsize=font_medium)
     ax1.set_ylim(time_max_data, time_min_data)
     ax1.tick_params(axis='both', which='major', labelsize=font_small)
-    ax1.set_title('Power-law exponent (r) vs. Distance', fontsize=font_large)
+    # ax1.set_title('Power-law exponent (r) vs. Distance', fontsize=font_large)
 
     # === 中段: kのプロット ===
     # B-scan背景
@@ -384,7 +400,7 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     valid_mask_k = ~np.isnan(k_values)
     ax2_twin.plot(window_centers[valid_mask_k], k_values[valid_mask_k],
                   'r-', linewidth=2, marker='s', markersize=4, label='k (scaling factor)')
-    ax2_twin.set_ylabel('k (scaling factor)', fontsize=font_medium, color='red')
+    ax2_twin.set_ylabel('k [/m²]', fontsize=font_medium, color='red')
     ax2_twin.tick_params(axis='y', labelcolor='red', labelsize=font_small)
     # y軸範囲設定（k値）: 1e-3〜15e-3に固定
     ax2_twin.set_ylim(1e-3, 15e-3)
@@ -392,7 +408,7 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     ax2.set_ylabel('Time [ns]', fontsize=font_medium)
     ax2.set_ylim(time_max_data, time_min_data)
     ax2.tick_params(axis='both', which='major', labelsize=font_small)
-    ax2.set_title('Scaling factor (k) vs. Distance', fontsize=font_large)
+    # ax2.set_title('Scaling factor (k) vs. Distance', fontsize=font_large)
 
     # === 下段: p値のプロット ===
     # B-scan背景
@@ -416,7 +432,7 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     ax3.set_ylabel('Time [ns]', fontsize=font_medium)
     ax3.set_ylim(time_max_data, time_min_data)
     ax3.tick_params(axis='both', which='major', labelsize=font_small)
-    ax3.set_title('p-value vs. Distance', fontsize=font_large)
+    # ax3.set_title('p-value vs. Distance', fontsize=font_large)
 
     plt.tight_layout()
 
@@ -430,15 +446,16 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     # 統計情報をテキストファイルに保存
     stats_path = f'{output_path}_statistics.txt'
     with open(stats_path, 'w', encoding='utf-8') as f:
-        f.write('# Horizontal Moving Window RSFD Statistics\n')
-        f.write('# =========================================\n\n')
+        f.write('# Horizontal Moving Window RSFD Statistics (Area-Normalized)\n')
+        f.write('# ==========================================================\n\n')
         f.write(f'Window width: {window_width:.2f} m\n')
         f.write(f'Step size: {step_size:.2f} m\n')
-        f.write(f'Number of windows: {len(window_centers)}\n\n')
-        f.write('Center [m]\tk\tr\tR2\tp-value\tNum rocks\n')
+        f.write(f'Number of windows: {len(window_centers)}\n')
+        f.write(f'Note: k values are area-normalized [/m²]\n\n')
+        f.write('Center [m]\tk [/m²]\tr\tR2\tp-value\tNum rocks\tArea [m²]\n')
         for i, center in enumerate(window_centers):
             f.write(f'{center:.2f}\t{k_values[i]:.4e}\t{r_values[i]:.4f}\t'
-                   f'{R2_values[i]:.4f}\t{p_values[i]:.4e}\t{num_rocks_list[i]}\n')
+                   f'{R2_values[i]:.4f}\t{p_values[i]:.4e}\t{num_rocks_list[i]}\t{area_list[i]:.4f}\n')
 
     print(f'統計情報保存: {stats_path}')
 
@@ -478,6 +495,7 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     R2_values = []
     p_values = []
     num_rocks_list = []
+    area_list = []
 
     print(f'\n深さ方向移動ウィンドウ解析: {len(window_centers)}個のウィンドウ')
 
@@ -485,9 +503,10 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
         t_min = center - window_width / 2
         t_max = center + window_width / 2
 
-        k, r, R2, p, num_rocks = calculate_rsfd_in_window(
+        k, r, R2, p, num_rocks, area = calculate_rsfd_in_window(
             rock_data, sizes, time_positions,
-            dist_min_data, dist_max_data, t_min, t_max
+            dist_min_data, dist_max_data, t_min, t_max,
+            epsilon_r, c
         )
 
         k_values.append(k)
@@ -495,6 +514,7 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
         R2_values.append(R2)
         p_values.append(p)
         num_rocks_list.append(num_rocks)
+        area_list.append(area)
 
     window_centers = np.array(window_centers)
     k_values = np.array(k_values)
@@ -540,7 +560,7 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     ax1.set_ylabel('Time [ns]', fontsize=font_medium)
     ax1.set_ylim(time_max_data, time_min_data)
     ax1.tick_params(axis='both', which='major', labelsize=font_small)
-    ax1.set_title('Power-law exponent (r) vs. Depth', fontsize=font_large)
+    # ax1.set_title('Power-law exponent (r) vs. Depth', fontsize=font_large)
 
     # === 中段: kのプロット ===
     # B-scan背景
@@ -554,7 +574,7 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     valid_mask_k = ~np.isnan(k_values)
     ax2_twin.plot(k_values[valid_mask_k], window_centers[valid_mask_k],
                   'r-', linewidth=2, marker='s', markersize=4, label='k (scaling factor)')
-    ax2_twin.set_xlabel('k (scaling factor)', fontsize=font_medium, color='red')
+    ax2_twin.set_xlabel('k [/m²]', fontsize=font_medium, color='red')
     ax2_twin.tick_params(axis='x', labelcolor='red', labelsize=font_small)
     # x軸範囲設定（k値）: 1e-3〜15e-3に固定
     ax2_twin.set_xlim(1e-3, 15e-3)
@@ -563,7 +583,7 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     ax2.set_ylabel('Time [ns]', fontsize=font_medium)
     ax2.set_ylim(time_max_data, time_min_data)
     ax2.tick_params(axis='both', which='major', labelsize=font_small)
-    ax2.set_title('Scaling factor (k) vs. Depth', fontsize=font_large)
+    # ax2.set_title('Scaling factor (k) vs. Depth', fontsize=font_large)
 
     # === 下段: p値のプロット ===
     # B-scan背景
@@ -587,7 +607,7 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     ax3.set_ylabel('Time [ns]', fontsize=font_medium)
     ax3.set_ylim(time_max_data, time_min_data)
     ax3.tick_params(axis='both', which='major', labelsize=font_small)
-    ax3.set_title('p-value vs. Depth', fontsize=font_large)
+    # ax3.set_title('p-value vs. Depth', fontsize=font_large)
 
     plt.tight_layout()
 
@@ -601,15 +621,16 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     # 統計情報をテキストファイルに保存
     stats_path = f'{output_path}_statistics.txt'
     with open(stats_path, 'w', encoding='utf-8') as f:
-        f.write('# Vertical Moving Window RSFD Statistics\n')
-        f.write('# =======================================\n\n')
+        f.write('# Vertical Moving Window RSFD Statistics (Area-Normalized)\n')
+        f.write('# ========================================================\n\n')
         f.write(f'Window width: {window_width:.2f} ns\n')
         f.write(f'Step size: {step_size:.2f} ns\n')
-        f.write(f'Number of windows: {len(window_centers)}\n\n')
-        f.write('Center [ns]\tk\tr\tR2\tp-value\tNum rocks\n')
+        f.write(f'Number of windows: {len(window_centers)}\n')
+        f.write(f'Note: k values are area-normalized [/m²]\n\n')
+        f.write('Center [ns]\tk [/m²]\tr\tR2\tp-value\tNum rocks\tArea [m²]\n')
         for i, center in enumerate(window_centers):
             f.write(f'{center:.2f}\t{k_values[i]:.4e}\t{r_values[i]:.4f}\t'
-                   f'{R2_values[i]:.4f}\t{p_values[i]:.4e}\t{num_rocks_list[i]}\n')
+                   f'{R2_values[i]:.4f}\t{p_values[i]:.4e}\t{num_rocks_list[i]}\t{area_list[i]:.4f}\n')
 
     print(f'統計情報保存: {stats_path}')
 
