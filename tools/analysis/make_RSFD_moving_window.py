@@ -1,0 +1,759 @@
+#!/usr/bin/env python3
+# make_RSFD_moving_window.py
+# ------------------------------------------------------------
+# 移動ウィンドウによるRSFD解析ツール
+# 水平方向または深さ方向に移動しながらRSFDパラメータ(r, k)を計算し、
+# B-scan背景上にプロットする
+# ------------------------------------------------------------
+
+import json
+import os
+import glob
+import numpy as np
+import matplotlib.pyplot as plt
+import statsmodels.api as sm
+from tqdm import tqdm
+
+# ------------------------------------------------------------------
+# 補助関数定義
+# ------------------------------------------------------------------
+def none_to_nan(v):
+    """None値をnp.nanに変換"""
+    return np.nan if v is None else v
+
+def calc_fitting_power_law(sizes, counts):
+    """
+    べき則フィッティングを実行
+
+    Returns:
+    --------
+    tuple: (k, r, R2, p_value) または データ不足時は (np.nan, np.nan, np.nan, np.nan)
+    """
+    if len(sizes) < 3 or len(counts) < 3:
+        return np.nan, np.nan, np.nan, np.nan
+
+    # 対数変換
+    mask = (sizes > 0) & (counts > 0)
+    if np.sum(mask) < 3:
+        return np.nan, np.nan, np.nan, np.nan
+
+    log_D = np.log(sizes[mask])
+    log_N = np.log(counts[mask])
+
+    try:
+        # べき則フィッティング (Power-law: log N = r log D + log k)
+        X_pow = sm.add_constant(log_D)
+        model_pow = sm.OLS(log_N, X_pow)
+        results_pow = model_pow.fit()
+
+        log_k_pow, r_pow = results_pow.params
+        k_pow = np.exp(log_k_pow)
+        R2_pow = results_pow.rsquared
+        p_pow = results_pow.pvalues[1]
+
+        return k_pow, np.abs(r_pow), R2_pow, p_pow
+    except Exception:
+        return np.nan, np.nan, np.nan, np.nan
+
+def find_label_json_files(bscan_dir):
+    """
+    B-scanと同階層のecho_labelsディレクトリからJSONファイルを検索
+
+    Parameters:
+    -----------
+    bscan_dir : str
+        B-scanファイルのディレクトリパス
+
+    Returns:
+    --------
+    list: JSONファイルのパスリスト
+    """
+    echo_labels_dir = os.path.join(bscan_dir, 'echo_labels')
+
+    if not os.path.exists(echo_labels_dir):
+        return []
+
+    # echo_labelsディレクトリ内の全JSONファイルを検索
+    label_files = glob.glob(os.path.join(echo_labels_dir, '*.json'))
+
+    return sorted(label_files)
+
+def select_label_file(label_files):
+    """
+    複数のlabel.jsonファイルがある場合、ユーザーに選択させる
+
+    Parameters:
+    -----------
+    label_files : list
+        label.jsonファイルのパスリスト
+
+    Returns:
+    --------
+    str: 選択されたファイルパス
+    """
+    if len(label_files) == 0:
+        raise FileNotFoundError('echo_labelsディレクトリにJSONファイルが見つかりません。')
+
+    if len(label_files) == 1:
+        print(f'label.jsonファイルを自動検出: {label_files[0]}')
+        return label_files[0]
+
+    print('\n複数のlabel.jsonファイルが見つかりました。使用するファイルを選択してください:')
+    for i, path in enumerate(label_files):
+        # 相対パスで表示
+        rel_path = os.path.relpath(path, os.path.dirname(os.path.dirname(path)))
+        print(f'  {i + 1}: {rel_path}')
+
+    while True:
+        try:
+            choice = int(input(f'選択 (1-{len(label_files)}): ').strip())
+            if 1 <= choice <= len(label_files):
+                return label_files[choice - 1]
+            else:
+                print(f'1から{len(label_files)}の数字を入力してください。')
+        except ValueError:
+            print('数字を入力してください。')
+
+def load_rock_data(label_path):
+    """
+    label.jsonから岩石データを読み込む
+
+    Parameters:
+    -----------
+    label_path : str
+        label.jsonファイルのパス
+
+    Returns:
+    --------
+    dict: 岩石データ（x, y, label, time_top, time_bottom）
+    """
+    with open(label_path, 'r') as f:
+        results = json.load(f).get('results', {})
+
+    x_all = np.array([v['x'] for v in results.values()])
+    y_all = np.array([v['y'] for v in results.values()])
+    lab_all = np.array([v['label'] for v in results.values()], dtype=int)
+    time_top_all = np.array([none_to_nan(v['time_top']) for v in results.values()], dtype=float)
+    time_bottom_all = np.array([none_to_nan(v['time_bottom']) for v in results.values()], dtype=float)
+
+    return {
+        'x': x_all,
+        'y': y_all,
+        'label': lab_all,
+        'time_top': time_top_all,
+        'time_bottom': time_bottom_all
+    }
+
+def calculate_rock_sizes(rock_data, epsilon_rock=9.0, c=299792458):
+    """
+    各岩石のサイズを計算
+
+    Parameters:
+    -----------
+    rock_data : dict
+        岩石データ
+    epsilon_rock : float
+        岩石の比誘電率
+    c : float
+        光速 [m/s]
+
+    Returns:
+    --------
+    ndarray: 各岩石のサイズ [cm]
+    """
+    lab = rock_data['label']
+    time_top = rock_data['time_top']
+    time_bottom = rock_data['time_bottom']
+
+    sizes = np.full(len(lab), np.nan)
+
+    # Group1: 1cm固定
+    sizes[lab == 1] = 1.0
+
+    # Group2, Group3: time_top/time_bottomから計算
+    for group in [2, 3]:
+        mask = (lab == group) & (~np.isnan(time_top)) & (~np.isnan(time_bottom))
+        if np.any(mask):
+            size_calc = (time_bottom[mask] - time_top[mask]) * 1e-9 * c / np.sqrt(epsilon_rock) * 0.5 * 100
+            sizes[mask] = np.round(size_calc, decimals=3)
+
+    return sizes
+
+def get_time_position(rock_data):
+    """
+    各岩石の時間位置を取得（Group1はy座標、Group2-3はtime_top）
+
+    Parameters:
+    -----------
+    rock_data : dict
+        岩石データ
+
+    Returns:
+    --------
+    ndarray: 各岩石の時間位置 [ns]
+    """
+    lab = rock_data['label']
+    y = rock_data['y']
+    time_top = rock_data['time_top']
+
+    time_pos = np.full(len(lab), np.nan)
+
+    # Group1: y座標を使用
+    time_pos[lab == 1] = y[lab == 1]
+
+    # Group2, Group3: time_topを使用
+    for group in [2, 3]:
+        mask = lab == group
+        time_pos[mask] = time_top[mask]
+
+    return time_pos
+
+def calculate_rsfd_in_window(rock_data, sizes, time_positions,
+                              dist_min, dist_max, time_min, time_max):
+    """
+    指定された範囲内の岩石からRSFDパラメータを計算
+
+    Parameters:
+    -----------
+    rock_data : dict
+        岩石データ
+    sizes : ndarray
+        各岩石のサイズ [cm]
+    time_positions : ndarray
+        各岩石の時間位置 [ns]
+    dist_min, dist_max : float
+        距離範囲 [m]
+    time_min, time_max : float
+        時間範囲 [ns]
+
+    Returns:
+    --------
+    tuple: (k, r, R2, p_value, num_rocks)
+    """
+    x = rock_data['x']
+
+    # 範囲内の岩石をフィルタリング
+    mask = (x >= dist_min) & (x <= dist_max) & \
+           (time_positions >= time_min) & (time_positions <= time_max) & \
+           (~np.isnan(sizes))
+
+    filtered_sizes = sizes[mask]
+    num_rocks = len(filtered_sizes)
+
+    if num_rocks < 3:
+        return np.nan, np.nan, np.nan, np.nan, num_rocks
+
+    # 累積サイズ分布を計算
+    unique_sizes = np.sort(np.unique(filtered_sizes))
+    cum_counts = np.array([np.sum(filtered_sizes >= s) for s in unique_sizes])
+
+    # べき則フィッティング
+    k, r, R2, p_value = calc_fitting_power_law(unique_sizes, cum_counts)
+
+    return k, r, R2, p_value, num_rocks
+
+def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_positions,
+                                          window_width, step_size,
+                                          time_min_data, time_max_data,
+                                          dist_min_data, dist_max_data,
+                                          sample_interval, trace_interval,
+                                          epsilon_r, c, output_path,
+                                          dpi_png=300, dpi_pdf=600):
+    """
+    水平方向移動ウィンドウのRSFDプロットを作成
+
+    Parameters:
+    -----------
+    bscan_data : ndarray
+        B-scanデータ
+    rock_data : dict
+        岩石データ
+    sizes : ndarray
+        岩石サイズ [cm]
+    time_positions : ndarray
+        時間位置 [ns]
+    window_width : float
+        ウィンドウ幅 [m]
+    step_size : float
+        ステップサイズ [m]
+    time_min_data, time_max_data : float
+        時間範囲 [ns]
+    dist_min_data, dist_max_data : float
+        距離範囲 [m]
+    sample_interval : float
+        サンプル間隔 [s]
+    trace_interval : float
+        トレース間隔 [m]
+    epsilon_r : float
+        比誘電率
+    c : float
+        光速 [m/s]
+    output_path : str
+        出力パス（拡張子なし）
+    """
+    # Font size standards
+    font_large = 20
+    font_medium = 18
+    font_small = 16
+
+    # ウィンドウ中心位置を計算
+    window_centers = []
+    current_center = dist_min_data + window_width / 2
+    while current_center + window_width / 2 <= dist_max_data:
+        window_centers.append(current_center)
+        current_center += step_size
+
+    # 各ウィンドウでRSFDパラメータを計算
+    k_values = []
+    r_values = []
+    R2_values = []
+    p_values = []
+    num_rocks_list = []
+
+    print(f'\n水平方向移動ウィンドウ解析: {len(window_centers)}個のウィンドウ')
+
+    for center in tqdm(window_centers, desc='RSFD計算中'):
+        d_min = center - window_width / 2
+        d_max = center + window_width / 2
+
+        k, r, R2, p, num_rocks = calculate_rsfd_in_window(
+            rock_data, sizes, time_positions,
+            d_min, d_max, time_min_data, time_max_data
+        )
+
+        k_values.append(k)
+        r_values.append(r)
+        R2_values.append(R2)
+        p_values.append(p)
+        num_rocks_list.append(num_rocks)
+
+    window_centers = np.array(window_centers)
+    k_values = np.array(k_values)
+    r_values = np.array(r_values)
+
+    # Time zero検出
+    first_trace = bscan_data[:, 0]
+    first_non_nan_idx = np.where(~np.isnan(first_trace))[0]
+    time_zero_idx = first_non_nan_idx[0] if len(first_non_nan_idx) > 0 else 0
+
+    # 時間配列の計算
+    time_array = (np.arange(bscan_data.shape[0]) - time_zero_idx) * sample_interval * 1e9  # [ns]
+
+    # B-scan表示範囲
+    vmin = -np.nanmax(np.abs(bscan_data)) / 10
+    vmax = np.nanmax(np.abs(bscan_data)) / 10
+
+    # Figure作成（2つのサブプロット：上がr、下がk）
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(18, 12), sharex=True)
+
+    # === 上段: rのプロット ===
+    # B-scan背景
+    im1 = ax1.imshow(bscan_data, aspect='auto', cmap='seismic',
+                     extent=[0, bscan_data.shape[1] * trace_interval,
+                            time_array[-1], time_array[0]],
+                     vmin=vmin, vmax=vmax, alpha=0.5)
+
+    # rの値を第2軸にプロット
+    ax1_twin = ax1.twinx()
+    valid_mask = ~np.isnan(r_values)
+    ax1_twin.plot(window_centers[valid_mask], r_values[valid_mask],
+                  'b-', linewidth=2, marker='o', markersize=4, label='r (power-law exponent)')
+    ax1_twin.set_ylabel('r (power-law exponent)', fontsize=font_medium, color='blue')
+    ax1_twin.tick_params(axis='y', labelcolor='blue', labelsize=font_small)
+
+    # y軸範囲設定（r値）
+    if np.any(valid_mask):
+        r_min, r_max = np.nanmin(r_values), np.nanmax(r_values)
+        r_margin = (r_max - r_min) * 0.1 if r_max > r_min else 0.5
+        ax1_twin.set_ylim(r_min - r_margin, r_max + r_margin)
+
+    ax1.set_ylabel('Time [ns]', fontsize=font_medium)
+    ax1.set_ylim(time_max_data, time_min_data)
+    ax1.tick_params(axis='both', which='major', labelsize=font_small)
+    ax1.set_title('Power-law exponent (r) vs. Distance', fontsize=font_large)
+
+    # 第2Y軸（深度）を追加
+    ax1_depth = ax1.secondary_yaxis('left', functions=(
+        lambda t: t * 1e-9 * c / np.sqrt(epsilon_r) / 2,
+        lambda d: d * 2 * np.sqrt(epsilon_r) / c * 1e9
+    ))
+    ax1_depth.set_ylabel(f'Depth [m] ($\\varepsilon_r = {epsilon_r}$)', fontsize=font_medium)
+    ax1_depth.tick_params(axis='y', which='major', labelsize=font_small)
+
+    # === 下段: kのプロット ===
+    # B-scan背景
+    im2 = ax2.imshow(bscan_data, aspect='auto', cmap='seismic',
+                     extent=[0, bscan_data.shape[1] * trace_interval,
+                            time_array[-1], time_array[0]],
+                     vmin=vmin, vmax=vmax, alpha=0.5)
+
+    # kの値を第2軸にプロット（対数スケール）
+    ax2_twin = ax2.twinx()
+    valid_mask_k = ~np.isnan(k_values) & (k_values > 0)
+    if np.any(valid_mask_k):
+        ax2_twin.semilogy(window_centers[valid_mask_k], k_values[valid_mask_k],
+                          'r-', linewidth=2, marker='s', markersize=4, label='k (scaling factor)')
+    ax2_twin.set_ylabel('k (scaling factor)', fontsize=font_medium, color='red')
+    ax2_twin.tick_params(axis='y', labelcolor='red', labelsize=font_small)
+
+    ax2.set_xlabel('Moving distance [m]', fontsize=font_medium)
+    ax2.set_ylabel('Time [ns]', fontsize=font_medium)
+    ax2.set_ylim(time_max_data, time_min_data)
+    ax2.tick_params(axis='both', which='major', labelsize=font_small)
+    ax2.set_title('Scaling factor (k) vs. Distance', fontsize=font_large)
+
+    # 第2Y軸（深度）を追加
+    ax2_depth = ax2.secondary_yaxis('left', functions=(
+        lambda t: t * 1e-9 * c / np.sqrt(epsilon_r) / 2,
+        lambda d: d * 2 * np.sqrt(epsilon_r) / c * 1e9
+    ))
+    ax2_depth.set_ylabel(f'Depth [m] ($\\varepsilon_r = {epsilon_r}$)', fontsize=font_medium)
+    ax2_depth.tick_params(axis='y', which='major', labelsize=font_small)
+
+    plt.tight_layout()
+
+    # 保存
+    plt.savefig(f'{output_path}.png', dpi=dpi_png)
+    plt.savefig(f'{output_path}.pdf', dpi=dpi_pdf)
+    plt.close()
+
+    print(f'水平方向移動ウィンドウプロット保存: {output_path}.png')
+
+    # 統計情報をテキストファイルに保存
+    stats_path = f'{output_path}_statistics.txt'
+    with open(stats_path, 'w', encoding='utf-8') as f:
+        f.write('# Horizontal Moving Window RSFD Statistics\n')
+        f.write('# =========================================\n\n')
+        f.write(f'Window width: {window_width:.2f} m\n')
+        f.write(f'Step size: {step_size:.2f} m\n')
+        f.write(f'Number of windows: {len(window_centers)}\n\n')
+        f.write('Center [m]\tk\tr\tR2\tp-value\tNum rocks\n')
+        for i, center in enumerate(window_centers):
+            f.write(f'{center:.2f}\t{k_values[i]:.4e}\t{r_values[i]:.4f}\t'
+                   f'{R2_values[i]:.4f}\t{p_values[i]:.4e}\t{num_rocks_list[i]}\n')
+
+    print(f'統計情報保存: {stats_path}')
+
+def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positions,
+                                        window_width, step_size,
+                                        time_min_data, time_max_data,
+                                        dist_min_data, dist_max_data,
+                                        sample_interval, trace_interval,
+                                        epsilon_r, c, output_path,
+                                        dpi_png=300, dpi_pdf=600):
+    """
+    深さ方向移動ウィンドウのRSFDプロットを作成
+
+    Parameters:
+    -----------
+    window_width : float
+        ウィンドウ幅 [ns]
+    step_size : float
+        ステップサイズ [ns]
+    (その他のパラメータは水平方向と同じ)
+    """
+    # Font size standards
+    font_large = 20
+    font_medium = 18
+    font_small = 16
+
+    # ウィンドウ中心位置を計算（時間方向）
+    window_centers = []
+    current_center = time_min_data + window_width / 2
+    while current_center + window_width / 2 <= time_max_data:
+        window_centers.append(current_center)
+        current_center += step_size
+
+    # 各ウィンドウでRSFDパラメータを計算
+    k_values = []
+    r_values = []
+    R2_values = []
+    p_values = []
+    num_rocks_list = []
+
+    print(f'\n深さ方向移動ウィンドウ解析: {len(window_centers)}個のウィンドウ')
+
+    for center in tqdm(window_centers, desc='RSFD計算中'):
+        t_min = center - window_width / 2
+        t_max = center + window_width / 2
+
+        k, r, R2, p, num_rocks = calculate_rsfd_in_window(
+            rock_data, sizes, time_positions,
+            dist_min_data, dist_max_data, t_min, t_max
+        )
+
+        k_values.append(k)
+        r_values.append(r)
+        R2_values.append(R2)
+        p_values.append(p)
+        num_rocks_list.append(num_rocks)
+
+    window_centers = np.array(window_centers)
+    k_values = np.array(k_values)
+    r_values = np.array(r_values)
+
+    # Time zero検出
+    first_trace = bscan_data[:, 0]
+    first_non_nan_idx = np.where(~np.isnan(first_trace))[0]
+    time_zero_idx = first_non_nan_idx[0] if len(first_non_nan_idx) > 0 else 0
+
+    # 時間配列の計算
+    time_array = (np.arange(bscan_data.shape[0]) - time_zero_idx) * sample_interval * 1e9  # [ns]
+
+    # B-scan表示範囲
+    vmin = -np.nanmax(np.abs(bscan_data)) / 10
+    vmax = np.nanmax(np.abs(bscan_data)) / 10
+
+    # Figure作成（2つのサブプロット：左がr、右がk）
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10), sharey=True)
+
+    # === 左: rのプロット ===
+    # B-scan背景
+    im1 = ax1.imshow(bscan_data, aspect='auto', cmap='seismic',
+                     extent=[0, bscan_data.shape[1] * trace_interval,
+                            time_array[-1], time_array[0]],
+                     vmin=vmin, vmax=vmax, alpha=0.5)
+
+    # rの値を第2軸にプロット
+    ax1_twin = ax1.twiny()
+    valid_mask = ~np.isnan(r_values)
+    ax1_twin.plot(r_values[valid_mask], window_centers[valid_mask],
+                  'b-', linewidth=2, marker='o', markersize=4, label='r (power-law exponent)')
+    ax1_twin.set_xlabel('r (power-law exponent)', fontsize=font_medium, color='blue')
+    ax1_twin.tick_params(axis='x', labelcolor='blue', labelsize=font_small)
+
+    # x軸範囲設定（r値）
+    if np.any(valid_mask):
+        r_min, r_max = np.nanmin(r_values), np.nanmax(r_values)
+        r_margin = (r_max - r_min) * 0.1 if r_max > r_min else 0.5
+        ax1_twin.set_xlim(r_min - r_margin, r_max + r_margin)
+
+    ax1.set_xlabel('Moving distance [m]', fontsize=font_medium)
+    ax1.set_ylabel('Time [ns]', fontsize=font_medium)
+    ax1.set_ylim(time_max_data, time_min_data)
+    ax1.tick_params(axis='both', which='major', labelsize=font_small)
+    ax1.set_title('Power-law exponent (r) vs. Depth', fontsize=font_large)
+
+    # 第2Y軸（深度）を追加
+    ax1_depth = ax1.secondary_yaxis('right', functions=(
+        lambda t: t * 1e-9 * c / np.sqrt(epsilon_r) / 2,
+        lambda d: d * 2 * np.sqrt(epsilon_r) / c * 1e9
+    ))
+    ax1_depth.set_ylabel(f'Depth [m] ($\\varepsilon_r = {epsilon_r}$)', fontsize=font_medium)
+    ax1_depth.tick_params(axis='y', which='major', labelsize=font_small)
+
+    # === 右: kのプロット ===
+    # B-scan背景
+    im2 = ax2.imshow(bscan_data, aspect='auto', cmap='seismic',
+                     extent=[0, bscan_data.shape[1] * trace_interval,
+                            time_array[-1], time_array[0]],
+                     vmin=vmin, vmax=vmax, alpha=0.5)
+
+    # kの値を第2軸にプロット（対数スケール）
+    ax2_twin = ax2.twiny()
+    valid_mask_k = ~np.isnan(k_values) & (k_values > 0)
+    if np.any(valid_mask_k):
+        ax2_twin.semilogx(k_values[valid_mask_k], window_centers[valid_mask_k],
+                          'r-', linewidth=2, marker='s', markersize=4, label='k (scaling factor)')
+    ax2_twin.set_xlabel('k (scaling factor)', fontsize=font_medium, color='red')
+    ax2_twin.tick_params(axis='x', labelcolor='red', labelsize=font_small)
+
+    ax2.set_xlabel('Moving distance [m]', fontsize=font_medium)
+    ax2.set_ylim(time_max_data, time_min_data)
+    ax2.tick_params(axis='both', which='major', labelsize=font_small)
+    ax2.set_title('Scaling factor (k) vs. Depth', fontsize=font_large)
+
+    # 第2Y軸（深度）を追加
+    ax2_depth = ax2.secondary_yaxis('right', functions=(
+        lambda t: t * 1e-9 * c / np.sqrt(epsilon_r) / 2,
+        lambda d: d * 2 * np.sqrt(epsilon_r) / c * 1e9
+    ))
+    ax2_depth.set_ylabel(f'Depth [m] ($\\varepsilon_r = {epsilon_r}$)', fontsize=font_medium)
+    ax2_depth.tick_params(axis='y', which='major', labelsize=font_small)
+
+    plt.tight_layout()
+
+    # 保存
+    plt.savefig(f'{output_path}.png', dpi=dpi_png)
+    plt.savefig(f'{output_path}.pdf', dpi=dpi_pdf)
+    plt.close()
+
+    print(f'深さ方向移動ウィンドウプロット保存: {output_path}.png')
+
+    # 統計情報をテキストファイルに保存
+    stats_path = f'{output_path}_statistics.txt'
+    with open(stats_path, 'w', encoding='utf-8') as f:
+        f.write('# Vertical Moving Window RSFD Statistics\n')
+        f.write('# =======================================\n\n')
+        f.write(f'Window width: {window_width:.2f} ns\n')
+        f.write(f'Step size: {step_size:.2f} ns\n')
+        f.write(f'Number of windows: {len(window_centers)}\n\n')
+        f.write('Center [ns]\tk\tr\tR2\tp-value\tNum rocks\n')
+        for i, center in enumerate(window_centers):
+            f.write(f'{center:.2f}\t{k_values[i]:.4e}\t{r_values[i]:.4f}\t'
+                   f'{R2_values[i]:.4f}\t{p_values[i]:.4e}\t{num_rocks_list[i]}\n')
+
+    print(f'統計情報保存: {stats_path}')
+
+# ------------------------------------------------------------------
+# メイン処理
+# ------------------------------------------------------------------
+print('=== RSFD Moving Window Analysis Tool ===')
+print('移動ウィンドウによるRSFD解析ツール\n')
+
+# ------------------------------------------------------------------
+# 1. 入力ファイルチェック
+# ------------------------------------------------------------------
+print('B-scanデータファイル(.txt)のパスを入力してください:')
+bscan_path = input().strip()
+if not (os.path.exists(bscan_path) and bscan_path.lower().endswith('.txt')):
+    raise FileNotFoundError('正しい .txt ファイルを指定してください。')
+
+bscan_dir = os.path.dirname(bscan_path)
+
+# ------------------------------------------------------------------
+# 2. label.jsonファイルの自動検索と選択
+# ------------------------------------------------------------------
+print('\nlabel.jsonファイルを検索中...')
+label_files = find_label_json_files(bscan_dir)
+label_path = select_label_file(label_files)
+
+# ------------------------------------------------------------------
+# 3. 解析方向とウィンドウ幅の入力
+# ------------------------------------------------------------------
+print('\n=== 解析パラメータ ===')
+print('解析方向を選択してください:')
+print('1: 水平方向 (Moving distance)')
+print('2: 深さ方向 (Depth / Time)')
+direction_choice = input('選択 (1 or 2): ').strip()
+
+if direction_choice not in ['1', '2']:
+    raise ValueError('1 または 2 を入力してください。')
+
+if direction_choice == '1':
+    analysis_direction = 'horizontal'
+    window_width = float(input('ウィンドウ幅 [m] を入力してください: ').strip())
+    if window_width <= 0:
+        raise ValueError('ウィンドウ幅は正の値を指定してください。')
+else:
+    analysis_direction = 'vertical'
+    window_width = float(input('ウィンドウ幅 [ns] を入力してください: ').strip())
+    if window_width <= 0:
+        raise ValueError('ウィンドウ幅は正の値を指定してください。')
+
+# ステップサイズ（ウィンドウ幅の20%）
+step_size = window_width * 0.2
+print(f'ステップサイズ: {step_size:.2f} {"m" if analysis_direction == "horizontal" else "ns"} (ウィンドウ幅の20%)')
+
+# ------------------------------------------------------------------
+# 4. データ読み込み
+# ------------------------------------------------------------------
+print('\nデータ読み込み中...')
+
+# B-scanデータの読み込み
+print('B-scanデータ読み込み中...')
+bscan_data = np.loadtxt(bscan_path, delimiter=' ')
+print(f'B-scan形状: {bscan_data.shape}')
+
+# 岩石データの読み込み
+print('岩石ラベルデータ読み込み中...')
+rock_data = load_rock_data(label_path)
+print(f'岩石数: {len(rock_data["label"])}')
+
+# 岩石サイズと時間位置の計算
+sizes = calculate_rock_sizes(rock_data)
+time_positions = get_time_position(rock_data)
+
+# ------------------------------------------------------------------
+# 5. データ範囲の計算（make_RSFD_grid_comparison.pyと同じロジック）
+# ------------------------------------------------------------------
+# 物理定数
+sample_interval = 0.312500e-9  # [s] - サンプル間隔
+trace_interval = 3.6e-2        # [m] - トレース間隔
+epsilon_r = 4.5                # 比誘電率
+c = 299792458                  # [m/s]
+
+# 時間方向：最小値はB-scanから、最大値はlabel.jsonから取得
+print('B-scanから時間範囲を計算中...')
+
+# time_zero_idx を検出（最初のトレースの最初の非NaN値）
+first_trace = bscan_data[:, 0]
+first_non_nan_idx = np.where(~np.isnan(first_trace))[0]
+time_zero_idx = first_non_nan_idx[0] if len(first_non_nan_idx) > 0 else 0
+
+# 各トレースの最初の非NaN値の時間を計算（t=0未満も含む）
+first_valid_times = []
+for col in range(bscan_data.shape[1]):
+    non_nan_idx = np.where(~np.isnan(bscan_data[:, col]))[0]
+    if len(non_nan_idx) > 0:
+        time_ns = (non_nan_idx[0] - time_zero_idx) * sample_interval * 1e9
+        first_valid_times.append(time_ns)
+
+if first_valid_times:
+    time_min_data = min(first_valid_times)
+else:
+    time_min_data = 0.0
+    print('警告: B-scanに有効なデータが見つかりませんでした。time_min=0として処理を続行します。')
+
+# 最大値はlabel.jsonから取得
+lab = rock_data['label']
+y = rock_data['y']
+time_top = rock_data['time_top']
+
+time_values_group1 = y[lab == 1]
+time_values_others = time_top[(lab != 1) & (~np.isnan(time_top))]
+time_values_all = np.concatenate([time_values_group1, time_values_others])
+time_max_data = np.max(time_values_all)
+
+# 距離方向：B-scanから取得
+dist_min_data = 0.0
+dist_max_data = bscan_data.shape[1] * trace_interval
+
+print(f'\n時間範囲: {time_min_data:.2f} - {time_max_data:.2f} ns')
+print(f'距離範囲: {dist_min_data:.2f} - {dist_max_data:.2f} m')
+
+# ------------------------------------------------------------------
+# 6. 出力ディレクトリの作成
+# ------------------------------------------------------------------
+output_dir = os.path.join(bscan_dir, 'RSFD_moving_window_comparison')
+os.makedirs(output_dir, exist_ok=True)
+
+# サブディレクトリ名
+if analysis_direction == 'horizontal':
+    sub_dir_name = f'horizontal_window{window_width:.0f}m'
+else:
+    sub_dir_name = f'vertical_window{window_width:.0f}ns'
+
+sub_dir = os.path.join(output_dir, sub_dir_name)
+os.makedirs(sub_dir, exist_ok=True)
+
+print(f'\n出力ディレクトリ: {sub_dir}')
+
+# ------------------------------------------------------------------
+# 7. プロット作成
+# ------------------------------------------------------------------
+print('\n=== プロット作成開始 ===')
+
+if analysis_direction == 'horizontal':
+    output_path = os.path.join(sub_dir, 'horizontal_moving_window_rsfd')
+    create_horizontal_moving_window_plot(
+        bscan_data, rock_data, sizes, time_positions,
+        window_width, step_size,
+        time_min_data, time_max_data,
+        dist_min_data, dist_max_data,
+        sample_interval, trace_interval,
+        epsilon_r, c, output_path
+    )
+else:
+    output_path = os.path.join(sub_dir, 'vertical_moving_window_rsfd')
+    create_vertical_moving_window_plot(
+        bscan_data, rock_data, sizes, time_positions,
+        window_width, step_size,
+        time_min_data, time_max_data,
+        dist_min_data, dist_max_data,
+        sample_interval, trace_interval,
+        epsilon_r, c, output_path
+    )
+
+print('\n=== 処理完了 ===')
+print(f'出力ディレクトリ: {sub_dir}')
