@@ -343,15 +343,18 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     vmin = -np.nanmax(np.abs(bscan_data)) / 10
     vmax = np.nanmax(np.abs(bscan_data)) / 10
 
-    # Figure作成（2つのサブプロット：上がr、下がk）
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(18, 12), sharex=True)
+    # p値の配列化
+    p_values_array = np.array(p_values)
+
+    # Figure作成（3つのサブプロット：上がr、中がk、下がp値）
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(18, 16), sharex=True)
 
     # === 上段: rのプロット ===
     # B-scan背景
-    im1 = ax1.imshow(bscan_data, aspect='auto', cmap='seismic',
-                     extent=[0, bscan_data.shape[1] * trace_interval,
-                            time_array[-1], time_array[0]],
-                     vmin=vmin, vmax=vmax, alpha=0.5)
+    ax1.imshow(bscan_data, aspect='auto', cmap='seismic',
+               extent=[0, bscan_data.shape[1] * trace_interval,
+                      time_array[-1], time_array[0]],
+               vmin=vmin, vmax=vmax, alpha=0.5)
 
     # rの値を第2軸にプロット
     ax1_twin = ax1.twinx()
@@ -361,54 +364,59 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     ax1_twin.set_ylabel('r (power-law exponent)', fontsize=font_medium, color='blue')
     ax1_twin.tick_params(axis='y', labelcolor='blue', labelsize=font_small)
 
-    # y軸範囲設定（r値）
-    if np.any(valid_mask):
-        r_min, r_max = np.nanmin(r_values), np.nanmax(r_values)
-        r_margin = (r_max - r_min) * 0.1 if r_max > r_min else 0.5
-        ax1_twin.set_ylim(r_min - r_margin, r_max + r_margin)
+    # y軸範囲設定（r値）: 0.3〜1.5に固定
+    ax1_twin.set_ylim(0.3, 1.5)
 
     ax1.set_ylabel('Time [ns]', fontsize=font_medium)
     ax1.set_ylim(time_max_data, time_min_data)
     ax1.tick_params(axis='both', which='major', labelsize=font_small)
     ax1.set_title('Power-law exponent (r) vs. Distance', fontsize=font_large)
 
-    # 第2Y軸（深度）を追加
-    ax1_depth = ax1.secondary_yaxis('left', functions=(
-        lambda t: t * 1e-9 * c / np.sqrt(epsilon_r) / 2,
-        lambda d: d * 2 * np.sqrt(epsilon_r) / c * 1e9
-    ))
-    ax1_depth.set_ylabel(f'Depth [m] ($\\varepsilon_r = {epsilon_r}$)', fontsize=font_medium)
-    ax1_depth.tick_params(axis='y', which='major', labelsize=font_small)
-
-    # === 下段: kのプロット ===
+    # === 中段: kのプロット ===
     # B-scan背景
-    im2 = ax2.imshow(bscan_data, aspect='auto', cmap='seismic',
-                     extent=[0, bscan_data.shape[1] * trace_interval,
-                            time_array[-1], time_array[0]],
-                     vmin=vmin, vmax=vmax, alpha=0.5)
+    ax2.imshow(bscan_data, aspect='auto', cmap='seismic',
+               extent=[0, bscan_data.shape[1] * trace_interval,
+                      time_array[-1], time_array[0]],
+               vmin=vmin, vmax=vmax, alpha=0.5)
 
-    # kの値を第2軸にプロット（対数スケール）
+    # kの値を第2軸にプロット（リニアスケール）
     ax2_twin = ax2.twinx()
-    valid_mask_k = ~np.isnan(k_values) & (k_values > 0)
-    if np.any(valid_mask_k):
-        ax2_twin.semilogy(window_centers[valid_mask_k], k_values[valid_mask_k],
-                          'r-', linewidth=2, marker='s', markersize=4, label='k (scaling factor)')
+    valid_mask_k = ~np.isnan(k_values)
+    ax2_twin.plot(window_centers[valid_mask_k], k_values[valid_mask_k],
+                  'r-', linewidth=2, marker='s', markersize=4, label='k (scaling factor)')
     ax2_twin.set_ylabel('k (scaling factor)', fontsize=font_medium, color='red')
     ax2_twin.tick_params(axis='y', labelcolor='red', labelsize=font_small)
+    # y軸範囲設定（k値）: 1e-3〜15e-3に固定
+    ax2_twin.set_ylim(1e-3, 15e-3)
 
-    ax2.set_xlabel('Moving distance [m]', fontsize=font_medium)
     ax2.set_ylabel('Time [ns]', fontsize=font_medium)
     ax2.set_ylim(time_max_data, time_min_data)
     ax2.tick_params(axis='both', which='major', labelsize=font_small)
     ax2.set_title('Scaling factor (k) vs. Distance', fontsize=font_large)
 
-    # 第2Y軸（深度）を追加
-    ax2_depth = ax2.secondary_yaxis('left', functions=(
-        lambda t: t * 1e-9 * c / np.sqrt(epsilon_r) / 2,
-        lambda d: d * 2 * np.sqrt(epsilon_r) / c * 1e9
-    ))
-    ax2_depth.set_ylabel(f'Depth [m] ($\\varepsilon_r = {epsilon_r}$)', fontsize=font_medium)
-    ax2_depth.tick_params(axis='y', which='major', labelsize=font_small)
+    # === 下段: p値のプロット ===
+    # B-scan背景
+    ax3.imshow(bscan_data, aspect='auto', cmap='seismic',
+               extent=[0, bscan_data.shape[1] * trace_interval,
+                      time_array[-1], time_array[0]],
+               vmin=vmin, vmax=vmax, alpha=0.5)
+
+    # p値を第2軸にプロット（対数スケール）
+    ax3_twin = ax3.twinx()
+    valid_mask_p = ~np.isnan(p_values_array) & (p_values_array > 0)
+    if np.any(valid_mask_p):
+        ax3_twin.semilogy(window_centers[valid_mask_p], p_values_array[valid_mask_p],
+                          'g-', linewidth=2, marker='^', markersize=4, label='p-value')
+    # p=0.05の横線を追加
+    ax3_twin.axhline(y=0.05, color='black', linestyle='--', linewidth=1.5, label='p = 0.05')
+    ax3_twin.set_ylabel('p-value', fontsize=font_medium, color='green')
+    ax3_twin.tick_params(axis='y', labelcolor='green', labelsize=font_small)
+
+    ax3.set_xlabel('Moving distance [m]', fontsize=font_medium)
+    ax3.set_ylabel('Time [ns]', fontsize=font_medium)
+    ax3.set_ylim(time_max_data, time_min_data)
+    ax3.tick_params(axis='both', which='major', labelsize=font_small)
+    ax3.set_title('p-value vs. Distance', fontsize=font_large)
 
     plt.tight_layout()
 
@@ -504,17 +512,20 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     vmin = -np.nanmax(np.abs(bscan_data)) / 10
     vmax = np.nanmax(np.abs(bscan_data)) / 10
 
-    # Figure作成（2つのサブプロット：左がr、右がk）
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10), sharey=True)
+    # p値の配列化
+    p_values_array = np.array(p_values)
 
-    # === 左: rのプロット ===
+    # Figure作成（3つのサブプロット：上がr、中がk、下がp値）
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(18, 16), sharey=True)
+
+    # === 上段: rのプロット ===
     # B-scan背景
-    im1 = ax1.imshow(bscan_data, aspect='auto', cmap='seismic',
-                     extent=[0, bscan_data.shape[1] * trace_interval,
-                            time_array[-1], time_array[0]],
-                     vmin=vmin, vmax=vmax, alpha=0.5)
+    ax1.imshow(bscan_data, aspect='auto', cmap='seismic',
+               extent=[0, bscan_data.shape[1] * trace_interval,
+                      time_array[-1], time_array[0]],
+               vmin=vmin, vmax=vmax, alpha=0.5)
 
-    # rの値を第2軸にプロット
+    # rの値を第2横軸にプロット（縦方向に沿って）
     ax1_twin = ax1.twiny()
     valid_mask = ~np.isnan(r_values)
     ax1_twin.plot(r_values[valid_mask], window_centers[valid_mask],
@@ -522,11 +533,8 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     ax1_twin.set_xlabel('r (power-law exponent)', fontsize=font_medium, color='blue')
     ax1_twin.tick_params(axis='x', labelcolor='blue', labelsize=font_small)
 
-    # x軸範囲設定（r値）
-    if np.any(valid_mask):
-        r_min, r_max = np.nanmin(r_values), np.nanmax(r_values)
-        r_margin = (r_max - r_min) * 0.1 if r_max > r_min else 0.5
-        ax1_twin.set_xlim(r_min - r_margin, r_max + r_margin)
+    # x軸範囲設定（r値）: 0.3〜1.5に固定
+    ax1_twin.set_xlim(0.3, 1.5)
 
     ax1.set_xlabel('Moving distance [m]', fontsize=font_medium)
     ax1.set_ylabel('Time [ns]', fontsize=font_medium)
@@ -534,42 +542,52 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     ax1.tick_params(axis='both', which='major', labelsize=font_small)
     ax1.set_title('Power-law exponent (r) vs. Depth', fontsize=font_large)
 
-    # 第2Y軸（深度）を追加
-    ax1_depth = ax1.secondary_yaxis('right', functions=(
-        lambda t: t * 1e-9 * c / np.sqrt(epsilon_r) / 2,
-        lambda d: d * 2 * np.sqrt(epsilon_r) / c * 1e9
-    ))
-    ax1_depth.set_ylabel(f'Depth [m] ($\\varepsilon_r = {epsilon_r}$)', fontsize=font_medium)
-    ax1_depth.tick_params(axis='y', which='major', labelsize=font_small)
-
-    # === 右: kのプロット ===
+    # === 中段: kのプロット ===
     # B-scan背景
-    im2 = ax2.imshow(bscan_data, aspect='auto', cmap='seismic',
-                     extent=[0, bscan_data.shape[1] * trace_interval,
-                            time_array[-1], time_array[0]],
-                     vmin=vmin, vmax=vmax, alpha=0.5)
+    ax2.imshow(bscan_data, aspect='auto', cmap='seismic',
+               extent=[0, bscan_data.shape[1] * trace_interval,
+                      time_array[-1], time_array[0]],
+               vmin=vmin, vmax=vmax, alpha=0.5)
 
-    # kの値を第2軸にプロット（対数スケール）
+    # kの値を第2横軸にプロット（リニアスケール、縦方向に沿って）
     ax2_twin = ax2.twiny()
-    valid_mask_k = ~np.isnan(k_values) & (k_values > 0)
-    if np.any(valid_mask_k):
-        ax2_twin.semilogx(k_values[valid_mask_k], window_centers[valid_mask_k],
-                          'r-', linewidth=2, marker='s', markersize=4, label='k (scaling factor)')
+    valid_mask_k = ~np.isnan(k_values)
+    ax2_twin.plot(k_values[valid_mask_k], window_centers[valid_mask_k],
+                  'r-', linewidth=2, marker='s', markersize=4, label='k (scaling factor)')
     ax2_twin.set_xlabel('k (scaling factor)', fontsize=font_medium, color='red')
     ax2_twin.tick_params(axis='x', labelcolor='red', labelsize=font_small)
+    # x軸範囲設定（k値）: 1e-3〜15e-3に固定
+    ax2_twin.set_xlim(1e-3, 15e-3)
 
     ax2.set_xlabel('Moving distance [m]', fontsize=font_medium)
+    ax2.set_ylabel('Time [ns]', fontsize=font_medium)
     ax2.set_ylim(time_max_data, time_min_data)
     ax2.tick_params(axis='both', which='major', labelsize=font_small)
     ax2.set_title('Scaling factor (k) vs. Depth', fontsize=font_large)
 
-    # 第2Y軸（深度）を追加
-    ax2_depth = ax2.secondary_yaxis('right', functions=(
-        lambda t: t * 1e-9 * c / np.sqrt(epsilon_r) / 2,
-        lambda d: d * 2 * np.sqrt(epsilon_r) / c * 1e9
-    ))
-    ax2_depth.set_ylabel(f'Depth [m] ($\\varepsilon_r = {epsilon_r}$)', fontsize=font_medium)
-    ax2_depth.tick_params(axis='y', which='major', labelsize=font_small)
+    # === 下段: p値のプロット ===
+    # B-scan背景
+    ax3.imshow(bscan_data, aspect='auto', cmap='seismic',
+               extent=[0, bscan_data.shape[1] * trace_interval,
+                      time_array[-1], time_array[0]],
+               vmin=vmin, vmax=vmax, alpha=0.5)
+
+    # p値を第2横軸にプロット（対数スケール、縦方向に沿って）
+    ax3_twin = ax3.twiny()
+    valid_mask_p = ~np.isnan(p_values_array) & (p_values_array > 0)
+    if np.any(valid_mask_p):
+        ax3_twin.semilogx(p_values_array[valid_mask_p], window_centers[valid_mask_p],
+                          'g-', linewidth=2, marker='^', markersize=4, label='p-value')
+    # p=0.05の縦線を追加
+    ax3_twin.axvline(x=0.05, color='black', linestyle='--', linewidth=1.5, label='p = 0.05')
+    ax3_twin.set_xlabel('p-value', fontsize=font_medium, color='green')
+    ax3_twin.tick_params(axis='x', labelcolor='green', labelsize=font_small)
+
+    ax3.set_xlabel('Moving distance [m]', fontsize=font_medium)
+    ax3.set_ylabel('Time [ns]', fontsize=font_medium)
+    ax3.set_ylim(time_max_data, time_min_data)
+    ax3.tick_params(axis='both', which='major', labelsize=font_small)
+    ax3.set_title('p-value vs. Depth', fontsize=font_large)
 
     plt.tight_layout()
 
