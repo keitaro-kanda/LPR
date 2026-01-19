@@ -402,8 +402,8 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
                   'r-', linewidth=2, marker='s', markersize=4, label='k (scaling factor)')
     ax2_twin.set_ylabel('k [/m²]', fontsize=font_medium, color='red')
     ax2_twin.tick_params(axis='y', labelcolor='red', labelsize=font_small)
-    # y軸範囲設定（k値）: 1e-3〜15e-3に固定
-    ax2_twin.set_ylim(1e-3, 15e-3)
+    # y軸範囲設定（k値）: 1e-3〜7e-3に固定
+    ax2_twin.set_ylim(1e-3, 7e-3)
 
     ax2.set_ylabel('Time [ns]', fontsize=font_medium)
     ax2.set_ylim(time_max_data, time_min_data)
@@ -576,8 +576,8 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
                   'r-', linewidth=2, marker='s', markersize=4, label='k (scaling factor)')
     ax2_twin.set_xlabel('k [/m²]', fontsize=font_medium, color='red')
     ax2_twin.tick_params(axis='x', labelcolor='red', labelsize=font_small)
-    # x軸範囲設定（k値）: 1e-3〜15e-3に固定
-    ax2_twin.set_xlim(1e-3, 15e-3)
+    # x軸範囲設定（k値）: 1e-3〜20e-3に固定
+    ax2_twin.set_xlim(1e-3, 20e-3)
 
     ax2.set_xlabel('Moving distance [m]', fontsize=font_medium)
     ax2.set_ylabel('Time [ns]', fontsize=font_medium)
