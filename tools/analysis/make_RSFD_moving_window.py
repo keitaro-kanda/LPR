@@ -233,7 +233,7 @@ def calculate_rsfd_in_window(rock_data, sizes, time_positions,
 
     Returns:
     --------
-    tuple: (k, r, R2, p_value, num_rocks, area)
+    tuple: (k, r, R2, p_value, num_rocks, area, unique_sizes, cum_counts_normalized)
     """
     x = rock_data['x']
 
@@ -251,7 +251,7 @@ def calculate_rsfd_in_window(rock_data, sizes, time_positions,
     area = (depth_max - depth_min) * (dist_max - dist_min)  # [m²]
 
     if num_rocks < 3:
-        return np.nan, np.nan, np.nan, np.nan, num_rocks, area
+        return np.nan, np.nan, np.nan, np.nan, num_rocks, area, np.array([]), np.array([])
 
     # 累積サイズ分布を計算
     unique_sizes = np.sort(np.unique(filtered_sizes))
@@ -263,7 +263,79 @@ def calculate_rsfd_in_window(rock_data, sizes, time_positions,
     # べき則フィッティング（規格化されたカウントを使用）
     k, r, R2, p_value = calc_fitting_power_law(unique_sizes, cum_counts_normalized)
 
-    return k, r, R2, p_value, num_rocks, area
+    return k, r, R2, p_value, num_rocks, area, unique_sizes, cum_counts_normalized
+
+def plot_individual_rsfd(unique_sizes, cum_counts_normalized, k, r, R2, p_value,
+                         num_rocks, area, window_range, output_path,
+                         dpi_png=300, dpi_pdf=600):
+    """
+    個別ウィンドウのRSFDプロットを作成
+
+    Parameters:
+    -----------
+    unique_sizes : ndarray
+        ユニークなサイズ配列 [cm]
+    cum_counts_normalized : ndarray
+        面積規格化された累積カウント [/m²]
+    k, r, R2, p_value : float
+        フィッティングパラメータ
+    num_rocks : int
+        岩石数
+    area : float
+        面積 [m²]
+    window_range : str
+        ウィンドウ範囲の説明文字列
+    output_path : str
+        出力パス（拡張子なし）
+    """
+    # Font size standards
+    font_medium = 18
+    font_small = 16
+
+    fig, ax = plt.subplots(figsize=(10, 8))
+
+    # データプロット
+    if len(unique_sizes) > 0:
+        ax.scatter(unique_sizes, cum_counts_normalized,
+                  s=100, alpha=0.7, edgecolors='black', linewidth=1.5,
+                  label='Observed data')
+
+        # べき則フィッティング曲線
+        if not np.isnan(k) and not np.isnan(r):
+            size_fit = np.logspace(np.log10(unique_sizes.min()),
+                                   np.log10(unique_sizes.max()), 100)
+            count_fit = k * size_fit ** (-r)
+            ax.plot(size_fit, count_fit, 'r-', linewidth=2,
+                   label=f'Power-law fit: N = {k:.4e} × D^(-{r:.3f})')
+
+    ax.set_title(f'Window: {window_range}', fontsize=font_medium)
+    ax.set_xlabel('Rock size D [cm]', fontsize=font_medium)
+    ax.set_ylabel('Cumulative count N(≥D) [/m²]', fontsize=font_medium)
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.tick_params(axis='both', which='major', labelsize=font_small)
+    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=font_small)
+
+    # パラメータ情報をテキストボックスで表示
+    info_text = f'Window: {window_range}\n'
+    info_text += f'k = {k:.4e} [/m²]\n'
+    info_text += f'r = {r:.4f}\n'
+    info_text += f'R² = {R2:.4f}\n'
+    info_text += f'p-value = {p_value:.4e}\n'
+    info_text += f'Num rocks = {num_rocks}\n'
+    info_text += f'Area = {area:.4f} m²'
+
+    ax.text(0.05, 0.05, info_text, transform=ax.transAxes,
+           fontsize=font_small, verticalalignment='bottom',
+           bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+    plt.tight_layout()
+
+    # 保存
+    plt.savefig(f'{output_path}.png', dpi=dpi_png)
+    plt.savefig(f'{output_path}.pdf', dpi=dpi_pdf)
+    plt.close()
 
 def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_positions,
                                           window_width, step_size,
@@ -316,6 +388,10 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
         window_centers.append(current_center)
         current_center += step_size
 
+    # RSFD個別プロット用サブディレクトリ作成
+    rsfd_plots_dir = os.path.join(os.path.dirname(output_path), 'RSFD_plots')
+    os.makedirs(rsfd_plots_dir, exist_ok=True)
+
     # 各ウィンドウでRSFDパラメータを計算
     k_values = []
     r_values = []
@@ -330,7 +406,7 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
         d_min = center - window_width / 2
         d_max = center + window_width / 2
 
-        k, r, R2, p, num_rocks, area = calculate_rsfd_in_window(
+        k, r, R2, p, num_rocks, area, unique_sizes, cum_counts_normalized = calculate_rsfd_in_window(
             rock_data, sizes, time_positions,
             d_min, d_max, time_min_data, time_max_data,
             epsilon_r, c
@@ -342,6 +418,13 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
         p_values.append(p)
         num_rocks_list.append(num_rocks)
         area_list.append(area)
+
+        # 個別RSFDプロット作成
+        window_range = f'{d_min:.2f} - {d_max:.2f} m'
+        rsfd_output_path = os.path.join(rsfd_plots_dir, f'rsfd_x{d_min:.2f}-{d_max:.2f}m')
+        plot_individual_rsfd(unique_sizes, cum_counts_normalized,
+                           k, r, R2, p, num_rocks, area,
+                           window_range, rsfd_output_path)
 
     window_centers = np.array(window_centers)
     k_values = np.array(k_values)
@@ -443,6 +526,20 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
 
     print(f'水平方向移動ウィンドウプロット保存: {output_path}.png')
 
+    # p値統計を計算（p値がnanの場合はp > 0.05とみなす）
+    p_values_array = np.array(p_values)
+    valid_p_count = 0
+    significant_count = 0
+    for p in p_values_array:
+        if np.isnan(p):
+            valid_p_count += 1  # nanはp > 0.05とみなす
+        else:
+            valid_p_count += 1
+            if p <= 0.05:
+                significant_count += 1
+
+    significant_ratio = (significant_count / valid_p_count * 100) if valid_p_count > 0 else 0.0
+
     # 統計情報をテキストファイルに保存
     stats_path = f'{output_path}_statistics.txt'
     with open(stats_path, 'w', encoding='utf-8') as f:
@@ -452,12 +549,16 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
         f.write(f'Step size: {step_size:.2f} m\n')
         f.write(f'Number of windows: {len(window_centers)}\n')
         f.write(f'Note: k values are area-normalized [/m²]\n\n')
+        f.write('# P-value Statistics\n')
+        f.write(f'Windows with p ≤ 0.05: {significant_count} / {valid_p_count} ({significant_ratio:.2f}%)\n')
+        f.write(f'Note: NaN p-values are treated as p > 0.05\n\n')
         f.write('Center [m]\tk [/m²]\tr\tR2\tp-value\tNum rocks\tArea [m²]\n')
         for i, center in enumerate(window_centers):
             f.write(f'{center:.2f}\t{k_values[i]:.4e}\t{r_values[i]:.4f}\t'
                    f'{R2_values[i]:.4f}\t{p_values[i]:.4e}\t{num_rocks_list[i]}\t{area_list[i]:.4f}\n')
 
     print(f'統計情報保存: {stats_path}')
+    print(f'p値統計: {significant_count}/{valid_p_count}個のウィンドウでp ≤ 0.05 ({significant_ratio:.2f}%)')
 
 def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positions,
                                         window_width, step_size,
@@ -482,6 +583,10 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     font_medium = 18
     font_small = 16
 
+    # RSFD個別プロット用サブディレクトリ作成
+    rsfd_plots_dir = os.path.join(os.path.dirname(output_path), 'RSFD_plots')
+    os.makedirs(rsfd_plots_dir, exist_ok=True)
+
     # ウィンドウ中心位置を計算（時間方向）
     window_centers = []
     current_center = time_min_data + window_width / 2
@@ -503,7 +608,7 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
         t_min = center - window_width / 2
         t_max = center + window_width / 2
 
-        k, r, R2, p, num_rocks, area = calculate_rsfd_in_window(
+        k, r, R2, p, num_rocks, area, unique_sizes, cum_counts_normalized = calculate_rsfd_in_window(
             rock_data, sizes, time_positions,
             dist_min_data, dist_max_data, t_min, t_max,
             epsilon_r, c
@@ -515,6 +620,13 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
         p_values.append(p)
         num_rocks_list.append(num_rocks)
         area_list.append(area)
+
+        # 個別RSFDプロット作成
+        window_range = f'{t_min:.2f} - {t_max:.2f} ns'
+        rsfd_output_path = os.path.join(rsfd_plots_dir, f'rsfd_t{t_min:.2f}-{t_max:.2f}ns')
+        plot_individual_rsfd(unique_sizes, cum_counts_normalized,
+                           k, r, R2, p, num_rocks, area,
+                           window_range, rsfd_output_path)
 
     window_centers = np.array(window_centers)
     k_values = np.array(k_values)
@@ -618,6 +730,20 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
 
     print(f'深さ方向移動ウィンドウプロット保存: {output_path}.png')
 
+    # p値統計を計算（p値がnanの場合はp > 0.05とみなす）
+    p_values_array = np.array(p_values)
+    valid_p_count = 0
+    significant_count = 0
+    for p in p_values_array:
+        if np.isnan(p):
+            valid_p_count += 1  # nanはp > 0.05とみなす
+        else:
+            valid_p_count += 1
+            if p <= 0.05:
+                significant_count += 1
+
+    significant_ratio = (significant_count / valid_p_count * 100) if valid_p_count > 0 else 0.0
+
     # 統計情報をテキストファイルに保存
     stats_path = f'{output_path}_statistics.txt'
     with open(stats_path, 'w', encoding='utf-8') as f:
@@ -627,12 +753,16 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
         f.write(f'Step size: {step_size:.2f} ns\n')
         f.write(f'Number of windows: {len(window_centers)}\n')
         f.write(f'Note: k values are area-normalized [/m²]\n\n')
+        f.write('# P-value Statistics\n')
+        f.write(f'Windows with p ≤ 0.05: {significant_count} / {valid_p_count} ({significant_ratio:.2f}%)\n')
+        f.write(f'Note: NaN p-values are treated as p > 0.05\n\n')
         f.write('Center [ns]\tk [/m²]\tr\tR2\tp-value\tNum rocks\tArea [m²]\n')
         for i, center in enumerate(window_centers):
             f.write(f'{center:.2f}\t{k_values[i]:.4e}\t{r_values[i]:.4f}\t'
                    f'{R2_values[i]:.4f}\t{p_values[i]:.4e}\t{num_rocks_list[i]}\t{area_list[i]:.4f}\n')
 
     print(f'統計情報保存: {stats_path}')
+    print(f'p値統計: {significant_count}/{valid_p_count}個のウィンドウでp ≤ 0.05 ({significant_ratio:.2f}%)')
 
 # ------------------------------------------------------------------
 # メイン処理
