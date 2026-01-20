@@ -8,6 +8,7 @@
 
 import json
 import os
+import glob
 import numpy as np
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
@@ -27,113 +28,65 @@ def format_p_value(p):
     else:
         return f"p={p:.3f}"
 
-def save_legend_info_to_txt(output_path, legend_entries):
+def find_label_json_files(bscan_dir):
     """
-    Legend情報をTXTファイルに保存
+    B-scanと同階層のecho_labelsディレクトリからJSONファイルを検索
 
     Parameters:
     -----------
-    output_path : str
-        出力パス（拡張子なし）
-    legend_entries : list of dict
-        Legendエントリのリスト [{'label': str, 'color': str, 'linestyle': str}, ...]
-    """
-    with open(f'{output_path}_legend.txt', 'w', encoding='utf-8') as f:
-        f.write('# Legend Information\n')
-        f.write('# -------------------\n')
-        for entry in legend_entries:
-            f.write(f"Label: {entry['label']}\n")
-            if 'color' in entry:
-                f.write(f"  Color: {entry['color']}\n")
-            if 'linestyle' in entry:
-                f.write(f"  Linestyle: {entry['linestyle']}\n")
-            if 'marker' in entry:
-                f.write(f"  Marker: {entry['marker']}\n")
-            if 'alpha' in entry:
-                f.write(f"  Alpha: {entry['alpha']}\n")
-            f.write('\n')
-    print(f'Legend情報保存: {output_path}_legend.txt')
+    bscan_dir : str
+        B-scanファイルのディレクトリパス
 
-def save_legend_only_pdf(output_path, legend_entries):
+    Returns:
+    --------
+    list: JSONファイルのパスリスト
     """
-    Legend専用のPDFファイルを作成
+    echo_labels_dir = os.path.join(bscan_dir, 'echo_labels')
+
+    if not os.path.exists(echo_labels_dir):
+        return []
+
+    # echo_labelsディレクトリ内の全JSONファイルを検索
+    label_files = glob.glob(os.path.join(echo_labels_dir, '*.json'))
+
+    return sorted(label_files)
+
+def select_label_file(label_files):
+    """
+    複数のlabel.jsonファイルがある場合、ユーザーに選択させる
 
     Parameters:
     -----------
-    output_path : str
-        出力パス（拡張子なし）
-    legend_entries : list of dict
-        Legendエントリのリスト [{'label': str, 'color': str, 'linestyle': str, 'marker': str}, ...]
+    label_files : list
+        label.jsonファイルのパスリスト
+
+    Returns:
+    --------
+    str: 選択されたファイルパス
     """
-    fig = plt.figure(figsize=(8, len(legend_entries) * 0.5 + 1))
-    ax = fig.add_subplot(111)
+    if len(label_files) == 0:
+        raise FileNotFoundError('echo_labelsディレクトリにJSONファイルが見つかりません。')
 
-    # 空のプロットを作成し、legend用のハンドルを生成
-    handles = []
-    labels = []
-    for entry in legend_entries:
-        label = entry['label']
-        color = entry.get('color', 'black')
-        linestyle = entry.get('linestyle', '-')
-        marker = entry.get('marker', '')
-        linewidth = entry.get('linewidth', 1.5)
-        alpha = entry.get('alpha', 1.0)
+    if len(label_files) == 1:
+        print(f'label.jsonファイルを自動検出: {label_files[0]}')
+        return label_files[0]
 
-        # ダミーのプロット（表示されない）
-        if marker and linestyle and linestyle != '':
-            line, = ax.plot([], [], color=color, linestyle=linestyle,
-                           marker=marker, linewidth=linewidth, alpha=alpha, label=label)
-        elif marker:
-            line, = ax.plot([], [], color=color, marker=marker,
-                           linestyle='', alpha=alpha, label=label)
-        else:
-            line, = ax.plot([], [], color=color, linestyle=linestyle,
-                           linewidth=linewidth, alpha=alpha, label=label)
-        handles.append(line)
-        labels.append(label)
+    print('\n複数のlabel.jsonファイルが見つかりました。使用するファイルを選択してください:')
+    for i, path in enumerate(label_files):
+        # 相対パスで表示
+        rel_path = os.path.relpath(path, os.path.dirname(os.path.dirname(path)))
+        print(f'  {i + 1}: {rel_path}')
 
-    # 軸を非表示にする
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
-    ax.axis('off')
+    while True:
+        try:
+            choice = int(input(f'選択 (1-{len(label_files)}): ').strip())
+            if 1 <= choice <= len(label_files):
+                return label_files[choice - 1]
+            else:
+                print(f'1から{len(label_files)}の数字を入力してください。')
+        except ValueError:
+            print('数字を入力してください。')
 
-    # Legendのみを表示
-    ax.legend(handles, labels, loc='center', fontsize=14,
-             frameon=True, fancybox=True, shadow=False)
-
-    plt.tight_layout()
-    plt.savefig(f'{output_path}_legend.pdf', dpi=600, bbox_inches='tight')
-    plt.close()
-
-    print(f'Legend専用PDF保存: {output_path}_legend.pdf')
-
-def calc_fitting_power_law(sizes, counts):
-    """べき則フィッティングのみを実行"""
-    # 対数変換
-    mask = sizes > 0
-    log_D = np.log(sizes[mask])
-    log_N = np.log(counts[mask])
-
-    # べき則フィッティング (Power-law: log N = r log D + log k)
-    X_pow = sm.add_constant(log_D)
-    model_pow = sm.OLS(log_N, X_pow)
-    results_pow = model_pow.fit()
-
-    log_k_pow, r_pow = results_pow.params
-    k_pow = np.exp(log_k_pow)
-    R2_pow = results_pow.rsquared
-    r_pow_se = results_pow.bse[1]
-    r_pow_t = results_pow.tvalues[1]
-    r_pow_p = results_pow.pvalues[1]
-    dof_pow = results_pow.df_resid
-    n_pow = int(results_pow.nobs)
-
-    # フィット曲線用に滑らかなサンプル点を生成
-    D_fit = np.linspace(sizes.min(), sizes.max(), 200)
-    N_pow_fit = k_pow * D_fit**r_pow
-
-    # べき則の結果, D_fit
-    return (k_pow, np.abs(r_pow), R2_pow, N_pow_fit, r_pow_t, r_pow_p, r_pow_se, n_pow, dof_pow), D_fit
 
 def calc_fitting_power_law_area_normalized(sizes, counts, area):
     """面積規格化されたべき則フィッティングを実行"""
@@ -218,7 +171,7 @@ def create_individual_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
 
     # Legendの表示
     if fit_line:
-        plt.legend(fontsize=14)
+        plt.legend(fontsize=16)
 
     plt.tight_layout()
 
@@ -228,89 +181,6 @@ def create_individual_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
     plt.close()
 
     print(f'個別プロット保存: {output_path}.png')
-
-def create_comparison_plot(ranges_data_list, xlabel, ylabel, output_path,
-                          scale_type='linear', dpi_png=300, dpi_pdf=600):
-    """
-    複数範囲のRSFDを1つのプロットに重ねて表示する関数（Legend別出力版）
-
-    Parameters:
-    -----------
-    ranges_data_list : list of dict
-        各範囲のデータリスト。各要素は以下のキーを持つ辞書:
-        {
-            'x_data': array, 'y_data': array,
-            'label': str, 'color': str, 'marker': str, 'alpha': float,
-            'fit_x': array, 'fit_y': array
-        }
-    xlabel, ylabel : str
-        軸ラベル
-    output_path : str
-        出力パス（拡張子なし）
-    scale_type : str
-        'linear' or 'loglog'
-    dpi_png, dpi_pdf : int
-        解像度
-    """
-    plt.figure(figsize=(10, 8))
-
-    # Legend情報を格納するリスト
-    legend_entries = []
-
-    # 各範囲のデータとフィット曲線をプロット
-    for range_data in ranges_data_list:
-        color = range_data['color']
-        marker = range_data['marker']
-        alpha = range_data['alpha']
-        label = range_data['label']
-
-        # データプロット
-        plt.plot(range_data['x_data'], range_data['y_data'],
-                marker=marker, linestyle='', color=color, alpha=alpha)
-
-        # フィット曲線プロット
-        plt.plot(range_data['fit_x'], range_data['fit_y'],
-                linestyle='--', linewidth=1.5, color=color, alpha=alpha)
-
-        # Legend情報を保存
-        legend_entries.append({
-            'label': label,
-            'color': color,
-            'marker': marker,
-            'linestyle': '--',
-            'alpha': alpha,
-            'linewidth': 1.5
-        })
-
-    # 軸スケール設定
-    if scale_type == 'loglog':
-        plt.xscale('log')
-        plt.yscale('log')
-
-    # 軸ラベルとグリッド
-    plt.xlabel(xlabel, fontsize=20)
-    plt.ylabel(ylabel, fontsize=20)
-    plt.tick_params(labelsize=16)
-    plt.grid(True, linestyle='--', alpha=0.5)
-
-    # y軸のtick設定
-    ax = plt.gca()
-    ylim = ax.get_ylim()
-    if scale_type == 'linear' and 1 <= ylim[1] <= 20:
-        ax.yaxis.set_major_locator(MultipleLocator(2))
-
-    plt.tight_layout()
-
-    # 保存
-    plt.savefig(f'{output_path}.png', dpi=dpi_png)
-    plt.savefig(f'{output_path}.pdf', dpi=dpi_pdf)
-    plt.close()
-
-    print(f'比較プロット保存: {output_path}.png')
-
-    # Legend情報をTXT・PDF形式で別途保存
-    save_legend_info_to_txt(output_path, legend_entries)
-    save_legend_only_pdf(output_path, legend_entries)
 
 def save_statistics_to_txt(output_path, grid_statistics):
     """
@@ -324,8 +194,8 @@ def save_statistics_to_txt(output_path, grid_statistics):
         各グリッドの統計情報
     """
     with open(output_path, 'w', encoding='utf-8') as f:
-        f.write('# Grid RSFD Statistics\n')
-        f.write('# =====================\n\n')
+        f.write('# Grid RSFD Statistics (Area-Normalized)\n')
+        f.write('# ======================================\n\n')
 
         for stat in grid_statistics:
             f.write(f"Grid: {stat['label']}\n")
@@ -336,17 +206,11 @@ def save_statistics_to_txt(output_path, grid_statistics):
             f.write(f"  Group 1 rocks: {stat['group1_rocks']}\n")
             f.write(f"  Group 2 rocks: {stat['group2_rocks']}\n")
             f.write(f"  Group 3 rocks: {stat['group3_rocks']}\n")
-            f.write(f"  Power-law fit (non-normalized):\n")
-            f.write(f"    k = {stat['k_pow']:.4e}\n")
-            f.write(f"    r = {stat['r_pow']:.4f}\n")
-            f.write(f"    R² = {stat['R2_pow']:.4f}\n")
-            f.write(f"    p-value: {stat['p_value_pow']}\n")
-            if 'k_pow_norm' in stat:
-                f.write(f"  Power-law fit (area-normalized):\n")
-                f.write(f"    k = {stat['k_pow_norm']:.4e}\n")
-                f.write(f"    r = {stat['r_pow_norm']:.4f}\n")
-                f.write(f"    R² = {stat['R2_pow_norm']:.4f}\n")
-                f.write(f"    p-value: {stat['p_value_pow_norm']}\n")
+            f.write(f"  Power-law fit (area-normalized):\n")
+            f.write(f"    k = {stat['k_pow_norm']:.4e}\n")
+            f.write(f"    r = {stat['r_pow_norm']:.4f}\n")
+            f.write(f"    R² = {stat['R2_pow_norm']:.4f}\n")
+            f.write(f"    p-value: {stat['p_value_pow_norm']}\n")
             f.write('\n')
 
     print(f'統計情報保存: {output_path}')
@@ -439,31 +303,36 @@ def create_grid_subplot_comparison(grid_data_dict, fit_params_dict, num_time_bin
                     ax.set_ylim(y_min, y_max)
 
                 # グリッドラベルを表示（右上）
-                ax.text(0.85, 0.95, f'T{i+1}D{j+1}',
-                       transform=ax.transAxes, fontsize=10, fontweight='bold',
-                       verticalalignment='top', bbox=dict(boxstyle='round',
-                       facecolor='wheat', alpha=0.5))
+                ax.text(0.95, 0.95, f'T{i+1}D{j+1}',
+                       transform=ax.transAxes, fontsize=16, fontweight='bold',
+                       verticalalignment='top', horizontalalignment='right',
+                       bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
 
-                # フィッティングパラメータを表示（右中央）
+                # フィッティング式を表示（左下）
                 if fit_params:
                     k = fit_params.get('k', 0)
                     r = fit_params.get('r', 0)
+                    R2 = fit_params.get('R2', 0)
                     p_str = fit_params.get('p_str', '')
 
-                    param_text = f'k={k:.3e}\nr={r:.3f}\n{p_str}'
-                    ax.text(0.60, 0.70, param_text,
-                           transform=ax.transAxes, fontsize=10,
-                           verticalalignment='bottom', horizontalalignment='left',
-                           bbox=dict(boxstyle='round', facecolor='white', alpha=0.7))
+                    # N = k D^(-r) 形式で表示
+                    fit_eq = f'$N = {k:.2e} \\cdot D^{{-{r:.2f}}}$'
+                    stats_text = f'$R^2 = {R2:.3f}$, {p_str}'
+                    param_text = f'{fit_eq}\n{stats_text}'
+                    ax.text(0.05, 0.05, param_text,
+                            transform=ax.transAxes, fontsize=14, color='red')
+                        #    horizontalalignment='left',
+                        #    bbox=dict(boxstyle='round', facecolor='white', alpha=0.7))
 
             else:
                 # データがない場合は空のプロット
                 ax.text(0.5, 0.5, 'No Data',
-                       transform=ax.transAxes, fontsize=12,
+                       transform=ax.transAxes, fontsize=16,
                        horizontalalignment='center', verticalalignment='center',
                        color='gray')
                 ax.set_xticks([])
                 ax.set_yticks([])
+                ax.tick_params(labelsize=14)
                 # if x_min is not None and x_max is not None:
                 #     ax.set_xlim(x_min, x_max)
                 # if y_min is not None and y_max is not None:
@@ -488,8 +357,144 @@ def create_grid_subplot_comparison(grid_data_dict, fit_params_dict, num_time_bin
 
     print(f'グリッドsubplotプロット保存: {output_path}.png')
 
+def create_grid_subplot_rock_counts(grid_data_dict, rock_counts_dict, num_time_bins, num_dist_bins,
+                                     xlabel, ylabel, output_path, scale_type='loglog',
+                                     dpi_png=300, dpi_pdf=600):
+    """
+    グリッド配置でsubplotを作成し、各グリッドのRSFDと岩石数を表示
+
+    Parameters:
+    -----------
+    grid_data_dict : dict
+        キーが(time_idx, dist_idx)のタプル、値がグリッドデータの辞書
+    rock_counts_dict : dict
+        キーが(time_idx, dist_idx)のタプル、値が岩石数の辞書
+        {'total': int, 'group1': int, 'group2': int, 'group3': int}
+    num_time_bins : int
+        時間方向の分割数（行数）
+    num_dist_bins : int
+        距離方向の分割数（列数）
+    xlabel, ylabel : str
+        軸ラベル
+    output_path : str
+        出力パス（拡張子なし）
+    scale_type : str
+        'linear' or 'loglog'
+    dpi_png, dpi_pdf : int
+        解像度
+    """
+    # 全データから軸範囲を計算
+    all_x_data = []
+    all_y_data = []
+    all_fit_y = []
+
+    for grid_data in grid_data_dict.values():
+        all_x_data.extend(grid_data['x_data'])
+        all_y_data.extend(grid_data['y_data'])
+        all_fit_y.extend(grid_data['fit_y'])
+
+    if len(all_x_data) > 0:
+        if scale_type == 'loglog':
+            # logスケールの場合は正の値のみ考慮
+            x_positive = [x for x in all_x_data if x > 0]
+            y_positive = [y for y in all_y_data + all_fit_y if y > 0]
+
+            if len(x_positive) > 0 and len(y_positive) > 0:
+                x_min, x_max = min(x_positive) * 0.8, max(x_positive) * 1.2
+                y_min, y_max = min(y_positive) * 0.5, max(y_positive) * 2.0
+            else:
+                x_min, x_max, y_min, y_max = None, None, None, None
+        else:
+            # linearスケールの場合
+            x_min, x_max = min(all_x_data) * 0.95, max(all_x_data) * 1.05
+            y_min, y_max = min(all_y_data + all_fit_y) * 0.95, max(all_y_data + all_fit_y) * 1.05
+    else:
+        x_min, x_max, y_min, y_max = None, None, None, None
+
+    # Figure作成
+    fig, axes = plt.subplots(num_time_bins, num_dist_bins,
+                             figsize=(4 * num_dist_bins, 3.5 * num_time_bins),
+                             squeeze=False)
+
+    # 各subplotにデータをプロット
+    for i in range(num_time_bins):
+        for j in range(num_dist_bins):
+            ax = axes[i, j]
+
+            # グリッドデータの取得
+            if (i, j) in grid_data_dict:
+                grid_data = grid_data_dict[(i, j)]
+                rock_counts = rock_counts_dict.get((i, j), {})
+
+                # データプロット
+                ax.plot(grid_data['x_data'], grid_data['y_data'],
+                       marker='o', linestyle='-', linewidth=1.5, color='blue', markersize=4)
+
+                # フィット曲線プロット
+                ax.plot(grid_data['fit_x'], grid_data['fit_y'],
+                       linestyle='--', linewidth=1.5, color='red')
+
+                # 軸スケール設定
+                if scale_type == 'loglog':
+                    ax.set_xscale('log')
+                    ax.set_yscale('log')
+
+                # 軸範囲を統一
+                if x_min is not None and x_max is not None:
+                    ax.set_xlim(x_min, x_max)
+                if y_min is not None and y_max is not None:
+                    ax.set_ylim(y_min, y_max)
+
+                # グリッドラベルを表示（右上）
+                ax.text(0.95, 0.95, f'T{i+1}D{j+1}',
+                       transform=ax.transAxes, fontsize=16, fontweight='bold',
+                       verticalalignment='top', horizontalalignment='right',
+                       bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+                # 岩石数を表示（左下）
+                if rock_counts:
+                    total = rock_counts.get('total', 0)
+                    g1 = rock_counts.get('group1', 0)
+                    g2 = rock_counts.get('group2', 0)
+                    g3 = rock_counts.get('group3', 0)
+
+                    count_text = f'Total: {total}\nG1: {g1}, G2: {g2}, G3: {g3}'
+                    ax.text(0.05, 0.05, count_text,
+                           transform=ax.transAxes, fontsize=14,
+                           verticalalignment='bottom', horizontalalignment='left',
+                            bbox=dict(boxstyle='round', facecolor='white', alpha=0.7))
+
+            else:
+                # データがない場合は空のプロット
+                ax.text(0.5, 0.5, 'No Data',
+                       transform=ax.transAxes, fontsize=16,
+                       horizontalalignment='center', verticalalignment='center',
+                       color='gray')
+                ax.set_xticks([])
+                ax.set_yticks([])
+                ax.tick_params(labelsize=14)
+
+            # グリッド表示
+            ax.grid(True, linestyle='--', alpha=0.3)
+
+            # Tick labelサイズ
+            ax.tick_params(labelsize=10)
+
+    # 全体で1つのxlabel/ylabelを配置
+    fig.text(0.5, 0.02, xlabel, ha='center', fontsize=18, fontweight='bold')
+    fig.text(0.02, 0.5, ylabel, va='center', rotation='vertical', fontsize=18, fontweight='bold')
+
+    plt.tight_layout(rect=[0.03, 0.03, 1, 1])
+
+    # 保存
+    plt.savefig(f'{output_path}.png', dpi=dpi_png)
+    plt.savefig(f'{output_path}.pdf', dpi=dpi_pdf)
+    plt.close()
+
+    print(f'グリッドsubplotプロット（岩石数表示版）保存: {output_path}.png')
+
 def create_bscan_with_grid_lines(bscan_data, time_bins, dist_bins, output_path,
-                                  fit_params_dict=None,
+                                  fit_params_dict=None, rock_counts_dict=None,
                                   sample_interval=0.312500e-9, trace_interval=3.6e-2,
                                   epsilon_r=4.5, c=299792458, dpi_png=300, dpi_pdf=600):
     """
@@ -508,6 +513,9 @@ def create_bscan_with_grid_lines(bscan_data, time_bins, dist_bins, output_path,
     fit_params_dict : dict, optional
         フィッティングパラメータの辞書。キーは(time_idx, dist_idx)のタプル。
         各値は{'k': float, 'r': float, 'p_value': float}を含む辞書。
+    rock_counts_dict : dict, optional
+        岩石数の辞書。キーは(time_idx, dist_idx)のタプル。
+        各値は{'total': int, 'group1': int, 'group2': int, 'group3': int}を含む辞書。
     sample_interval : float
         サンプル間隔 [s]
     trace_interval : float
@@ -520,7 +528,6 @@ def create_bscan_with_grid_lines(bscan_data, time_bins, dist_bins, output_path,
         解像度
     """
     # Font size standards (plot_Bscan.pyと同じ)
-    font_large = 20
     font_medium = 18
     font_small = 16
 
@@ -577,40 +584,29 @@ def create_bscan_with_grid_lines(bscan_data, time_bins, dist_bins, output_path,
     for d_boundary in sorted(dist_boundaries):
         ax.axvline(x=d_boundary, color='black', linestyle='--', linewidth=1.5, alpha=0.8)
 
-    # グリッドラベルの表示
-    num_time_bins = len(time_bins)
-    num_dist_bins = len(dist_bins)
-
+    # グリッドラベルの表示（岩石数のみ）
     for i, (t_min, t_max) in enumerate(time_bins):
         for j, (d_min, d_max) in enumerate(dist_bins):
             # ラベル位置（グリッドの中央）
             label_x = (d_min + d_max) / 2
             label_y = (t_min + t_max) / 2
 
-            # フィッティングパラメータの取得とラベルテキスト生成
-            if fit_params_dict and (i, j) in fit_params_dict:
-                params = fit_params_dict[(i, j)]
-                k = params['k']
-                r = params['r']
-                p_value = params['p_value']
+            # 岩石数の取得とラベルテキスト生成
+            if rock_counts_dict and (i, j) in rock_counts_dict:
+                counts = rock_counts_dict[(i, j)]
+                g1 = counts.get('group1', 0)
+                g2 = counts.get('group2', 0)
+                g3 = counts.get('group3', 0)
 
-                # p<0.05の場合は赤色、それ以外は黒色
-                text_color = 'red' if p_value < 0.05 else 'black'
-
-                # p値の表示フォーマット
-                if p_value < 0.001:
-                    p_str = 'p<0.001'
-                else:
-                    p_str = f'p={p_value:.3f}'
-
-                label_text = f'T{i+1}D{j+1}\nk={k:.2e}\nr={r:.2f}\n{p_str}'
-            else:
+                label_text = f'Gr1: {g1}, Gr2: {g2}, Gr3: {g3}'
                 text_color = 'black'
-                label_text = f'T{i+1}D{j+1}'
+            else:
+                label_text = 'No Data'
+                text_color = 'gray'
 
             # ラベル描画（白背景付き）
             ax.text(label_x, label_y, label_text,
-                   fontsize=10, fontweight='bold', color=text_color,
+                   fontsize=12, fontweight='bold', color=text_color,
                    horizontalalignment='center', verticalalignment='center',
                    bbox=dict(boxstyle='round,pad=0.3', facecolor='white',
                             edgecolor='black', alpha=0.8))
@@ -645,46 +641,6 @@ def create_bscan_with_grid_lines(bscan_data, time_bins, dist_bins, output_path,
     print(f'B-scanグリッドプロット保存: {output_path}.png')
 
 
-def generate_color_marker_combinations(num_time_bins, num_dist_bins):
-    """
-    時間範囲と距離範囲に応じた色とマーカーの組み合わせを生成
-
-    Parameters:
-    -----------
-    num_time_bins : int
-        時間方向の分割数
-    num_dist_bins : int
-        距離方向の分割数
-
-    Returns:
-    --------
-    list of dict
-        各グリッドに対応する色・マーカー・透明度の組み合わせ
-    """
-    # 基本色のリスト（時間範囲ごとに異なる色）
-    base_colors = ['red', 'blue', 'green', 'orange', 'purple', 'brown',
-                   'pink', 'olive', 'cyan', 'magenta']
-
-    # マーカーのリスト（距離範囲ごとに異なるマーカー）
-    markers = ['o', 's', '^', 'D', 'v', '<', '>', 'p', '*', 'h']
-
-    # 色の濃度（距離範囲ごとに変化）
-    alphas = np.linspace(1.0, 0.4, num_dist_bins)
-
-    combinations = []
-    for i in range(num_time_bins):
-        base_color = base_colors[i % len(base_colors)]
-        for j in range(num_dist_bins):
-            marker = markers[j % len(markers)]
-            alpha = alphas[j]
-            combinations.append({
-                'color': base_color,
-                'marker': marker,
-                'alpha': alpha
-            })
-
-    return combinations
-
 # ------------------------------------------------------------------
 # メイン処理
 # ------------------------------------------------------------------
@@ -694,18 +650,22 @@ print('時間・距離方向のグリッド分割によるRSFD比較ツール\n'
 # ------------------------------------------------------------------
 # 1. 入力ファイルチェック
 # ------------------------------------------------------------------
-print('検出された岩石のラベルデータファイル(.json)のパスを入力してください:')
-data_path = input().strip()
-if not (os.path.exists(data_path) and data_path.lower().endswith('.json')):
-    raise FileNotFoundError('正しい .json ファイルを指定してください。')
-
-print('\nB-scanデータファイル(.txt)のパスを入力してください:')
+print('B-scanデータファイル(.txt)のパスを入力してください:')
 bscan_path = input().strip()
 if not (os.path.exists(bscan_path) and bscan_path.lower().endswith('.txt')):
     raise FileNotFoundError('正しい .txt ファイルを指定してください。')
 
+bscan_dir = os.path.dirname(bscan_path)
+
 # ------------------------------------------------------------------
-# 2. グリッド分割パラメータの入力
+# 2. label.jsonファイルの自動検索と選択
+# ------------------------------------------------------------------
+print('\nlabel.jsonファイルを検索中...')
+label_files = find_label_json_files(bscan_dir)
+data_path = select_label_file(label_files)
+
+# ------------------------------------------------------------------
+# 3. グリッド分割パラメータの入力
 # ------------------------------------------------------------------
 print('\n=== グリッド分割パラメータ ===')
 print('グリッド分割の入力方法を選択してください:')
@@ -740,7 +700,7 @@ else:
     dist_bin_width = None
 
 # ------------------------------------------------------------------
-# 3. JSONデータ読み込み
+# 4. JSONデータ読み込み
 # ------------------------------------------------------------------
 print('\nデータ読み込み中...')
 with open(data_path, 'r') as f:
@@ -760,7 +720,7 @@ time_bottom_all = np.array([none_to_nan(v['time_bottom']) for v in results.value
 print(f'ラベルデータ読み込み完了: {len(lab_all)}個')
 
 # ------------------------------------------------------------------
-# 4. グリッド範囲の計算
+# 5. グリッド範囲の計算
 # ------------------------------------------------------------------
 # 物理定数
 sample_interval = 0.312500e-9  # [s] - サンプル間隔
@@ -821,15 +781,12 @@ print(f'時間方向分割幅: {time_bin_width:.2f} ns')
 print(f'距離方向分割幅: {dist_bin_width:.2f} m')
 print(f'総グリッド数: {num_time_bins * num_dist_bins}')
 
-# 色・マーカーの組み合わせを生成
-color_marker_combinations = generate_color_marker_combinations(num_time_bins, num_dist_bins)
-
 # ------------------------------------------------------------------
-# 5. 出力ディレクトリの作成
+# 6. 出力ディレクトリの作成
 # ------------------------------------------------------------------
 
-# 親ディレクトリ: RSFD_grid_comparison
-parent_dir = os.path.join(os.path.dirname(os.path.dirname(data_path)), 'RSFD_grid_comparison')
+# 親ディレクトリ: RSFD_grid_comparison（B-scanファイルと同じディレクトリに作成）
+parent_dir = os.path.join(bscan_dir, 'RSFD_grid_comparison')
 os.makedirs(parent_dir, exist_ok=True)
 
 # サブディレクトリ名の決定（入力モードに応じて命名を変更）
@@ -844,14 +801,14 @@ base_dir = os.path.join(parent_dir, sub_dir_name)
 os.makedirs(base_dir, exist_ok=True)
 
 individual_dir = os.path.join(base_dir, 'individual_plots')
-comparison_dir = os.path.join(base_dir, 'comparison_plots')
+# comparison_dir = os.path.join(base_dir, 'comparison_plots')
 os.makedirs(individual_dir, exist_ok=True)
-os.makedirs(comparison_dir, exist_ok=True)
+os.makedirs(parent_dir, exist_ok=True)
 
 print(f'\n出力ディレクトリ: {base_dir}')
 
 # ------------------------------------------------------------------
-# 6. 各グリッドの処理
+# 7. 各グリッドの処理
 # ------------------------------------------------------------------
 print('\n=== グリッド処理開始 ===')
 
@@ -861,8 +818,6 @@ epsilon_rock = 9.0     # 岩石の比誘電率
 c = 299_792_458  # [m/s]
 
 # 各グリッドのデータを格納するリスト
-all_grids_data_non_normalized = []  # 非規格化
-all_grids_data_area_normalized = []  # 面積規格化
 grid_statistics = []
 
 # B-scanプロット用のグリッド範囲情報
@@ -870,12 +825,13 @@ time_bins_for_bscan = []  # [(time_min, time_max), ...]
 dist_bins_for_bscan = []  # [(dist_min, dist_max), ...]
 
 # subplot用のグリッドデータ辞書（キー: (time_idx, dist_idx)）
-grid_data_dict_non_normalized = {}
 grid_data_dict_area_normalized = {}
 
 # subplot用のフィッティングパラメータ辞書（キー: (time_idx, dist_idx)）
-fit_params_dict_non_normalized = {}
 fit_params_dict_area_normalized = {}
+
+# 岩石数カウント辞書（キー: (time_idx, dist_idx)）
+rock_counts_dict = {}
 
 # B-scanプロット用のグリッド範囲情報を事前計算
 for i in range(num_time_bins):
@@ -988,10 +944,6 @@ for i in range(num_time_bins):
         unique_sizes = np.sort(np.unique(all_sizes))
         cum_counts = np.array([np.sum(all_sizes >= s) for s in unique_sizes])
 
-        # フィッティング（非規格化）
-        (k_pow, r_pow, R2_pow, N_pow_fit, t_pow, p_pow, se_pow, n_pow, dof_pow), D_fit = \
-            calc_fitting_power_law(unique_sizes, cum_counts)
-
         # フィッティング（面積規格化）
         (k_pow_norm, r_pow_norm, R2_pow_norm, N_pow_fit_norm, t_pow_norm, p_pow_norm,
          se_pow_norm, n_pow_norm, dof_pow_norm), D_fit_norm, cum_counts_normalized = \
@@ -999,61 +951,6 @@ for i in range(num_time_bins):
 
         # グリッドラベル
         grid_label = f'T{i+1}D{j+1} ({time_min:.0f}-{time_max:.0f}ns, {dist_min:.0f}-{dist_max:.0f}m)'
-
-        # 色・マーカー・透明度の取得
-        style = color_marker_combinations[(i * num_dist_bins + j) % len(color_marker_combinations)]
-
-        # 非規格化データを保存（比較プロット用リスト）
-        all_grids_data_non_normalized.append({
-            'x_data': unique_sizes,
-            'y_data': cum_counts,
-            'fit_x': D_fit,
-            'fit_y': N_pow_fit,
-            'label': grid_label,
-            'color': style['color'],
-            'marker': style['marker'],
-            'alpha': style['alpha'],
-            'fit_params': {
-                'k': k_pow,
-                'r': r_pow,
-                'R2': R2_pow,
-                'p_str': format_p_value(p_pow)
-            }
-        })
-
-        # 非規格化データを保存（subplot用辞書）
-        grid_data_dict_non_normalized[(i, j)] = {
-            'x_data': unique_sizes,
-            'y_data': cum_counts,
-            'fit_x': D_fit,
-            'fit_y': N_pow_fit
-        }
-
-        # 非規格化フィッティングパラメータを保存（subplot用辞書）
-        fit_params_dict_non_normalized[(i, j)] = {
-            'k': k_pow,
-            'r': r_pow,
-            'R2': R2_pow,
-            'p_str': format_p_value(p_pow)
-        }
-
-        # 面積規格化データを保存（比較プロット用リスト）
-        all_grids_data_area_normalized.append({
-            'x_data': unique_sizes,
-            'y_data': cum_counts_normalized,
-            'fit_x': D_fit_norm,
-            'fit_y': N_pow_fit_norm,
-            'label': grid_label,
-            'color': style['color'],
-            'marker': style['marker'],
-            'alpha': style['alpha'],
-            'fit_params': {
-                'k': k_pow_norm,
-                'r': r_pow_norm,
-                'R2': R2_pow_norm,
-                'p_str': format_p_value(p_pow_norm)
-            }
-        })
 
         # 面積規格化データを保存（subplot用辞書）
         grid_data_dict_area_normalized[(i, j)] = {
@@ -1072,6 +969,14 @@ for i in range(num_time_bins):
             'p_value': p_pow_norm  # p値（数値）を追加
         }
 
+        # 岩石数カウントを保存
+        rock_counts_dict[(i, j)] = {
+            'total': num_rocks,
+            'group1': num_group1,
+            'group2': num_group2,
+            'group3': num_group3
+        }
+
         # 統計情報を保存
         grid_statistics.append({
             'label': grid_label,
@@ -1084,45 +989,13 @@ for i in range(num_time_bins):
             'group1_rocks': num_group1,
             'group2_rocks': num_group2,
             'group3_rocks': num_group3,
-            'k_pow': k_pow,
-            'r_pow': r_pow,
-            'R2_pow': R2_pow,
-            'p_value_pow': format_p_value(p_pow),
             'k_pow_norm': k_pow_norm,
             'r_pow_norm': r_pow_norm,
             'R2_pow_norm': R2_pow_norm,
             'p_value_pow_norm': format_p_value(p_pow_norm)
         })
 
-        # 個別プロットの作成
-        # 非規格化 linear-linear
-        output_path_individual = os.path.join(individual_dir,
-            f'grid_{i+1:02d}_{j+1:02d}_linear_non_normalized')
-        create_individual_rsfd_plot(
-            unique_sizes, cum_counts,
-            'Rock Size D [cm]', 'Cumulative Number N',
-            output_path_individual,
-            scale_type='linear',
-            fit_line={
-                'x': D_fit, 'y': N_pow_fit,
-                'label': f'Power-law: k={k_pow:.2e}, r={r_pow:.3f}, R²={R2_pow:.4f}'
-            }
-        )
-
-        # 非規格化 log-log
-        output_path_individual = os.path.join(individual_dir,
-            f'grid_{i+1:02d}_{j+1:02d}_loglog_non_normalized')
-        create_individual_rsfd_plot(
-            unique_sizes, cum_counts,
-            'Rock Size D [cm]', 'Cumulative Number N',
-            output_path_individual,
-            scale_type='loglog',
-            fit_line={
-                'x': D_fit, 'y': N_pow_fit,
-                'label': f'Power-law: k={k_pow:.2e}, r={r_pow:.3f}, R²={R2_pow:.4f}'
-            }
-        )
-
+        # 個別プロットの作成（面積規格化のみ）
         # 面積規格化 linear-linear
         output_path_individual = os.path.join(individual_dir,
             f'grid_{i+1:02d}_{j+1:02d}_linear_area_normalized')
@@ -1152,64 +1025,13 @@ for i in range(num_time_bins):
         )
 
 # ------------------------------------------------------------------
-# 7. 比較プロットの作成
+# 8. グリッドsubplot比較プロットの作成
 # ------------------------------------------------------------------
-if len(all_grids_data_non_normalized) > 0:
-    print('\n=== 比較プロット作成 ===')
-
-    # # 非規格化 linear-linear
-    # output_path_comparison = os.path.join(comparison_dir, 'comparison_linear_non_normalized')
-    # create_comparison_plot(
-    #     all_grids_data_non_normalized,
-    #     'Rock Size D [cm]', 'Cumulative Number N',
-    #     output_path_comparison,
-    #     scale_type='linear'
-    # )
-
-    # 非規格化 log-log
-    output_path_comparison = os.path.join(comparison_dir, 'comparison_loglog_non_normalized')
-    create_comparison_plot(
-        all_grids_data_non_normalized,
-        'Rock Size D [cm]', 'Cumulative Number N',
-        output_path_comparison,
-        scale_type='loglog'
-    )
-
-    # # 面積規格化 linear-linear
-    # output_path_comparison = os.path.join(comparison_dir, 'comparison_linear_area_normalized')
-    # create_comparison_plot(
-    #     all_grids_data_area_normalized,
-    #     'Rock Size D [cm]', 'Cumulative number of rocks /m²',
-    #     output_path_comparison,
-    #     scale_type='linear'
-    # )
-
-    # 面積規格化 log-log
-    output_path_comparison = os.path.join(comparison_dir, 'comparison_loglog_area_normalized')
-    create_comparison_plot(
-        all_grids_data_area_normalized,
-        'Rock Size D [cm]', 'Cumulative number of rocks /m²',
-        output_path_comparison,
-        scale_type='loglog'
-    )
-
-    # ------------------------------------------------------------------
-    # グリッドsubplot比較プロットの作成
-    # ------------------------------------------------------------------
+if len(grid_data_dict_area_normalized) > 0:
     print('\n=== グリッドsubplot比較プロット作成 ===')
 
-    # 非規格化 log-log
-    output_path_subplot = os.path.join(comparison_dir, 'grid_subplot_loglog_non_normalized')
-    create_grid_subplot_comparison(
-        grid_data_dict_non_normalized, fit_params_dict_non_normalized,
-        num_time_bins, num_dist_bins,
-        'Rock Size D [cm]', 'Cumulative Number N',
-        output_path_subplot,
-        scale_type='loglog'
-    )
-
-    # 面積規格化 log-log
-    output_path_subplot = os.path.join(comparison_dir, 'grid_subplot_loglog_area_normalized')
+    # 面積規格化 log-log（フィッティング式表示版）
+    output_path_subplot = os.path.join(base_dir, 'grid_subplot_loglog_area_normalized')
     create_grid_subplot_comparison(
         grid_data_dict_area_normalized, fit_params_dict_area_normalized,
         num_time_bins, num_dist_bins,
@@ -1218,16 +1040,26 @@ if len(all_grids_data_non_normalized) > 0:
         scale_type='loglog'
     )
 
+    # 面積規格化 log-log（岩石数表示版）
+    output_path_subplot_rocks = os.path.join(base_dir, 'grid_subplot_loglog_area_normalized_rock_counts')
+    create_grid_subplot_rock_counts(
+        grid_data_dict_area_normalized, rock_counts_dict,
+        num_time_bins, num_dist_bins,
+        'Rock Size D [cm]', 'Cumulative Number Density N [/m²]',
+        output_path_subplot_rocks,
+        scale_type='loglog'
+    )
+
     # ------------------------------------------------------------------
     # B-scanプロットにグリッド境界線を表示
     # ------------------------------------------------------------------
     print('\n=== B-scanグリッドプロット作成 ===')
 
-    output_path_bscan = os.path.join(comparison_dir, 'bscan_with_grid')
+    output_path_bscan = os.path.join(base_dir, 'bscan_with_grid')
     create_bscan_with_grid_lines(
         bscan_data, time_bins_for_bscan, dist_bins_for_bscan,
         output_path_bscan,
-        fit_params_dict=fit_params_dict_area_normalized,
+        rock_counts_dict=rock_counts_dict,
         sample_interval=sample_interval,
         trace_interval=trace_interval,
         epsilon_r=epsilon_regolith,
@@ -1237,7 +1069,7 @@ else:
     print('\n警告: 有効なグリッドデータが見つかりませんでした。')
 
 # ------------------------------------------------------------------
-# 8. 統計情報の保存
+# 9. 統計情報の保存
 # ------------------------------------------------------------------
 if len(grid_statistics) > 0:
     stats_path = os.path.join(base_dir, 'grid_statistics.txt')
