@@ -321,8 +321,6 @@ def create_grid_subplot_comparison(grid_data_dict, fit_params_dict, num_time_bin
                     param_text = f'{fit_eq}\n{stats_text}'
                     ax.text(0.05, 0.05, param_text,
                             transform=ax.transAxes, fontsize=14, color='red')
-                        #    horizontalalignment='left',
-                        #    bbox=dict(boxstyle='round', facecolor='white', alpha=0.7))
 
             else:
                 # データがない場合は空のプロット
@@ -333,10 +331,6 @@ def create_grid_subplot_comparison(grid_data_dict, fit_params_dict, num_time_bin
                 ax.set_xticks([])
                 ax.set_yticks([])
                 ax.tick_params(labelsize=14)
-                # if x_min is not None and x_max is not None:
-                #     ax.set_xlim(x_min, x_max)
-                # if y_min is not None and y_max is not None:
-                #     ax.set_ylim(y_min, y_max)
 
             # グリッド表示
             ax.grid(True, linestyle='--', alpha=0.3)
@@ -584,32 +578,61 @@ def create_bscan_with_grid_lines(bscan_data, time_bins, dist_bins, output_path,
     for d_boundary in sorted(dist_boundaries):
         ax.axvline(x=d_boundary, color='black', linestyle='--', linewidth=1.5, alpha=0.8)
 
-    # グリッドラベルの表示（岩石数のみ）
+    # グリッドラベルの表示（岩石数 + RSFD Params）
     for i, (t_min, t_max) in enumerate(time_bins):
         for j, (d_min, d_max) in enumerate(dist_bins):
             # ラベル位置（グリッドの中央）
             label_x = (d_min + d_max) / 2
             label_y = (t_min + t_max) / 2
 
-            # 岩石数の取得とラベルテキスト生成
+            lines = []
+            
+            # デフォルトの枠線色と太さ
+            box_edge_color = 'black'
+            box_linewidth = 1.0
+
+            # 1. 岩石数の取得とラベルテキスト生成
             if rock_counts_dict and (i, j) in rock_counts_dict:
                 counts = rock_counts_dict[(i, j)]
                 g1 = counts.get('group1', 0)
                 g2 = counts.get('group2', 0)
                 g3 = counts.get('group3', 0)
 
-                label_text = f'Gr1: {g1}, Gr2: {g2}, Gr3: {g3}'
+                # スペース節約のため空白を詰める
+                lines.append(f'Gr1:{g1} Gr2:{g2} Gr3:{g3}')
+
+            # 2. RSFDパラメータの取得 (r, k, p)
+            if fit_params_dict and (i, j) in fit_params_dict:
+                params = fit_params_dict[(i, j)]
+                r_val = params.get('r', 0)
+                k_val = params.get('k', 0)
+                p_str = params.get('p_str', '')
+                p_val = params.get('p_value', 1.0) # 判定用数値p値
+
+                # 2行目: rとk
+                lines.append(f'r={r_val:.2f}, k={k_val:.1e}')
+                # 3行目: p-value
+                lines.append(f'{p_str}')
+                
+                # p-valueが0.05以下なら赤枠に変更し、線を少し太くする
+                if p_val <= 0.05:
+                    box_edge_color = 'red'
+                    box_linewidth = 2.0
+
+            if lines:
+                label_text = '\n'.join(lines)
                 text_color = 'black'
             else:
                 label_text = 'No Data'
                 text_color = 'gray'
 
             # ラベル描画（白背景付き）
+            # 情報量が増えるのでフォントを少し小さく設定 (12 -> 10)
             ax.text(label_x, label_y, label_text,
-                   fontsize=12, fontweight='bold', color=text_color,
+                   fontsize=10, fontweight='bold', color=text_color,
                    horizontalalignment='center', verticalalignment='center',
                    bbox=dict(boxstyle='round,pad=0.3', facecolor='white',
-                            edgecolor='black', alpha=0.8))
+                            edgecolor=box_edge_color, linewidth=box_linewidth, alpha=0.8))
 
     # 軸ラベルの設定
     ax.set_xlabel('Moving distance [m]', fontsize=font_medium)
@@ -644,436 +667,438 @@ def create_bscan_with_grid_lines(bscan_data, time_bins, dist_bins, output_path,
 # ------------------------------------------------------------------
 # メイン処理
 # ------------------------------------------------------------------
-print('=== RSFD Grid Comparison Tool ===')
-print('時間・距離方向のグリッド分割によるRSFD比較ツール\n')
+if __name__ == '__main__':
+    print('=== RSFD Grid Comparison Tool ===')
+    print('時間・距離方向のグリッド分割によるRSFD比較ツール\n')
 
-# ------------------------------------------------------------------
-# 1. 入力ファイルチェック
-# ------------------------------------------------------------------
-print('B-scanデータファイル(.txt)のパスを入力してください:')
-bscan_path = input().strip()
-if not (os.path.exists(bscan_path) and bscan_path.lower().endswith('.txt')):
-    raise FileNotFoundError('正しい .txt ファイルを指定してください。')
+    # ------------------------------------------------------------------
+    # 1. 入力ファイルチェック
+    # ------------------------------------------------------------------
+    print('B-scanデータファイル(.txt)のパスを入力してください:')
+    bscan_path = input().strip()
+    if not (os.path.exists(bscan_path) and bscan_path.lower().endswith('.txt')):
+        raise FileNotFoundError('正しい .txt ファイルを指定してください。')
 
-bscan_dir = os.path.dirname(bscan_path)
+    bscan_dir = os.path.dirname(bscan_path)
 
-# ------------------------------------------------------------------
-# 2. label.jsonファイルの自動検索と選択
-# ------------------------------------------------------------------
-print('\nlabel.jsonファイルを検索中...')
-label_files = find_label_json_files(bscan_dir)
-data_path = select_label_file(label_files)
+    # ------------------------------------------------------------------
+    # 2. label.jsonファイルの自動検索と選択
+    # ------------------------------------------------------------------
+    print('\nlabel.jsonファイルを検索中...')
+    label_files = find_label_json_files(bscan_dir)
+    data_path = select_label_file(label_files)
 
-# ------------------------------------------------------------------
-# 3. グリッド分割パラメータの入力
-# ------------------------------------------------------------------
-print('\n=== グリッド分割パラメータ ===')
-print('グリッド分割の入力方法を選択してください:')
-print('1: 分割幅を入力 (時間[ns]、距離[m])')
-print('2: 分割数を入力 (時間方向の分割数、距離方向の分割数)')
-grid_input_mode = input('選択 (1 or 2): ').strip()
+    # ------------------------------------------------------------------
+    # 3. グリッド分割パラメータの入力
+    # ------------------------------------------------------------------
+    print('\n=== グリッド分割パラメータ ===')
+    print('グリッド分割の入力方法を選択してください:')
+    print('1: 分割幅を入力 (時間[ns]、距離[m])')
+    print('2: 分割数を入力 (時間方向の分割数、距離方向の分割数)')
+    grid_input_mode = input('選択 (1 or 2): ').strip()
 
-if grid_input_mode not in ['1', '2']:
-    raise ValueError('1 または 2 を入力してください。')
+    if grid_input_mode not in ['1', '2']:
+        raise ValueError('1 または 2 を入力してください。')
 
-if grid_input_mode == '1':
-    # モード1: 分割幅を入力
-    time_bin_width = float(input('時間方向の分割幅 [ns] を入力してください: ').strip())
-    dist_bin_width = float(input('距離方向の分割幅 [m] を入力してください: ').strip())
+    if grid_input_mode == '1':
+        # モード1: 分割幅を入力
+        time_bin_width = float(input('時間方向の分割幅 [ns] を入力してください: ').strip())
+        dist_bin_width = float(input('距離方向の分割幅 [m] を入力してください: ').strip())
 
-    if time_bin_width <= 0 or dist_bin_width <= 0:
-        raise ValueError('分割幅は正の値を指定してください。')
+        if time_bin_width <= 0 or dist_bin_width <= 0:
+            raise ValueError('分割幅は正の値を指定してください。')
 
-    # 分割数は後で計算される
-    num_time_bins_input = None
-    num_dist_bins_input = None
-else:
-    # モード2: 分割数を入力
-    num_time_bins_input = int(input('時間方向の分割数を入力してください: ').strip())
-    num_dist_bins_input = int(input('距離方向の分割数を入力してください: ').strip())
+        # 分割数は後で計算される
+        num_time_bins_input = None
+        num_dist_bins_input = None
+    else:
+        # モード2: 分割数を入力
+        num_time_bins_input = int(input('時間方向の分割数を入力してください: ').strip())
+        num_dist_bins_input = int(input('距離方向の分割数を入力してください: ').strip())
 
-    if num_time_bins_input <= 0 or num_dist_bins_input <= 0:
-        raise ValueError('分割数は正の整数を指定してください。')
+        if num_time_bins_input <= 0 or num_dist_bins_input <= 0:
+            raise ValueError('分割数は正の整数を指定してください。')
 
-    # 分割幅は後で計算される
-    time_bin_width = None
-    dist_bin_width = None
+        # 分割幅は後で計算される
+        time_bin_width = None
+        dist_bin_width = None
 
-# ------------------------------------------------------------------
-# 4. JSONデータ読み込み
-# ------------------------------------------------------------------
-print('\nデータ読み込み中...')
-with open(data_path, 'r') as f:
-    results = json.load(f).get('results', {})
+    # ------------------------------------------------------------------
+    # 4. JSONデータ読み込み
+    # ------------------------------------------------------------------
+    print('\nデータ読み込み中...')
+    with open(data_path, 'r') as f:
+        results = json.load(f).get('results', {})
 
-# B-scanデータの読み込み
-print('B-scanデータ読み込み中...')
-bscan_data = np.loadtxt(bscan_path, delimiter=' ')
-print(f'B-scan形状: {bscan_data.shape}')
+    # B-scanデータの読み込み
+    print('B-scanデータ読み込み中...')
+    bscan_data = np.loadtxt(bscan_path, delimiter=' ')
+    print(f'B-scan形状: {bscan_data.shape}')
 
-x_all = np.array([v['x'] for v in results.values()])
-y_all = np.array([v['y'] for v in results.values()])
-lab_all = np.array([v['label'] for v in results.values()], dtype=int)
-time_top_all = np.array([none_to_nan(v['time_top']) for v in results.values()], dtype=float)
-time_bottom_all = np.array([none_to_nan(v['time_bottom']) for v in results.values()], dtype=float)
+    x_all = np.array([v['x'] for v in results.values()])
+    y_all = np.array([v['y'] for v in results.values()])
+    lab_all = np.array([v['label'] for v in results.values()], dtype=int)
+    time_top_all = np.array([none_to_nan(v['time_top']) for v in results.values()], dtype=float)
+    time_bottom_all = np.array([none_to_nan(v['time_bottom']) for v in results.values()], dtype=float)
 
-print(f'ラベルデータ読み込み完了: {len(lab_all)}個')
+    print(f'ラベルデータ読み込み完了: {len(lab_all)}個')
 
-# ------------------------------------------------------------------
-# 5. グリッド範囲の計算
-# ------------------------------------------------------------------
-# 物理定数
-sample_interval = 0.312500e-9  # [s] - サンプル間隔
-trace_interval = 3.6e-2        # [m] - トレース間隔
+    # ------------------------------------------------------------------
+    # 5. グリッド範囲の計算
+    # ------------------------------------------------------------------
+    # 物理定数
+    sample_interval = 0.312500e-9  # [s] - サンプル間隔
+    trace_interval = 3.6e-2        # [m] - トレース間隔
 
-# 時間方向：最小値はB-scanから、最大値はlabel.jsonから取得
-# B-scanから時間の最小値を取得（地形補正対応、t<0も含む）
-print('B-scanから時間範囲を計算中...')
+    # 時間方向：最小値はB-scanから、最大値はlabel.jsonから取得
+    # B-scanから時間の最小値を取得（地形補正対応、t<0も含む）
+    print('B-scanから時間範囲を計算中...')
 
-# time_zero_idx を検出（最初のトレースの最初の非NaN値）
-first_trace = bscan_data[:, 0]
-first_non_nan_idx = np.where(~np.isnan(first_trace))[0]
-time_zero_idx = first_non_nan_idx[0] if len(first_non_nan_idx) > 0 else 0
+    # time_zero_idx を検出（最初のトレースの最初の非NaN値）
+    first_trace = bscan_data[:, 0]
+    first_non_nan_idx = np.where(~np.isnan(first_trace))[0]
+    time_zero_idx = first_non_nan_idx[0] if len(first_non_nan_idx) > 0 else 0
 
-# 各トレースの最初の非NaN値の時間を計算（t=0未満も含む）
-first_valid_times = []
-for col in range(bscan_data.shape[1]):
-    non_nan_idx = np.where(~np.isnan(bscan_data[:, col]))[0]
-    if len(non_nan_idx) > 0:
-        # time_zero_idxを基準とした相対時間（負の値も含む）
-        time_ns = (non_nan_idx[0] - time_zero_idx) * sample_interval * 1e9
-        first_valid_times.append(time_ns)
+    # 各トレースの最初の非NaN値の時間を計算（t=0未満も含む）
+    first_valid_times = []
+    for col in range(bscan_data.shape[1]):
+        non_nan_idx = np.where(~np.isnan(bscan_data[:, col]))[0]
+        if len(non_nan_idx) > 0:
+            # time_zero_idxを基準とした相対時間（負の値も含む）
+            time_ns = (non_nan_idx[0] - time_zero_idx) * sample_interval * 1e9
+            first_valid_times.append(time_ns)
 
-if first_valid_times:
-    time_min_data = min(first_valid_times)  # 負の値も含めて最小値を採用
-else:
-    time_min_data = 0.0
-    print('警告: B-scanに有効なデータが見つかりませんでした。time_min=0として処理を続行します。')
+    if first_valid_times:
+        time_min_data = min(first_valid_times)  # 負の値も含めて最小値を採用
+    else:
+        time_min_data = 0.0
+        print('警告: B-scanに有効なデータが見つかりませんでした。time_min=0として処理を続行します。')
 
-# 最大値はlabel.jsonから取得
-# Group1はy座標、Group2-3はtime_topを使用
-time_values_group1 = y_all[lab_all == 1]
-time_values_others = time_top_all[(lab_all != 1) & (~np.isnan(time_top_all))]
-time_values_all = np.concatenate([time_values_group1, time_values_others])
-time_max_data = np.max(time_values_all)
+    # 最大値はlabel.jsonから取得
+    # Group1はy座標、Group2-3はtime_topを使用
+    time_values_group1 = y_all[lab_all == 1]
+    time_values_others = time_top_all[(lab_all != 1) & (~np.isnan(time_top_all))]
+    time_values_all = np.concatenate([time_values_group1, time_values_others])
+    time_max_data = np.max(time_values_all)
 
-# 距離方向：B-scanから取得
-dist_min_data = 0.0  # B-scanの開始位置
-dist_max_data = bscan_data.shape[1] * trace_interval  # [m]
+    # 距離方向：B-scanから取得
+    dist_min_data = 0.0  # B-scanの開始位置
+    dist_max_data = bscan_data.shape[1] * trace_interval  # [m]
 
-# 入力モードに応じて分割数または分割幅を計算
-if grid_input_mode == '1':
-    # モード1: 分割幅から分割数を計算
-    num_time_bins = int(np.ceil((time_max_data - time_min_data) / time_bin_width))
-    num_dist_bins = int(np.ceil((dist_max_data - dist_min_data) / dist_bin_width))
-else:
-    # モード2: 分割数から分割幅を計算
-    num_time_bins = num_time_bins_input
-    num_dist_bins = num_dist_bins_input
-    time_bin_width = (time_max_data - time_min_data) / num_time_bins
-    dist_bin_width = (dist_max_data - dist_min_data) / num_dist_bins
+    # 入力モードに応じて分割数または分割幅を計算
+    if grid_input_mode == '1':
+        # モード1: 分割幅から分割数を計算
+        num_time_bins = int(np.ceil((time_max_data - time_min_data) / time_bin_width))
+        num_dist_bins = int(np.ceil((dist_max_data - dist_min_data) / dist_bin_width))
+    else:
+        # モード2: 分割数から分割幅を計算
+        num_time_bins = num_time_bins_input
+        num_dist_bins = num_dist_bins_input
+        time_bin_width = (time_max_data - time_min_data) / num_time_bins
+        dist_bin_width = (dist_max_data - dist_min_data) / num_dist_bins
 
-print(f'\n時間範囲: {time_min_data:.2f} - {time_max_data:.2f} ns')
-print(f'距離範囲: {dist_min_data:.2f} - {dist_max_data:.2f} m')
-print(f'時間方向分割数: {num_time_bins}')
-print(f'距離方向分割数: {num_dist_bins}')
-print(f'時間方向分割幅: {time_bin_width:.2f} ns')
-print(f'距離方向分割幅: {dist_bin_width:.2f} m')
-print(f'総グリッド数: {num_time_bins * num_dist_bins}')
+    print(f'\n時間範囲: {time_min_data:.2f} - {time_max_data:.2f} ns')
+    print(f'距離範囲: {dist_min_data:.2f} - {dist_max_data:.2f} m')
+    print(f'時間方向分割数: {num_time_bins}')
+    print(f'距離方向分割数: {num_dist_bins}')
+    print(f'時間方向分割幅: {time_bin_width:.2f} ns')
+    print(f'距離方向分割幅: {dist_bin_width:.2f} m')
+    print(f'総グリッド数: {num_time_bins * num_dist_bins}')
 
-# ------------------------------------------------------------------
-# 6. 出力ディレクトリの作成
-# ------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # 6. 出力ディレクトリの作成
+    # ------------------------------------------------------------------
 
-# 親ディレクトリ: RSFD_grid_comparison（B-scanファイルと同じディレクトリに作成）
-parent_dir = os.path.join(bscan_dir, 'RSFD_grid_comparison')
-os.makedirs(parent_dir, exist_ok=True)
+    # 親ディレクトリ: RSFD_grid_comparison（B-scanファイルと同じディレクトリに作成）
+    parent_dir = os.path.join(bscan_dir, 'RSFD_grid_comparison')
+    os.makedirs(parent_dir, exist_ok=True)
 
-# サブディレクトリ名の決定（入力モードに応じて命名を変更）
-if grid_input_mode == '1':
-    # モード1（分割幅入力）: timeXXns_distOOm
-    sub_dir_name = f'time{time_bin_width:.0f}ns_dist{dist_bin_width:.0f}m'
-else:
-    # モード2（分割数入力）: timeX_distY
-    sub_dir_name = f'time{num_time_bins}_dist{num_dist_bins}'
+    # サブディレクトリ名の決定（入力モードに応じて命名を変更）
+    if grid_input_mode == '1':
+        # モード1（分割幅入力）: timeXXns_distOOm
+        sub_dir_name = f'time{time_bin_width:.0f}ns_dist{dist_bin_width:.0f}m'
+    else:
+        # モード2（分割数入力）: timeX_distY
+        sub_dir_name = f'time{num_time_bins}_dist{num_dist_bins}'
 
-base_dir = os.path.join(parent_dir, sub_dir_name)
-os.makedirs(base_dir, exist_ok=True)
+    base_dir = os.path.join(parent_dir, sub_dir_name)
+    os.makedirs(base_dir, exist_ok=True)
 
-individual_dir = os.path.join(base_dir, 'individual_plots')
-# comparison_dir = os.path.join(base_dir, 'comparison_plots')
-os.makedirs(individual_dir, exist_ok=True)
-os.makedirs(parent_dir, exist_ok=True)
+    individual_dir = os.path.join(base_dir, 'individual_plots')
+    # comparison_dir = os.path.join(base_dir, 'comparison_plots')
+    os.makedirs(individual_dir, exist_ok=True)
+    os.makedirs(parent_dir, exist_ok=True)
 
-print(f'\n出力ディレクトリ: {base_dir}')
+    print(f'\n出力ディレクトリ: {base_dir}')
 
-# ------------------------------------------------------------------
-# 7. 各グリッドの処理
-# ------------------------------------------------------------------
-print('\n=== グリッド処理開始 ===')
+    # ------------------------------------------------------------------
+    # 7. 各グリッドの処理
+    # ------------------------------------------------------------------
+    print('\n=== グリッド処理開始 ===')
 
-# 物理定数
-epsilon_regolith = 4.5  # 月面レゴリスの比誘電率
-epsilon_rock = 9.0     # 岩石の比誘電率
-c = 299_792_458  # [m/s]
+    # 物理定数
+    epsilon_regolith = 4.5  # 月面レゴリスの比誘電率
+    epsilon_rock = 9.0     # 岩石の比誘電率
+    c = 299_792_458  # [m/s]
 
-# 各グリッドのデータを格納するリスト
-grid_statistics = []
+    # 各グリッドのデータを格納するリスト
+    grid_statistics = []
 
-# B-scanプロット用のグリッド範囲情報
-time_bins_for_bscan = []  # [(time_min, time_max), ...]
-dist_bins_for_bscan = []  # [(dist_min, dist_max), ...]
+    # B-scanプロット用のグリッド範囲情報
+    time_bins_for_bscan = []  # [(time_min, time_max), ...]
+    dist_bins_for_bscan = []  # [(dist_min, dist_max), ...]
 
-# subplot用のグリッドデータ辞書（キー: (time_idx, dist_idx)）
-grid_data_dict_area_normalized = {}
+    # subplot用のグリッドデータ辞書（キー: (time_idx, dist_idx)）
+    grid_data_dict_area_normalized = {}
 
-# subplot用のフィッティングパラメータ辞書（キー: (time_idx, dist_idx)）
-fit_params_dict_area_normalized = {}
+    # subplot用のフィッティングパラメータ辞書（キー: (time_idx, dist_idx)）
+    fit_params_dict_area_normalized = {}
 
-# 岩石数カウント辞書（キー: (time_idx, dist_idx)）
-rock_counts_dict = {}
+    # 岩石数カウント辞書（キー: (time_idx, dist_idx)）
+    rock_counts_dict = {}
 
-# B-scanプロット用のグリッド範囲情報を事前計算
-for i in range(num_time_bins):
-    t_min = time_min_data + i * time_bin_width
-    t_max = time_min_data + (i + 1) * time_bin_width
-    if i == num_time_bins - 1:
-        t_max = time_max_data
-    time_bins_for_bscan.append((t_min, t_max))
-
-for j in range(num_dist_bins):
-    d_min = dist_min_data + j * dist_bin_width
-    d_max = dist_min_data + (j + 1) * dist_bin_width
-    if j == num_dist_bins - 1:
-        d_max = dist_max_data
-    dist_bins_for_bscan.append((d_min, d_max))
-
-grid_idx = 0
-for i in range(num_time_bins):
-    for j in range(num_dist_bins):
-        grid_idx += 1
-
-        # グリッド範囲の計算
-        time_min = time_min_data + i * time_bin_width
-        time_max = time_min_data + (i + 1) * time_bin_width
-        dist_min = dist_min_data + j * dist_bin_width
-        dist_max = dist_min_data + (j + 1) * dist_bin_width
-
-        # 最後の区間の調整
+    # B-scanプロット用のグリッド範囲情報を事前計算
+    for i in range(num_time_bins):
+        t_min = time_min_data + i * time_bin_width
+        t_max = time_min_data + (i + 1) * time_bin_width
         if i == num_time_bins - 1:
-            time_max = time_max_data
+            t_max = time_max_data
+        time_bins_for_bscan.append((t_min, t_max))
+
+    for j in range(num_dist_bins):
+        d_min = dist_min_data + j * dist_bin_width
+        d_max = dist_min_data + (j + 1) * dist_bin_width
         if j == num_dist_bins - 1:
-            dist_max = dist_max_data
+            d_max = dist_max_data
+        dist_bins_for_bscan.append((d_min, d_max))
 
-        print(f'\nGrid {grid_idx}/{num_time_bins * num_dist_bins}: '
-              f'Time {time_min:.1f}-{time_max:.1f} ns, Dist {dist_min:.1f}-{dist_max:.1f} m')
+    grid_idx = 0
+    for i in range(num_time_bins):
+        for j in range(num_dist_bins):
+            grid_idx += 1
 
-        # データのコピー
-        x = x_all.copy()
-        y = y_all.copy()
-        lab = lab_all.copy()
-        time_top = time_top_all.copy()
-        time_bottom = time_bottom_all.copy()
+            # グリッド範囲の計算
+            time_min = time_min_data + i * time_bin_width
+            time_max = time_min_data + (i + 1) * time_bin_width
+            dist_min = dist_min_data + j * dist_bin_width
+            dist_max = dist_min_data + (j + 1) * dist_bin_width
 
-        # データ範囲フィルタリング
-        # 時間範囲フィルタ
-        mask_group1 = (lab == 1) & (y >= time_min) & (y <= time_max)
-        mask_others = (lab != 1) & (time_top >= time_min) & (time_top <= time_max)
-        time_mask = mask_group1 | mask_others
+            # 最後の区間の調整
+            if i == num_time_bins - 1:
+                time_max = time_max_data
+            if j == num_dist_bins - 1:
+                dist_max = dist_max_data
 
-        x = x[time_mask]
-        y = y[time_mask]
-        lab = lab[time_mask]
-        time_top = time_top[time_mask]
-        time_bottom = time_bottom[time_mask]
+            print(f'\nGrid {grid_idx}/{num_time_bins * num_dist_bins}: '
+                  f'Time {time_min:.1f}-{time_max:.1f} ns, Dist {dist_min:.1f}-{dist_max:.1f} m')
 
-        # 距離範囲フィルタ
-        dist_mask = (x >= dist_min) & (x <= dist_max)
-        x = x[dist_mask]
-        y = y[dist_mask]
-        lab = lab[dist_mask]
-        time_top = time_top[dist_mask]
-        time_bottom = time_bottom[dist_mask]
+            # データのコピー
+            x = x_all.copy()
+            y = y_all.copy()
+            lab = lab_all.copy()
+            time_top = time_top_all.copy()
+            time_bottom = time_bottom_all.copy()
 
-        num_rocks = len(lab)
-        print(f'  岩石数: {num_rocks}')
+            # データ範囲フィルタリング
+            # 時間範囲フィルタ
+            mask_group1 = (lab == 1) & (y >= time_min) & (y <= time_max)
+            mask_others = (lab != 1) & (time_top >= time_min) & (time_top <= time_max)
+            time_mask = mask_group1 | mask_others
 
-        # データが少なすぎる場合はスキップ
-        if num_rocks < 3:
-            print(f'  警告: データ数が不足しているためスキップします')
-            continue
+            x = x[time_mask]
+            y = y[time_mask]
+            lab = lab[time_mask]
+            time_top = time_top[time_mask]
+            time_bottom = time_bottom[time_mask]
 
-        # 面積計算（時間範囲×距離範囲）
-        # 時間を距離に変換: depth = time * c / (2 * sqrt(epsilon_r))
-        depth_min = time_min * 1e-9 * c / (2 * np.sqrt(epsilon_regolith))
-        depth_max = time_max * 1e-9 * c / (2 * np.sqrt(epsilon_regolith))
-        area = (depth_max - depth_min) * (dist_max - dist_min)
-        print(f'  面積: {area:.2f} m²')
+            # 距離範囲フィルタ
+            dist_mask = (x >= dist_min) & (x <= dist_max)
+            x = x[dist_mask]
+            y = y[dist_mask]
+            lab = lab[dist_mask]
+            time_top = time_top[dist_mask]
+            time_bottom = time_bottom[dist_mask]
 
-        # サイズ配列を作成（Group1, Group2, Group3全て含める）
-        # Group1: 1cm固定
-        num_group1 = int(np.sum(lab == 1))
-        size_label1 = np.full(num_group1, 1.0)
+            num_rocks = len(lab)
+            print(f'  岩石数: {num_rocks}')
 
-        # Group2: 6cm固定
-        mask2_valid = (lab == 2) & (~np.isnan(time_top)) & (~np.isnan(time_bottom))
-        sizes_group2 = (time_bottom[mask2_valid] - time_top[mask2_valid]) * 1e-9 * c / np.sqrt(epsilon_rock) * 0.5 * 100
+            # データが少なすぎる場合はスキップ
+            if num_rocks < 3:
+                print(f'  警告: データ数が不足しているためスキップします')
+                continue
 
-        # 浮動小数点誤差を排除
-        sizes_group2 = np.round(sizes_group2, decimals=3)
-        num_group2 = len(sizes_group2)
+            # 面積計算（時間範囲×距離範囲）
+            # 時間を距離に変換: depth = time * c / (2 * sqrt(epsilon_r))
+            depth_min = time_min * 1e-9 * c / (2 * np.sqrt(epsilon_regolith))
+            depth_max = time_max * 1e-9 * c / (2 * np.sqrt(epsilon_regolith))
+            area = (depth_max - depth_min) * (dist_max - dist_min)
+            print(f'  面積: {area:.2f} m²')
 
-        # Group3: 計算値
-        mask3_valid = (lab == 3) & (~np.isnan(time_top)) & (~np.isnan(time_bottom))
-        sizes_group3 = (time_bottom[mask3_valid] - time_top[mask3_valid]) * 1e-9 * c / np.sqrt(epsilon_rock) * 0.5 * 100
+            # サイズ配列を作成（Group1, Group2, Group3全て含める）
+            # Group1: 1cm固定
+            num_group1 = int(np.sum(lab == 1))
+            size_label1 = np.full(num_group1, 1.0)
 
-        # 浮動小数点誤差を排除
-        sizes_group3 = np.round(sizes_group3, decimals=3)
-        num_group3 = len(sizes_group3)
+            # Group2: 6cm固定
+            mask2_valid = (lab == 2) & (~np.isnan(time_top)) & (~np.isnan(time_bottom))
+            sizes_group2 = (time_bottom[mask2_valid] - time_top[mask2_valid]) * 1e-9 * c / np.sqrt(epsilon_rock) * 0.5 * 100
 
-        print(f'  Group1: {num_group1}, Group2: {num_group2}, Group3: {num_group3}')
+            # 浮動小数点誤差を排除
+            sizes_group2 = np.round(sizes_group2, decimals=3)
+            num_group2 = len(sizes_group2)
 
-        # データが不足している場合はスキップ
-        total_samples = num_group1 + num_group2 + num_group3
-        if total_samples < 3:
-            print(f'  警告: データ数が不足しているためスキップします')
-            continue
+            # Group3: 計算値
+            mask3_valid = (lab == 3) & (~np.isnan(time_top)) & (~np.isnan(time_bottom))
+            sizes_group3 = (time_bottom[mask3_valid] - time_top[mask3_valid]) * 1e-9 * c / np.sqrt(epsilon_rock) * 0.5 * 100
 
-        # Group1-2-3統合データ
-        all_sizes = np.concatenate([size_label1, sizes_group2, sizes_group3])
-        unique_sizes = np.sort(np.unique(all_sizes))
-        cum_counts = np.array([np.sum(all_sizes >= s) for s in unique_sizes])
+            # 浮動小数点誤差を排除
+            sizes_group3 = np.round(sizes_group3, decimals=3)
+            num_group3 = len(sizes_group3)
 
-        # フィッティング（面積規格化）
-        (k_pow_norm, r_pow_norm, R2_pow_norm, N_pow_fit_norm, t_pow_norm, p_pow_norm,
-         se_pow_norm, n_pow_norm, dof_pow_norm), D_fit_norm, cum_counts_normalized = \
-            calc_fitting_power_law_area_normalized(unique_sizes, cum_counts, area)
+            print(f'  Group1: {num_group1}, Group2: {num_group2}, Group3: {num_group3}')
 
-        # グリッドラベル
-        grid_label = f'T{i+1}D{j+1} ({time_min:.0f}-{time_max:.0f}ns, {dist_min:.0f}-{dist_max:.0f}m)'
+            # データが不足している場合はスキップ
+            total_samples = num_group1 + num_group2 + num_group3
+            if total_samples < 3:
+                print(f'  警告: データ数が不足しているためスキップします')
+                continue
 
-        # 面積規格化データを保存（subplot用辞書）
-        grid_data_dict_area_normalized[(i, j)] = {
-            'x_data': unique_sizes,
-            'y_data': cum_counts_normalized,
-            'fit_x': D_fit_norm,
-            'fit_y': N_pow_fit_norm
-        }
+            # Group1-2-3統合データ
+            all_sizes = np.concatenate([size_label1, sizes_group2, sizes_group3])
+            unique_sizes = np.sort(np.unique(all_sizes))
+            cum_counts = np.array([np.sum(all_sizes >= s) for s in unique_sizes])
 
-        # 面積規格化フィッティングパラメータを保存（subplot用辞書）
-        fit_params_dict_area_normalized[(i, j)] = {
-            'k': k_pow_norm,
-            'r': r_pow_norm,
-            'R2': R2_pow_norm,
-            'p_str': format_p_value(p_pow_norm),
-            'p_value': p_pow_norm  # p値（数値）を追加
-        }
+            # フィッティング（面積規格化）
+            (k_pow_norm, r_pow_norm, R2_pow_norm, N_pow_fit_norm, t_pow_norm, p_pow_norm,
+             se_pow_norm, n_pow_norm, dof_pow_norm), D_fit_norm, cum_counts_normalized = \
+                calc_fitting_power_law_area_normalized(unique_sizes, cum_counts, area)
 
-        # 岩石数カウントを保存
-        rock_counts_dict[(i, j)] = {
-            'total': num_rocks,
-            'group1': num_group1,
-            'group2': num_group2,
-            'group3': num_group3
-        }
+            # グリッドラベル
+            grid_label = f'T{i+1}D{j+1} ({time_min:.0f}-{time_max:.0f}ns, {dist_min:.0f}-{dist_max:.0f}m)'
 
-        # 統計情報を保存
-        grid_statistics.append({
-            'label': grid_label,
-            'time_min': time_min,
-            'time_max': time_max,
-            'dist_min': dist_min,
-            'dist_max': dist_max,
-            'area': area,
-            'total_rocks': num_rocks,
-            'group1_rocks': num_group1,
-            'group2_rocks': num_group2,
-            'group3_rocks': num_group3,
-            'k_pow_norm': k_pow_norm,
-            'r_pow_norm': r_pow_norm,
-            'R2_pow_norm': R2_pow_norm,
-            'p_value_pow_norm': format_p_value(p_pow_norm)
-        })
-
-        # 個別プロットの作成（面積規格化のみ）
-        # 面積規格化 linear-linear
-        output_path_individual = os.path.join(individual_dir,
-            f'grid_{i+1:02d}_{j+1:02d}_linear_area_normalized')
-        create_individual_rsfd_plot(
-            unique_sizes, cum_counts_normalized,
-            'Rock Size D [cm]', 'Cumulative number of rocks /m²',
-            output_path_individual,
-            scale_type='linear',
-            fit_line={
-                'x': D_fit_norm, 'y': N_pow_fit_norm,
-                'label': f'Power-law: k={k_pow_norm:.2e}, r={r_pow_norm:.3f}, R²={R2_pow_norm:.4f}'
+            # 面積規格化データを保存（subplot用辞書）
+            grid_data_dict_area_normalized[(i, j)] = {
+                'x_data': unique_sizes,
+                'y_data': cum_counts_normalized,
+                'fit_x': D_fit_norm,
+                'fit_y': N_pow_fit_norm
             }
-        )
 
-        # 面積規格化 log-log
-        output_path_individual = os.path.join(individual_dir,
-            f'grid_{i+1:02d}_{j+1:02d}_loglog_area_normalized')
-        create_individual_rsfd_plot(
-            unique_sizes, cum_counts_normalized,
-            'Rock Size D [cm]', 'Cumulative number of rocks /m²',
-            output_path_individual,
-            scale_type='loglog',
-            fit_line={
-                'x': D_fit_norm, 'y': N_pow_fit_norm,
-                'label': f'Power-law: k={k_pow_norm:.2e}, r={r_pow_norm:.3f}, R²={R2_pow_norm:.4f}'
+            # 面積規格化フィッティングパラメータを保存（subplot用辞書）
+            fit_params_dict_area_normalized[(i, j)] = {
+                'k': k_pow_norm,
+                'r': r_pow_norm,
+                'R2': R2_pow_norm,
+                'p_str': format_p_value(p_pow_norm),
+                'p_value': p_pow_norm  # p値（数値）を追加
             }
-        )
 
-# ------------------------------------------------------------------
-# 8. グリッドsubplot比較プロットの作成
-# ------------------------------------------------------------------
-if len(grid_data_dict_area_normalized) > 0:
-    print('\n=== グリッドsubplot比較プロット作成 ===')
+            # 岩石数カウントを保存
+            rock_counts_dict[(i, j)] = {
+                'total': num_rocks,
+                'group1': num_group1,
+                'group2': num_group2,
+                'group3': num_group3
+            }
 
-    # 面積規格化 log-log（フィッティング式表示版）
-    output_path_subplot = os.path.join(base_dir, 'grid_subplot_loglog_area_normalized')
-    create_grid_subplot_comparison(
-        grid_data_dict_area_normalized, fit_params_dict_area_normalized,
-        num_time_bins, num_dist_bins,
-        'Rock Size D [cm]', 'Cumulative Number Density N [/m²]',
-        output_path_subplot,
-        scale_type='loglog'
-    )
+            # 統計情報を保存
+            grid_statistics.append({
+                'label': grid_label,
+                'time_min': time_min,
+                'time_max': time_max,
+                'dist_min': dist_min,
+                'dist_max': dist_max,
+                'area': area,
+                'total_rocks': num_rocks,
+                'group1_rocks': num_group1,
+                'group2_rocks': num_group2,
+                'group3_rocks': num_group3,
+                'k_pow_norm': k_pow_norm,
+                'r_pow_norm': r_pow_norm,
+                'R2_pow_norm': R2_pow_norm,
+                'p_value_pow_norm': format_p_value(p_pow_norm)
+            })
 
-    # 面積規格化 log-log（岩石数表示版）
-    output_path_subplot_rocks = os.path.join(base_dir, 'grid_subplot_loglog_area_normalized_rock_counts')
-    create_grid_subplot_rock_counts(
-        grid_data_dict_area_normalized, rock_counts_dict,
-        num_time_bins, num_dist_bins,
-        'Rock Size D [cm]', 'Cumulative Number Density N [/m²]',
-        output_path_subplot_rocks,
-        scale_type='loglog'
-    )
+            # 個別プロットの作成（面積規格化のみ）
+            # 面積規格化 linear-linear
+            output_path_individual = os.path.join(individual_dir,
+                f'grid_{i+1:02d}_{j+1:02d}_linear_area_normalized')
+            create_individual_rsfd_plot(
+                unique_sizes, cum_counts_normalized,
+                'Rock Size D [cm]', 'Cumulative number of rocks /m²',
+                output_path_individual,
+                scale_type='linear',
+                fit_line={
+                    'x': D_fit_norm, 'y': N_pow_fit_norm,
+                    'label': f'Power-law: k={k_pow_norm:.2e}, r={r_pow_norm:.3f}, R²={R2_pow_norm:.4f}'
+                }
+            )
+
+            # 面積規格化 log-log
+            output_path_individual = os.path.join(individual_dir,
+                f'grid_{i+1:02d}_{j+1:02d}_loglog_area_normalized')
+            create_individual_rsfd_plot(
+                unique_sizes, cum_counts_normalized,
+                'Rock Size D [cm]', 'Cumulative number of rocks /m²',
+                output_path_individual,
+                scale_type='loglog',
+                fit_line={
+                    'x': D_fit_norm, 'y': N_pow_fit_norm,
+                    'label': f'Power-law: k={k_pow_norm:.2e}, r={r_pow_norm:.3f}, R²={R2_pow_norm:.4f}'
+                }
+            )
 
     # ------------------------------------------------------------------
-    # B-scanプロットにグリッド境界線を表示
+    # 8. グリッドsubplot比較プロットの作成
     # ------------------------------------------------------------------
-    print('\n=== B-scanグリッドプロット作成 ===')
+    if len(grid_data_dict_area_normalized) > 0:
+        print('\n=== グリッドsubplot比較プロット作成 ===')
 
-    output_path_bscan = os.path.join(base_dir, 'bscan_with_grid')
-    create_bscan_with_grid_lines(
-        bscan_data, time_bins_for_bscan, dist_bins_for_bscan,
-        output_path_bscan,
-        rock_counts_dict=rock_counts_dict,
-        sample_interval=sample_interval,
-        trace_interval=trace_interval,
-        epsilon_r=epsilon_regolith,
-        c=c
-    )
-else:
-    print('\n警告: 有効なグリッドデータが見つかりませんでした。')
+        # 面積規格化 log-log（フィッティング式表示版）
+        output_path_subplot = os.path.join(base_dir, 'grid_subplot_loglog_area_normalized')
+        create_grid_subplot_comparison(
+            grid_data_dict_area_normalized, fit_params_dict_area_normalized,
+            num_time_bins, num_dist_bins,
+            'Rock Size D [cm]', 'Cumulative Number Density N [/m²]',
+            output_path_subplot,
+            scale_type='loglog'
+        )
 
-# ------------------------------------------------------------------
-# 9. 統計情報の保存
-# ------------------------------------------------------------------
-if len(grid_statistics) > 0:
-    stats_path = os.path.join(base_dir, 'grid_statistics.txt')
-    save_statistics_to_txt(stats_path, grid_statistics)
+        # 面積規格化 log-log（岩石数表示版）
+        output_path_subplot_rocks = os.path.join(base_dir, 'grid_subplot_loglog_area_normalized_rock_counts')
+        create_grid_subplot_rock_counts(
+            grid_data_dict_area_normalized, rock_counts_dict,
+            num_time_bins, num_dist_bins,
+            'Rock Size D [cm]', 'Cumulative Number Density N [/m²]',
+            output_path_subplot_rocks,
+            scale_type='loglog'
+        )
 
-print('\n=== 処理完了 ===')
-print(f'出力ディレクトリ: {base_dir}')
+        # ------------------------------------------------------------------
+        # B-scanプロットにグリッド境界線を表示
+        # ------------------------------------------------------------------
+        print('\n=== B-scanグリッドプロット作成 ===')
+
+        output_path_bscan = os.path.join(base_dir, 'bscan_with_grid')
+        create_bscan_with_grid_lines(
+            bscan_data, time_bins_for_bscan, dist_bins_for_bscan,
+            output_path_bscan,
+            fit_params_dict=fit_params_dict_area_normalized,
+            rock_counts_dict=rock_counts_dict,
+            sample_interval=sample_interval,
+            trace_interval=trace_interval,
+            epsilon_r=epsilon_regolith,
+            c=c
+        )
+    else:
+        print('\n警告: 有効なグリッドデータが見つかりませんでした。')
+
+    # ------------------------------------------------------------------
+    # 9. 統計情報の保存
+    # ------------------------------------------------------------------
+    if len(grid_statistics) > 0:
+        stats_path = os.path.join(base_dir, 'grid_statistics.txt')
+        save_statistics_to_txt(stats_path, grid_statistics)
+
+    print('\n=== 処理完了 ===')
+    print(f'出力ディレクトリ: {base_dir}')
