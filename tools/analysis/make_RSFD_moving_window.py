@@ -455,16 +455,22 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
                       time_array[-1], time_array[0]],
                vmin=vmin, vmax=vmax, alpha=0.5)
 
-    # rの値を第2軸にプロット
+    # rの値を第2軸にプロット（NaN値は1.6としてプロット）
     ax1_twin = ax1.twinx()
-    valid_mask = ~np.isnan(r_values)
-    ax1_twin.plot(window_centers[valid_mask], r_values[valid_mask],
-                  'b-', linewidth=2, marker='o', markersize=4, label='r (power-law exponent)')
+    r_nan_value = 1.6  # NaN値の代替値
+    r_values_plot = np.where(np.isnan(r_values), r_nan_value, r_values)
+    ax1_twin.plot(window_centers, r_values_plot,
+                  'b-', linewidth=2, marker='o', markersize=15, label='r (power-law exponent)')
     ax1_twin.set_ylabel('r (power-law exponent)', fontsize=font_medium, color='blue')
     ax1_twin.tick_params(axis='y', labelcolor='blue', labelsize=font_small)
 
-    # y軸範囲設定（r値）: 0.3〜1.5に固定
-    ax1_twin.set_ylim(0.3, 1.5)
+    # y軸範囲設定（r値）: 0.3〜1.6に拡張（1.6はNaN用）
+    ax1_twin.set_ylim(0.3, 1.6)
+    # カスタム目盛り設定（1.6を「nan」と表示）
+    r_ticks = [0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6]
+    r_tick_labels = ['0.4', '0.6', '0.8', '1.0', '1.2', '1.4', 'nan']
+    ax1_twin.set_yticks(r_ticks)
+    ax1_twin.set_yticklabels(r_tick_labels)
 
     ax1.set_ylabel('Time [ns]', fontsize=font_medium)
     ax1.set_ylim(time_max_data, time_min_data)
@@ -478,15 +484,22 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
                       time_array[-1], time_array[0]],
                vmin=vmin, vmax=vmax, alpha=0.5)
 
-    # kの値を第2軸にプロット（リニアスケール）
+    # kの値を第2軸にプロット（リニアスケール、NaN値は8e-3としてプロット）
     ax2_twin = ax2.twinx()
-    valid_mask_k = ~np.isnan(k_values)
-    ax2_twin.plot(window_centers[valid_mask_k], k_values[valid_mask_k],
-                  'r-', linewidth=2, marker='s', markersize=4, label='k (scaling factor)')
+    k_nan_value = 8e-3  # NaN値の代替値
+    k_values_plot = np.where(np.isnan(k_values), k_nan_value, k_values)
+    ax2_twin.plot(window_centers, k_values_plot,
+                  'r-', linewidth=2, marker='s', markersize=15, label='k (scaling factor)')
     ax2_twin.set_ylabel('k [/m²]', fontsize=font_medium, color='red')
     ax2_twin.tick_params(axis='y', labelcolor='red', labelsize=font_small)
-    # y軸範囲設定（k値）: 1e-3〜7e-3に固定
-    ax2_twin.set_ylim(1e-3, 7e-3)
+    # y軸範囲設定（k値）: 1e-3〜8e-3に拡張（8e-3はNaN用）
+    ax2_twin.set_ylim(1e-3, 8e-3)
+    # カスタム目盛り設定（8e-3を「nan」と表示）
+    k_ticks = [1e-3, 2e-3, 3e-3, 4e-3, 5e-3, 6e-3, 7e-3, 8e-3]
+    k_tick_labels = ['1', '2', '3', '4', '5', '6', '7', 'nan']
+    ax2_twin.set_yticks(k_ticks)
+    ax2_twin.set_yticklabels(k_tick_labels)
+    ax2_twin.set_ylabel('k [×10⁻³ /m²]', fontsize=font_medium, color='red')
 
     ax2.set_ylabel('Time [ns]', fontsize=font_medium)
     ax2.set_ylim(time_max_data, time_min_data)
@@ -500,16 +513,23 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
                       time_array[-1], time_array[0]],
                vmin=vmin, vmax=vmax, alpha=0.5)
 
-    # p値を第2軸にプロット（対数スケール）
+    # p値を第2軸にプロット（対数スケール、NaN値は1.5としてプロット）
     ax3_twin = ax3.twinx()
-    valid_mask_p = ~np.isnan(p_values_array) & (p_values_array > 0)
-    if np.any(valid_mask_p):
-        ax3_twin.semilogy(window_centers[valid_mask_p], p_values_array[valid_mask_p],
-                          'g-', linewidth=2, marker='^', markersize=4, label='p-value')
+    p_nan_value = 1.5  # NaN値の代替値
+    p_values_plot = np.where(np.isnan(p_values_array) | (p_values_array <= 0), p_nan_value, p_values_array)
+    ax3_twin.semilogy(window_centers, p_values_plot,
+                      'g-', linewidth=2, marker='^', markersize=15, label='p-value')
     # p=0.05の横線を追加
     ax3_twin.axhline(y=0.05, color='black', linestyle='--', linewidth=1.5, label='p = 0.05')
     ax3_twin.set_ylabel('p-value', fontsize=font_medium, color='green')
     ax3_twin.tick_params(axis='y', labelcolor='green', labelsize=font_small)
+    # y軸範囲設定（p値）: 1e-4〜1.5に拡張（1.5はNaN用）
+    ax3_twin.set_ylim(1e-4, 1.5)
+    # カスタム目盛り設定（1.5を「nan」と表示）
+    p_ticks = [1e-4, 1e-3, 1e-2, 0.05, 1e-1, 1.0, 1.5]
+    p_tick_labels = ['10⁻⁴', '10⁻³', '10⁻²', '0.05', '10⁻¹', '1', 'nan']
+    ax3_twin.set_yticks(p_ticks)
+    ax3_twin.set_yticklabels(p_tick_labels)
 
     ax3.set_xlabel('Moving distance [m]', fontsize=font_medium)
     ax3.set_ylabel('Time [ns]', fontsize=font_medium)
@@ -552,9 +572,9 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
         f.write('# P-value Statistics\n')
         f.write(f'Windows with p ≤ 0.05: {significant_count} / {valid_p_count} ({significant_ratio:.2f}%)\n')
         f.write(f'Note: NaN p-values are treated as p > 0.05\n\n')
-        f.write('Center [m]\tk [/m²]\tr\tR2\tp-value\tNum rocks\tArea [m²]\n')
+        f.write('Window\tCenter [m]\tk [/m²]\tr\tR2\tp-value\tNum rocks\tArea [m²]\n')
         for i, center in enumerate(window_centers):
-            f.write(f'{center:.2f}\t{k_values[i]:.4e}\t{r_values[i]:.4f}\t'
+            f.write(f'{i+1}\t{center:.2f}\t{k_values[i]:.4e}\t{r_values[i]:.4f}\t'
                    f'{R2_values[i]:.4f}\t{p_values[i]:.4e}\t{num_rocks_list[i]}\t{area_list[i]:.4f}\n')
 
     print(f'統計情報保存: {stats_path}')
@@ -657,16 +677,22 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
                       time_array[-1], time_array[0]],
                vmin=vmin, vmax=vmax, alpha=0.5)
 
-    # rの値を第2横軸にプロット（縦方向に沿って）
+    # rの値を第2横軸にプロット（縦方向に沿って、NaN値は1.6としてプロット）
     ax1_twin = ax1.twiny()
-    valid_mask = ~np.isnan(r_values)
-    ax1_twin.plot(r_values[valid_mask], window_centers[valid_mask],
-                  'b-', linewidth=2, marker='o', markersize=4, label='r (power-law exponent)')
+    r_nan_value = 1.6  # NaN値の代替値
+    r_values_plot = np.where(np.isnan(r_values), r_nan_value, r_values)
+    ax1_twin.plot(r_values_plot, window_centers,
+                  'b-', linewidth=2, marker='o', markersize=15, label='r (power-law exponent)')
     ax1_twin.set_xlabel('r (power-law exponent)', fontsize=font_medium, color='blue')
     ax1_twin.tick_params(axis='x', labelcolor='blue', labelsize=font_small)
 
-    # x軸範囲設定（r値）: 0.3〜1.5に固定
-    ax1_twin.set_xlim(0.3, 1.5)
+    # x軸範囲設定（r値）: 0.3〜1.6に拡張（1.6はNaN用）
+    ax1_twin.set_xlim(0.3, 1.6)
+    # カスタム目盛り設定（1.6を「nan」と表示）
+    r_ticks = [0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6]
+    r_tick_labels = ['0.4', '0.6', '0.8', '1.0', '1.2', '1.4', 'nan']
+    ax1_twin.set_xticks(r_ticks)
+    ax1_twin.set_xticklabels(r_tick_labels)
 
     ax1.set_xlabel('Moving distance [m]', fontsize=font_medium)
     ax1.set_ylabel('Time [ns]', fontsize=font_medium)
@@ -681,15 +707,21 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
                       time_array[-1], time_array[0]],
                vmin=vmin, vmax=vmax, alpha=0.5)
 
-    # kの値を第2横軸にプロット（リニアスケール、縦方向に沿って）
+    # kの値を第2横軸にプロット（リニアスケール、縦方向に沿って、NaN値は22e-3としてプロット）
     ax2_twin = ax2.twiny()
-    valid_mask_k = ~np.isnan(k_values)
-    ax2_twin.plot(k_values[valid_mask_k], window_centers[valid_mask_k],
-                  'r-', linewidth=2, marker='s', markersize=4, label='k (scaling factor)')
-    ax2_twin.set_xlabel('k [/m²]', fontsize=font_medium, color='red')
+    k_nan_value = 22e-3  # NaN値の代替値
+    k_values_plot = np.where(np.isnan(k_values), k_nan_value, k_values)
+    ax2_twin.plot(k_values_plot, window_centers,
+                  'r-', linewidth=2, marker='s', markersize=15, label='k (scaling factor)')
     ax2_twin.tick_params(axis='x', labelcolor='red', labelsize=font_small)
-    # x軸範囲設定（k値）: 1e-3〜20e-3に固定
-    ax2_twin.set_xlim(1e-3, 20e-3)
+    # x軸範囲設定（k値）: 0〜22e-3に拡張（22e-3はNaN用）
+    ax2_twin.set_xlim(0, 22e-3)
+    # カスタム目盛り設定（22e-3を「nan」と表示）
+    k_ticks = [0, 5e-3, 10e-3, 15e-3, 20e-3, 22e-3]
+    k_tick_labels = ['0', '5', '10', '15', '20', 'nan']
+    ax2_twin.set_xticks(k_ticks)
+    ax2_twin.set_xticklabels(k_tick_labels)
+    ax2_twin.set_xlabel('k [×10⁻³ /m²]', fontsize=font_medium, color='red')
 
     ax2.set_xlabel('Moving distance [m]', fontsize=font_medium)
     ax2.set_ylabel('Time [ns]', fontsize=font_medium)
@@ -704,16 +736,23 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
                       time_array[-1], time_array[0]],
                vmin=vmin, vmax=vmax, alpha=0.5)
 
-    # p値を第2横軸にプロット（対数スケール、縦方向に沿って）
+    # p値を第2横軸にプロット（対数スケール、縦方向に沿って、NaN値は1.5としてプロット）
     ax3_twin = ax3.twiny()
-    valid_mask_p = ~np.isnan(p_values_array) & (p_values_array > 0)
-    if np.any(valid_mask_p):
-        ax3_twin.semilogx(p_values_array[valid_mask_p], window_centers[valid_mask_p],
-                          'g-', linewidth=2, marker='^', markersize=4, label='p-value')
+    p_nan_value = 1.5  # NaN値の代替値
+    p_values_plot = np.where(np.isnan(p_values_array) | (p_values_array <= 0), p_nan_value, p_values_array)
+    ax3_twin.semilogx(p_values_plot, window_centers,
+                      'g-', linewidth=2, marker='^', markersize=15, label='p-value')
     # p=0.05の縦線を追加
     ax3_twin.axvline(x=0.05, color='black', linestyle='--', linewidth=1.5, label='p = 0.05')
     ax3_twin.set_xlabel('p-value', fontsize=font_medium, color='green')
     ax3_twin.tick_params(axis='x', labelcolor='green', labelsize=font_small)
+    # x軸範囲設定（p値）: 1e-4〜1.5に拡張（1.5はNaN用）
+    ax3_twin.set_xlim(1e-4, 1.5)
+    # カスタム目盛り設定（1.5を「nan」と表示）
+    p_ticks = [1e-4, 1e-3, 1e-2, 0.05, 1e-1, 1.0, 1.5]
+    p_tick_labels = ['10⁻⁴', '10⁻³', '10⁻²', '0.05', '10⁻¹', '1', 'nan']
+    ax3_twin.set_xticks(p_ticks)
+    ax3_twin.set_xticklabels(p_tick_labels)
 
     ax3.set_xlabel('Moving distance [m]', fontsize=font_medium)
     ax3.set_ylabel('Time [ns]', fontsize=font_medium)
@@ -756,9 +795,9 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
         f.write('# P-value Statistics\n')
         f.write(f'Windows with p ≤ 0.05: {significant_count} / {valid_p_count} ({significant_ratio:.2f}%)\n')
         f.write(f'Note: NaN p-values are treated as p > 0.05\n\n')
-        f.write('Center [ns]\tk [/m²]\tr\tR2\tp-value\tNum rocks\tArea [m²]\n')
+        f.write('Window\tCenter [ns]\tk [/m²]\tr\tR2\tp-value\tNum rocks\tArea [m²]\n')
         for i, center in enumerate(window_centers):
-            f.write(f'{center:.2f}\t{k_values[i]:.4e}\t{r_values[i]:.4f}\t'
+            f.write(f'{i+1}\t{center:.2f}\t{k_values[i]:.4e}\t{r_values[i]:.4f}\t'
                    f'{R2_values[i]:.4f}\t{p_values[i]:.4e}\t{num_rocks_list[i]}\t{area_list[i]:.4f}\n')
 
     print(f'統計情報保存: {stats_path}')
