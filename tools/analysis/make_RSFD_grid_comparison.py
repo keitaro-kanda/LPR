@@ -493,7 +493,7 @@ def create_bscan_with_grid_lines(bscan_data, time_bins, dist_bins, output_path,
                                   epsilon_r=4.5, c=299792458, dpi_png=300, dpi_pdf=600):
     """
     B-scanプロット上にグリッド分割の境界線を表示する関数
-    (右側の余白削除修正版)
+    (右側の余白削除 + kをe-3オーダー固定表示版)
     """
     # Font size standards
     font_medium = 18
@@ -575,7 +575,11 @@ def create_bscan_with_grid_lines(bscan_data, time_bins, dist_bins, output_path,
                 p_str = params.get('p_str', '')
                 p_val = params.get('p_value', 1.0)
 
-                lines.append(f'r={r_val:.2f}, k={k_val:.1e}')
+                # kをe-3オーダーに変換して表示 (k * 1000)e-3
+                k_scaled = k_val * 1000
+                lines.append(f'r={r_val:.2f}, k={k_scaled:.1f}e-3')
+                
+                # p-value
                 lines.append(f'{p_str}')
                 
                 # p-value強調表示
@@ -611,27 +615,23 @@ def create_bscan_with_grid_lines(bscan_data, time_bins, dist_bins, output_path,
     ax2.set_ylabel(r'Depth [m] ($\varepsilon_r = 4.5$)', fontsize=font_medium)
     ax2.tick_params(axis='y', which='major', labelsize=font_small)
 
-    # レイアウトの自動調整（右側の強制余白制限を削除）
+    # レイアウトの自動調整
     plt.tight_layout()
 
     # カラーバーの配置（プロット領域に合わせて配置）
-    # 現在の軸の位置を取得
     pos = ax.get_position()
     
     # カラーバー用の軸を作成 [left, bottom, width, height]
-    # プロットの右下に配置（軸の外側）
     cbar_width = 0.2
     cbar_height = 0.03
-    # pos.x1はプロットの右端。そこに合わせて配置
     cbar_left = pos.x1 - cbar_width 
-    # pos.y0はプロットの下端。そこから少し下げる
     cbar_bottom = pos.y0 - 0.13 
     
     cbar_ax = fig.add_axes([cbar_left, cbar_bottom, cbar_width, cbar_height])
     cbar = plt.colorbar(im, cax=cbar_ax, orientation='horizontal')
     cbar.ax.tick_params(labelsize=font_small)
 
-    # 保存 (bbox_inches='tight'で余白を自動トリミング)
+    # 保存
     plt.savefig(f'{output_path}.png', dpi=dpi_png, bbox_inches='tight', pad_inches=0.05)
     plt.savefig(f'{output_path}.pdf', dpi=dpi_pdf, bbox_inches='tight', pad_inches=0.05)
     plt.close()
