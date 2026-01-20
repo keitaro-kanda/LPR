@@ -493,39 +493,13 @@ def create_bscan_with_grid_lines(bscan_data, time_bins, dist_bins, output_path,
                                   epsilon_r=4.5, c=299792458, dpi_png=300, dpi_pdf=600):
     """
     B-scanプロット上にグリッド分割の境界線を表示する関数
-
-    Parameters:
-    -----------
-    bscan_data : ndarray
-        B-scanデータ（2D配列、行がサンプル、列がトレース）
-    time_bins : list of tuple
-        時間方向の分割境界 [(time_min1, time_max1), (time_min2, time_max2), ...]
-    dist_bins : list of tuple
-        距離方向の分割境界 [(dist_min1, dist_max1), (dist_min2, dist_max2), ...]
-    output_path : str
-        出力パス（拡張子なし）
-    fit_params_dict : dict, optional
-        フィッティングパラメータの辞書。キーは(time_idx, dist_idx)のタプル。
-        各値は{'k': float, 'r': float, 'p_value': float}を含む辞書。
-    rock_counts_dict : dict, optional
-        岩石数の辞書。キーは(time_idx, dist_idx)のタプル。
-        各値は{'total': int, 'group1': int, 'group2': int, 'group3': int}を含む辞書。
-    sample_interval : float
-        サンプル間隔 [s]
-    trace_interval : float
-        トレース間隔 [m]
-    epsilon_r : float
-        比誘電率
-    c : float
-        光速 [m/s]
-    dpi_png, dpi_pdf : int
-        解像度
+    (右側の余白削除修正版)
     """
-    # Font size standards (plot_Bscan.pyと同じ)
+    # Font size standards
     font_medium = 18
     font_small = 16
 
-    # Time zero検出（最初のトレースで最初の非NaN値を探す）
+    # Time zero検出
     first_trace = bscan_data[:, 0]
     first_non_nan_idx = np.where(~np.isnan(first_trace))[0]
     time_zero_idx = first_non_nan_idx[0] if len(first_non_nan_idx) > 0 else 0
@@ -533,7 +507,7 @@ def create_bscan_with_grid_lines(bscan_data, time_bins, dist_bins, output_path,
     # 時間配列の計算
     time_array = (np.arange(bscan_data.shape[0]) - time_zero_idx) * sample_interval * 1e9  # [ns]
 
-    # vmin/vmaxの設定（plot_Bscan.pyと同じロジック）
+    # vmin/vmaxの設定
     vmin = -np.nanmax(np.abs(bscan_data)) / 10
     vmax = np.nanmax(np.abs(bscan_data)) / 10
 
@@ -560,61 +534,51 @@ def create_bscan_with_grid_lines(bscan_data, time_bins, dist_bins, output_path,
     ax.set_ylim(time_max_grid + time_margin, time_min_grid - time_margin)
 
     # グリッド境界線の描画（黒点線）
-    # 時間方向の境界線（水平線）
     time_boundaries = set()
     for t_min, t_max in time_bins:
         time_boundaries.add(t_min)
         time_boundaries.add(t_max)
-
     for t_boundary in sorted(time_boundaries):
         ax.axhline(y=t_boundary, color='black', linestyle='--', linewidth=1.5, alpha=0.8)
 
-    # 距離方向の境界線（垂直線）
     dist_boundaries = set()
     for d_min, d_max in dist_bins:
         dist_boundaries.add(d_min)
         dist_boundaries.add(d_max)
-
     for d_boundary in sorted(dist_boundaries):
         ax.axvline(x=d_boundary, color='black', linestyle='--', linewidth=1.5, alpha=0.8)
 
-    # グリッドラベルの表示（岩石数 + RSFD Params）
+    # グリッドラベルの表示
     for i, (t_min, t_max) in enumerate(time_bins):
         for j, (d_min, d_max) in enumerate(dist_bins):
-            # ラベル位置（グリッドの中央）
+            # ラベル位置
             label_x = (d_min + d_max) / 2
             label_y = (t_min + t_max) / 2
 
             lines = []
-            
-            # デフォルトの枠線色と太さ
             box_edge_color = 'black'
             box_linewidth = 1.0
 
-            # 1. 岩石数の取得とラベルテキスト生成
+            # 1. 岩石数
             if rock_counts_dict and (i, j) in rock_counts_dict:
                 counts = rock_counts_dict[(i, j)]
                 g1 = counts.get('group1', 0)
                 g2 = counts.get('group2', 0)
                 g3 = counts.get('group3', 0)
-
-                # スペース節約のため空白を詰める
                 lines.append(f'Gr1:{g1} Gr2:{g2} Gr3:{g3}')
 
-            # 2. RSFDパラメータの取得 (r, k, p)
+            # 2. RSFDパラメータ
             if fit_params_dict and (i, j) in fit_params_dict:
                 params = fit_params_dict[(i, j)]
                 r_val = params.get('r', 0)
                 k_val = params.get('k', 0)
                 p_str = params.get('p_str', '')
-                p_val = params.get('p_value', 1.0) # 判定用数値p値
+                p_val = params.get('p_value', 1.0)
 
-                # 2行目: rとk
                 lines.append(f'r={r_val:.2f}, k={k_val:.1e}')
-                # 3行目: p-value
                 lines.append(f'{p_str}')
                 
-                # p-valueが0.05以下なら赤枠に変更し、線を少し太くする
+                # p-value強調表示
                 if p_val <= 0.05:
                     box_edge_color = 'red'
                     box_linewidth = 2.0
@@ -626,8 +590,7 @@ def create_bscan_with_grid_lines(bscan_data, time_bins, dist_bins, output_path,
                 label_text = 'No Data'
                 text_color = 'gray'
 
-            # ラベル描画（白背景付き）
-            # 情報量が増えるのでフォントを少し小さく設定 (12 -> 10)
+            # ラベル描画
             ax.text(label_x, label_y, label_text,
                    fontsize=10, fontweight='bold', color=text_color,
                    horizontalalignment='center', verticalalignment='center',
@@ -648,17 +611,29 @@ def create_bscan_with_grid_lines(bscan_data, time_bins, dist_bins, output_path,
     ax2.set_ylabel(r'Depth [m] ($\varepsilon_r = 4.5$)', fontsize=font_medium)
     ax2.tick_params(axis='y', which='major', labelsize=font_small)
 
-    # レイアウト調整とカラーバー
-    fig.subplots_adjust(bottom=0.18, right=0.9)
-    cbar_ax = fig.add_axes([0.65, 0.05, 0.2, 0.05])
+    # レイアウトの自動調整（右側の強制余白制限を削除）
+    plt.tight_layout()
+
+    # カラーバーの配置（プロット領域に合わせて配置）
+    # 現在の軸の位置を取得
+    pos = ax.get_position()
+    
+    # カラーバー用の軸を作成 [left, bottom, width, height]
+    # プロットの右下に配置（軸の外側）
+    cbar_width = 0.2
+    cbar_height = 0.03
+    # pos.x1はプロットの右端。そこに合わせて配置
+    cbar_left = pos.x1 - cbar_width 
+    # pos.y0はプロットの下端。そこから少し下げる
+    cbar_bottom = pos.y0 - 0.13 
+    
+    cbar_ax = fig.add_axes([cbar_left, cbar_bottom, cbar_width, cbar_height])
     cbar = plt.colorbar(im, cax=cbar_ax, orientation='horizontal')
     cbar.ax.tick_params(labelsize=font_small)
 
-    plt.tight_layout(rect=[0, 0.1, 0.9, 1])
-
-    # 保存
-    plt.savefig(f'{output_path}.png', dpi=dpi_png)
-    plt.savefig(f'{output_path}.pdf', dpi=dpi_pdf)
+    # 保存 (bbox_inches='tight'で余白を自動トリミング)
+    plt.savefig(f'{output_path}.png', dpi=dpi_png, bbox_inches='tight', pad_inches=0.05)
+    plt.savefig(f'{output_path}.pdf', dpi=dpi_pdf, bbox_inches='tight', pad_inches=0.05)
     plt.close()
 
     print(f'B-scanグリッドプロット保存: {output_path}.png')
