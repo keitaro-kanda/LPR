@@ -215,11 +215,12 @@ def save_statistics_to_txt(output_path, grid_statistics):
 
     print(f'統計情報保存: {output_path}')
 
-def create_grid_subplot_comparison(grid_data_dict, fit_params_dict, num_time_bins, num_dist_bins,
-                                   xlabel, ylabel, output_path, scale_type='loglog',
-                                   dpi_png=300, dpi_pdf=600):
+def create_grid_subplot(grid_data_dict, fit_params_dict, rock_counts_dict,
+                        num_time_bins, num_dist_bins,
+                        xlabel, ylabel, output_path, scale_type='loglog',
+                        dpi_png=300, dpi_pdf=600):
     """
-    グリッド配置でsubplotを作成し、各グリッドのRSFDを表示
+    グリッド配置でsubplotを作成し、各グリッドのRSFD・フィッティング結果・岩石数を表示
 
     Parameters:
     -----------
@@ -227,140 +228,6 @@ def create_grid_subplot_comparison(grid_data_dict, fit_params_dict, num_time_bin
         キーが(time_idx, dist_idx)のタプル、値がグリッドデータの辞書
     fit_params_dict : dict
         キーが(time_idx, dist_idx)のタプル、値がフィッティングパラメータの辞書
-    num_time_bins : int
-        時間方向の分割数（行数）
-    num_dist_bins : int
-        距離方向の分割数（列数）
-    xlabel, ylabel : str
-        軸ラベル
-    output_path : str
-        出力パス（拡張子なし）
-    scale_type : str
-        'linear' or 'loglog'
-    dpi_png, dpi_pdf : int
-        解像度
-    """
-    # 全データから軸範囲を計算
-    all_x_data = []
-    all_y_data = []
-    all_fit_y = []
-
-    for grid_data in grid_data_dict.values():
-        all_x_data.extend(grid_data['x_data'])
-        all_y_data.extend(grid_data['y_data'])
-        all_fit_y.extend(grid_data['fit_y'])
-
-    if len(all_x_data) > 0:
-        if scale_type == 'loglog':
-            # logスケールの場合は正の値のみ考慮
-            x_positive = [x for x in all_x_data if x > 0]
-            y_positive = [y for y in all_y_data + all_fit_y if y > 0]
-
-            if len(x_positive) > 0 and len(y_positive) > 0:
-                x_min, x_max = min(x_positive) * 0.8, max(x_positive) * 1.2
-                y_min, y_max = min(y_positive) * 0.5, max(y_positive) * 2.0
-            else:
-                x_min, x_max, y_min, y_max = None, None, None, None
-        else:
-            # linearスケールの場合
-            x_min, x_max = min(all_x_data) * 0.95, max(all_x_data) * 1.05
-            y_min, y_max = min(all_y_data + all_fit_y) * 0.95, max(all_y_data + all_fit_y) * 1.05
-    else:
-        x_min, x_max, y_min, y_max = None, None, None, None
-
-    # Figure作成
-    fig, axes = plt.subplots(num_time_bins, num_dist_bins,
-                             figsize=(4 * num_dist_bins, 3.5 * num_time_bins),
-                             squeeze=False)
-
-    # 各subplotにデータをプロット
-    for i in range(num_time_bins):
-        for j in range(num_dist_bins):
-            ax = axes[i, j]
-
-            # グリッドデータの取得
-            if (i, j) in grid_data_dict:
-                grid_data = grid_data_dict[(i, j)]
-                fit_params = fit_params_dict.get((i, j), {})
-
-                # データプロット
-                ax.plot(grid_data['x_data'], grid_data['y_data'],
-                       marker='o', linestyle='-', linewidth=1.5, color='blue', markersize=4)
-
-                # フィット曲線プロット
-                ax.plot(grid_data['fit_x'], grid_data['fit_y'],
-                       linestyle='--', linewidth=1.5, color='red')
-
-                # 軸スケール設定
-                if scale_type == 'loglog':
-                    ax.set_xscale('log')
-                    ax.set_yscale('log')
-
-                # 軸範囲を統一
-                if x_min is not None and x_max is not None:
-                    ax.set_xlim(x_min, x_max)
-                if y_min is not None and y_max is not None:
-                    ax.set_ylim(y_min, y_max)
-
-                # グリッドラベルを表示（右上）
-                ax.text(0.95, 0.95, f'T{i+1}D{j+1}',
-                       transform=ax.transAxes, fontsize=16, fontweight='bold',
-                       verticalalignment='top', horizontalalignment='right',
-                       bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
-
-                # フィッティング式を表示（左下）
-                if fit_params:
-                    k = fit_params.get('k', 0)
-                    r = fit_params.get('r', 0)
-                    R2 = fit_params.get('R2', 0)
-                    p_str = fit_params.get('p_str', '')
-
-                    # N = k D^(-r) 形式で表示
-                    fit_eq = f'$N = {k:.2e} \\cdot D^{{-{r:.2f}}}$'
-                    stats_text = f'$R^2 = {R2:.3f}$, {p_str}'
-                    param_text = f'{fit_eq}\n{stats_text}'
-                    ax.text(0.05, 0.05, param_text,
-                            transform=ax.transAxes, fontsize=14, color='red')
-
-            else:
-                # データがない場合は空のプロット
-                ax.text(0.5, 0.5, 'No Data',
-                       transform=ax.transAxes, fontsize=16,
-                       horizontalalignment='center', verticalalignment='center',
-                       color='gray')
-                ax.set_xticks([])
-                ax.set_yticks([])
-                ax.tick_params(labelsize=14)
-
-            # グリッド表示
-            ax.grid(True, linestyle='--', alpha=0.3)
-
-            # Tick labelサイズ
-            ax.tick_params(labelsize=10)
-
-    # 全体で1つのxlabel/ylabelを配置
-    fig.text(0.5, 0.02, xlabel, ha='center', fontsize=18, fontweight='bold')
-    fig.text(0.02, 0.5, ylabel, va='center', rotation='vertical', fontsize=18, fontweight='bold')
-
-    plt.tight_layout(rect=[0.03, 0.03, 1, 1])
-
-    # 保存
-    plt.savefig(f'{output_path}.png', dpi=dpi_png)
-    plt.savefig(f'{output_path}.pdf', dpi=dpi_pdf)
-    plt.close()
-
-    print(f'グリッドsubplotプロット保存: {output_path}.png')
-
-def create_grid_subplot_rock_counts(grid_data_dict, rock_counts_dict, num_time_bins, num_dist_bins,
-                                     xlabel, ylabel, output_path, scale_type='loglog',
-                                     dpi_png=300, dpi_pdf=600):
-    """
-    グリッド配置でsubplotを作成し、各グリッドのRSFDと岩石数を表示
-
-    Parameters:
-    -----------
-    grid_data_dict : dict
-        キーが(time_idx, dist_idx)のタプル、値がグリッドデータの辞書
     rock_counts_dict : dict
         キーが(time_idx, dist_idx)のタプル、値が岩石数の辞書
         {'total': int, 'group1': int, 'group2': int, 'group3': int}
@@ -394,8 +261,8 @@ def create_grid_subplot_rock_counts(grid_data_dict, rock_counts_dict, num_time_b
             y_positive = [y for y in all_y_data + all_fit_y if y > 0]
 
             if len(x_positive) > 0 and len(y_positive) > 0:
-                x_min, x_max = min(x_positive) * 0.8, max(x_positive) * 1.2
-                y_min, y_max = min(y_positive) * 0.5, max(y_positive) * 2.0
+                x_min, x_max = min(x_positive) * 0.7, max(x_positive) * 1.4
+                y_min, y_max = min(y_positive) * 0.5, max(y_positive) * 3.0
             else:
                 x_min, x_max, y_min, y_max = None, None, None, None
         else:
@@ -418,6 +285,7 @@ def create_grid_subplot_rock_counts(grid_data_dict, rock_counts_dict, num_time_b
             # グリッドデータの取得
             if (i, j) in grid_data_dict:
                 grid_data = grid_data_dict[(i, j)]
+                fit_params = fit_params_dict.get((i, j), {})
                 rock_counts = rock_counts_dict.get((i, j), {})
 
                 # データプロット
@@ -439,24 +307,32 @@ def create_grid_subplot_rock_counts(grid_data_dict, rock_counts_dict, num_time_b
                 if y_min is not None and y_max is not None:
                     ax.set_ylim(y_min, y_max)
 
-                # グリッドラベルを表示（右上）
-                ax.text(0.95, 0.95, f'T{i+1}D{j+1}',
-                       transform=ax.transAxes, fontsize=16, fontweight='bold',
-                       verticalalignment='top', horizontalalignment='right',
-                       bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
-
-                # 岩石数を表示（左下）
+                # グリッドラベルと岩石数を表示（右上、同じボックス内）
+                label_lines = [f'T{i+1}D{j+1}']
                 if rock_counts:
                     total = rock_counts.get('total', 0)
                     g1 = rock_counts.get('group1', 0)
                     g2 = rock_counts.get('group2', 0)
                     g3 = rock_counts.get('group3', 0)
+                    label_lines.append(f'Num={total} (G1:{g1}, G2:{g2}, G3:{g3})')
+                label_text = '\n'.join(label_lines)
+                ax.text(0.5, 0.95, label_text,
+                       transform=ax.transAxes, fontsize=12, fontweight='bold',
+                       verticalalignment='top', horizontalalignment='center',
+                       bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
 
-                    count_text = f'Total: {total}\nG1: {g1}, G2: {g2}, G3: {g3}'
-                    ax.text(0.05, 0.05, count_text,
-                           transform=ax.transAxes, fontsize=14,
-                           verticalalignment='bottom', horizontalalignment='left',
-                            bbox=dict(boxstyle='round', facecolor='white', alpha=0.7))
+                # フィッティング結果を表示（左下、ボックスなし、赤字）
+                if fit_params:
+                    k = fit_params.get('k', 0)
+                    r = fit_params.get('r', 0)
+                    R2 = fit_params.get('R2', 0)
+                    p_str = fit_params.get('p_str', '')
+                    # kを10^-3オーダーに統一して表示
+                    k_scaled = k * 1000  # 10^-3オーダーに変換
+                    fit_text = f'$N={k_scaled:.2f} \\times 10^{{-3}} \\cdot D^{{-{r:.2f}}}$\n$R^2$={R2:.3f}, {p_str}'
+                    ax.text(0.05, 0.05, fit_text,
+                           transform=ax.transAxes, fontsize=12, color='red',
+                           verticalalignment='bottom', horizontalalignment='left')
 
             else:
                 # データがない場合は空のプロット
@@ -472,7 +348,7 @@ def create_grid_subplot_rock_counts(grid_data_dict, rock_counts_dict, num_time_b
             ax.grid(True, linestyle='--', alpha=0.3)
 
             # Tick labelサイズ
-            ax.tick_params(labelsize=10)
+            ax.tick_params(labelsize=12)
 
     # 全体で1つのxlabel/ylabelを配置
     fig.text(0.5, 0.02, xlabel, ha='center', fontsize=18, fontweight='bold')
@@ -485,7 +361,7 @@ def create_grid_subplot_rock_counts(grid_data_dict, rock_counts_dict, num_time_b
     plt.savefig(f'{output_path}.pdf', dpi=dpi_pdf)
     plt.close()
 
-    print(f'グリッドsubplotプロット（岩石数表示版）保存: {output_path}.png')
+    print(f'グリッドsubplotプロット保存: {output_path}.png')
 
 def create_bscan_with_grid_lines(bscan_data, time_bins, dist_bins, output_path,
                                   fit_params_dict=None, rock_counts_dict=None,
@@ -994,10 +870,10 @@ if __name__ == '__main__':
                 'p_value_pow_norm': format_p_value(p_pow_norm)
             })
 
-            # 個別プロットの作成（面積規格化のみ）
-            # 面積規格化 linear-linear
+            # 個別プロットの作成
+            # linear-linear
             output_path_individual = os.path.join(individual_dir,
-                f'grid_{i+1:02d}_{j+1:02d}_linear_area_normalized')
+                f'grid_{i+1:02d}_{j+1:02d}_linear')
             create_individual_rsfd_plot(
                 unique_sizes, cum_counts_normalized,
                 'Rock Size D [cm]', 'Cumulative number of rocks /m²',
@@ -1009,9 +885,9 @@ if __name__ == '__main__':
                 }
             )
 
-            # 面積規格化 log-log
+            # log-log
             output_path_individual = os.path.join(individual_dir,
-                f'grid_{i+1:02d}_{j+1:02d}_loglog_area_normalized')
+                f'grid_{i+1:02d}_{j+1:02d}_loglog')
             create_individual_rsfd_plot(
                 unique_sizes, cum_counts_normalized,
                 'Rock Size D [cm]', 'Cumulative number of rocks /m²',
@@ -1029,23 +905,13 @@ if __name__ == '__main__':
     if len(grid_data_dict_area_normalized) > 0:
         print('\n=== グリッドsubplot比較プロット作成 ===')
 
-        # 面積規格化 log-log（フィッティング式表示版）
-        output_path_subplot = os.path.join(base_dir, 'grid_subplot_loglog_area_normalized')
-        create_grid_subplot_comparison(
-            grid_data_dict_area_normalized, fit_params_dict_area_normalized,
+        # log-log（岩石数・フィッティング結果統合版）
+        output_path_subplot = os.path.join(base_dir, 'grid_subplot_loglog')
+        create_grid_subplot(
+            grid_data_dict_area_normalized, fit_params_dict_area_normalized, rock_counts_dict,
             num_time_bins, num_dist_bins,
             'Rock Size D [cm]', 'Cumulative Number Density N [/m²]',
             output_path_subplot,
-            scale_type='loglog'
-        )
-
-        # 面積規格化 log-log（岩石数表示版）
-        output_path_subplot_rocks = os.path.join(base_dir, 'grid_subplot_loglog_area_normalized_rock_counts')
-        create_grid_subplot_rock_counts(
-            grid_data_dict_area_normalized, rock_counts_dict,
-            num_time_bins, num_dist_bins,
-            'Rock Size D [cm]', 'Cumulative Number Density N [/m²]',
-            output_path_subplot_rocks,
             scale_type='loglog'
         )
 
