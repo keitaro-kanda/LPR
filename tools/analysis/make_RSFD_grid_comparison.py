@@ -13,6 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
 from matplotlib.ticker import MultipleLocator
+from adjustText import adjust_text
 
 # ------------------------------------------------------------------
 # 補助関数定義
@@ -261,7 +262,7 @@ def create_grid_subplot(grid_data_dict, fit_params_dict, rock_counts_dict,
             y_positive = [y for y in all_y_data + all_fit_y if y > 0]
 
             if len(x_positive) > 0 and len(y_positive) > 0:
-                x_min, x_max = min(x_positive) * 0.7, max(x_positive) * 1.4
+                x_min, x_max = min(x_positive) * 0.5, max(x_positive) * 2.0
                 y_min, y_max = min(y_positive) * 0.5, max(y_positive) * 3.0
             else:
                 x_min, x_max, y_min, y_max = None, None, None, None
@@ -307,21 +308,21 @@ def create_grid_subplot(grid_data_dict, fit_params_dict, rock_counts_dict,
                 if y_min is not None and y_max is not None:
                     ax.set_ylim(y_min, y_max)
 
-                # グリッドラベルと岩石数を表示（右上、同じボックス内）
+                # グリッドラベルと岩石数を表示（上部中央、固定位置）
                 label_lines = [f'T{i+1}D{j+1}']
                 if rock_counts:
                     total = rock_counts.get('total', 0)
                     g1 = rock_counts.get('group1', 0)
                     g2 = rock_counts.get('group2', 0)
                     g3 = rock_counts.get('group3', 0)
-                    label_lines.append(f'Num={total} (G1:{g1}, G2:{g2}, G3:{g3})')
+                    label_lines.append(f'Num:{total} (G1:{g1}, G2:{g2}, G3:{g3})')
                 label_text = '\n'.join(label_lines)
-                ax.text(0.5, 0.95, label_text,
+                label_obj = ax.text(0.5, 0.95, label_text,
                        transform=ax.transAxes, fontsize=12, fontweight='bold',
                        verticalalignment='top', horizontalalignment='center',
                        bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
 
-                # フィッティング結果を表示（左下、ボックスなし、赤字）
+                # フィッティング結果を表示（adjustTextで自動配置）
                 if fit_params:
                     k = fit_params.get('k', 0)
                     r = fit_params.get('r', 0)
@@ -330,9 +331,23 @@ def create_grid_subplot(grid_data_dict, fit_params_dict, rock_counts_dict,
                     # kを10^-3オーダーに統一して表示
                     k_scaled = k * 1000  # 10^-3オーダーに変換
                     fit_text = f'$N={k_scaled:.2f} \\times 10^{{-3}} \\cdot D^{{-{r:.2f}}}$\n$R^2$={R2:.3f}, {p_str}'
-                    ax.text(0.05, 0.05, fit_text,
-                           transform=ax.transAxes, fontsize=12, color='red',
-                           verticalalignment='bottom', horizontalalignment='left')
+
+                    # データ座標系でテキストを配置（初期位置はフィット曲線の中央付近）
+                    fit_x_mid = grid_data['fit_x'][len(grid_data['fit_x']) // 2]
+                    fit_y_mid = grid_data['fit_y'][len(grid_data['fit_y']) // 2]
+
+                    text_obj = ax.text(fit_x_mid, fit_y_mid, fit_text,
+                                      fontsize=12, color='red',
+                                      verticalalignment='center', horizontalalignment='left')
+
+                    # adjustTextで自動配置（データ点・フィット曲線・ラベルテキストとの重なりを回避）
+                    adjust_text([text_obj],
+                               x=list(grid_data['x_data']) + list(grid_data['fit_x']),
+                               y=list(grid_data['y_data']) + list(grid_data['fit_y']),
+                               add_objects=[label_obj],
+                               ax=ax,
+                               force_points=(0.5, 0.5),
+                               expand_points=(1.5, 1.5))
 
             else:
                 # データがない場合は空のプロット
