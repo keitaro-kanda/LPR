@@ -346,8 +346,8 @@ def create_grid_subplot(grid_data_dict, fit_params_dict, rock_counts_dict,
                                y=list(grid_data['y_data']) + list(grid_data['fit_y']),
                                add_objects=[label_obj],
                                ax=ax,
-                               force_points=(0.5, 0.5),
-                               expand_points=(1.5, 1.5))
+                               force_points=(0.2, 0.2),
+                               expand_points=(1.0, 1.0))
 
             else:
                 # データがない場合は空のプロット
