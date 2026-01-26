@@ -6,26 +6,22 @@ from tqdm import tqdm
 from natsort import natsorted
 import matplotlib.pyplot as plt
 
-#* Input data folder path
-data_folder_path = input('Binary data folder path: ').strip()
+# ==========================================
+# 設定: データフォルダのパス
+# ==========================================
+#data_folder_path = '/Volumes/SSD_Kanda_SAMSUNG/CE3_LPR/LPR_2B_0005-0009/original_binary'  # ←ここに実際のパスを記入してください
+data_folder_path = '/Volumes/SSD_Kanda_SAMSUNG/CE3_LPR/LPR_2B_all/original_binary'
 
-#* Check the data folder path
-if not os.path.exists(data_folder_path):
-    print('Error: The specified folder does not exist.')
-    exit(1)
-if not os.path.isdir(data_folder_path):
-    print('Error: The specified path is not a folder.')
-    exit(1)
+# ==========================================
+# 関数定義
+# ==========================================
 
-print('Data folder is successfully loaded')
-print('Channel: LPR_2B (Fixed format)')
-
-#* Define a function to read the binary data
 def read_binary_data(file_path, start_byte, record_format):
+    """バイナリデータを指定フォーマットで読み込む関数"""
     results = {}
     with open(file_path, 'rb') as file:
         for field_name, field_loc, field_len, fmt in record_format:
-            file.seek(start_byte + field_loc - 1)  # Adjust for 1-based index
+            file.seek(start_byte + field_loc - 1)
             data = file.read(field_len)
             if len(data) != field_len:
                 continue
@@ -37,158 +33,77 @@ def read_binary_data(file_path, start_byte, record_format):
                 else:
                     val = struct.unpack(fmt, data)
                     results[field_name] = val[0] if len(val) == 1 else val
-            except struct.error as e:
-                # print(f"Error unpacking field {field_name}: {e}")
+            except struct.error:
                 continue
     return results
 
-#* Interpretation functions
 def read_frame_identification(mode_value):
-    # LSB_BIT_STRING -> Little Endian Integer interpretation
     if isinstance(mode_value, tuple):
         mode_int = int.from_bytes(bytes(mode_value), byteorder='little')
     else:
         mode_int = mode_value
-    
-    # Header says 0x146F2222.
-    # If read as Little Endian, bytes 22 22 6F 14 become 0x146F2222
     frame_identification = {0x146F2222: 'Channel 2 data'}
     return frame_identification.get(mode_int, f"Unknown ID: {hex(mode_int) if isinstance(mode_int, int) else mode_value}")
 
-def read_radar_mode(mode_value):
-    descriptions = {0x00: "standby", 0x0f: "only Channel 1 works", 0xf0: "only Channel 2 works", 0xff: "Channel 1 and Channel 2 work"}
-    return descriptions.get(mode_value, f"Unknown: {hex(mode_value)}")
-
-def read_gain_mode(mode_value):
-    descriptions = {0x00: "variational gain", 0xff: "fixed gain", 0x01: "fixed gain"}
-    return descriptions.get(mode_value, f"Unknown: {hex(mode_value)}")
-
-def read_ch2_gain_mode(mode_value):
-    descriptions = {0x00: "Ant A: var, Ant B: var", 0x0f: "Ant A: var, Ant B: fixed", 0xf0: "Ant A: fixed, Ant B: var", 0xff: "Ant A: fixed, Ant B: fixed"}
-    return descriptions.get(mode_value, f"Unknown: {hex(mode_value)}")
-
-def read_time_window(mode_value):
-    descriptions = {0x00: "1K echoes", 0x11: "2K echoes", 0xff: "16K echoes", 0x77: "8K echoes"}
-    return descriptions.get(mode_value, f"Unknown: {hex(mode_value)}")
-
-def read_pulse_repetition(mode_value):
-    descriptions = {0xc8: "0.5kHz", 0x64: "1kHz", 0x32: "2kHz", 0x28: "5kHz", 0x14: "10kHz", 0x0A: "20kHz"}
-    return descriptions.get(mode_value, f"Unknown: {hex(mode_value)}")
-
-def channel_and_antenna_mark(mode_value):
-    descriptions = {0x11: "Channel 1", 0x2A: "Channel 2, Antenna A", 0x2B: "Channel 2, Antenna B"}
-    return descriptions.get(mode_value, f"Unknown: {hex(mode_value)}")
-
-
-#* Define Full Record Format (ALL LITTLE ENDIAN based on Header PC_REAL & LSB_UNSIGNED)
+# ==========================================
+# レコードフォーマット定義 (Little Endian <)
+# ==========================================
 record_format_2B_corrected = [
-    # --- Basic Info ---
     ("FRAME_IDENTIFICATION", 1, 4, '4B'),
-    ("TIME", 5, 6, '6B'), # LSB_UNSIGNED
-    
-    # --- Rover Attitude & Position (PC_REAL -> Little Endian <f) ---
+    ("TIME", 5, 6, '6B'), 
     ("VELOCITY", 11, 4, '<f'),
-    ("XPOSITION", 15, 4, '<f'),
-    ("YPOSITION", 19, 4, '<f'),
+    ("XPOSITION", 15, 4, '<f'), # Rover X = NORTH
+    ("YPOSITION", 19, 4, '<f'), # Rover Y = EAST
     ("ZPOSITION", 23, 4, '<f'),
     ("ATT_PITCHING", 27, 4, '<f'),
     ("ATT_ROLLING", 31, 4, '<f'),
     ("ATT_YAWING", 35, 4, '<f'),
-    
-    # --- Reference Point Info (PC_REAL -> Little Endian <f) ---
-    ("REFERENCE_POINT_XPOSITION", 39, 4, '<f'),
-    ("REFERENCE_POINT_YPOSITION", 43, 4, '<f'),
+    ("REFERENCE_POINT_XPOSITION", 39, 4, '<f'), # Ref X = EAST
+    ("REFERENCE_POINT_YPOSITION", 43, 4, '<f'), # Ref Y = NORTH
     ("REFERENCE_POINT_ZPOSITION", 47, 4, '<f'),
     ("REFERENCE_POINT_ATT_PITCHING", 51, 4, '<f'),
     ("REFERENCE_POINT_ATT_ROLLING", 55, 4, '<f'),
     ("REFERENCE_POINT_ATT_YAWING", 59, 4, '<f'),
-    
-    # --- Data Parameter (LSB -> Little Endian <H) ---
     ("DATA_BLOCK_COUNT", 63, 2, '<H'), 
-    ("ELECTRIC_CABINET_PLUS_5_VOLTAGE", 65, 1, 'B'),
-    ("ELECTRIC_CABINET_PLUS_3.3_VOLTAGE", 66, 1, 'B'),
-    ("ELECTRIC_CABINET_MINUS_12_VOLTAGE", 67, 1, 'B'),
-    ("ELECTRIC_CABINET_TOTAL_CURRENT", 68, 1, 'B'),
-    ("MULTIPLEXING_MARK", 69, 1, 'B'),
-    ("RADAR_HIGH_VOLTAGE_1", 70, 1, 'B'),
-    ("RADAR_HIGH_VOLTAGE_2", 71, 1, 'B'),
-    ("RADAR_PRF_1", 72, 1, 'B'),
-    ("RADAR_PRF_2", 73, 1, 'B'),
-    ("RADAR_WORKING_MODE", 74, 1, 'B'),
-    ("RADAR_CHANNEL_1_GAIN_MODE", 75, 1, 'B'),
-    ("RADAR_CHANNEL_1_GAIN_VALUE", 76, 1, 'B'),
-    ("RADAR_CHANNEL_2_GAIN_MODE", 77, 1, 'B'),
-    ("RADAR_CHANNEL_2_GAIN_VALUE_1", 78, 1, 'B'),
-    ("RADAR_CHANNEL_2_GAIN_VALUE_2", 79, 1, 'B'),
-    ("RADAR_CHANNEL_1_TIME_WINDOW", 80, 1, 'B'),
-    ("RADAR_CHANNEL_1_DELAY", 81, 1, 'B'),
-    ("RADAR_CHANNEL_2_TIME_WINDOW", 82, 1, 'B'),
-    ("RADAR_CHANNEL_2_DELAY", 83, 1, 'B'),
-    ("CHANNEL_1_PULSE_REPETITION_RATE", 84, 1, 'B'),
-    ("CHANNEL_1_ACCUMULATING_TIMES", 85, 1, 'B'),
-    ("CHANNEL_2_PULSE_REPETITION_RATE", 86, 1, 'B'),
-    ("CHANNEL_2_ACCUMULATING_TIMES", 87, 1, 'B'),
-    
-    # --- Counts (LSB -> Little Endian <H) ---
-    ("DATA_RECORD_1_COUNT", 88, 2, '<H'),
-    ("DATA_RECORD_2_COUNT", 90, 2, '<H'),
-    
-    # ... (1byte fields) ...
-    ("RADAR_PRF_SELECTING_STATE", 92, 1, 'B'),
-    ("RADAR_RECEIVER_POWER_SUPPLY", 93, 1, 'B'),
-    ("RADAR_FPGA_STATE", 94, 1, 'B'),
-    ("RESERVED_BYTES_1", 95, 1, 'B'),
-    ("RESERVED_BYTES_2", 96, 1, 'B'),
-    ("RESERVED_BYTES_3", 97, 1, 'B'),
-    ("RESERVED_BYTES_4", 98, 1, 'B'),
-    ("RADAR_RECEIVER_VOLTAGE", 99, 1, 'B'),
-    ("RADAR_CONTROLLER_VOLTAGE", 100, 1, 'B'),
-    ("RADAR_TRANSMITTER_CURRENT", 101, 1, 'B'),
-    ("ELECTRIC_CABINET_POWER_SUBSYSTEM_TEMP", 102, 1, 'B'),
-    ("ELECTRIC_CABINET_PLUS_5V_REF_VOLTAGE", 103, 1, 'B'),
-    ("RADAR_TRANSMITTER_1_TEMPERATURE", 104, 1, 'B'),
-    ("RADAR_TRANSMITTER_2_TEMPERATURE", 105, 1, 'B'),
-    ("RADAR_RECEIVER_1_TEMPERATURE", 106, 1, 'B'),
-    ("RADAR_RECEIVER_2_TEMPERATURE", 107, 1, 'B'),
-    
-    # --- Data Structure (LSB -> Little Endian <H) ---
     ("VALID_DATA_LENGTH", 108, 2, '<H'),
     ("CHANNEL_1_RECORD_COUNT", 110, 2, '<H'),
     ("CHANNEL_2_RECORD_COUNT", 112, 2, '<H'),
     ("CHANNEL_AND_ANTENNA_MARK", 114, 1, 'B'),
-    
-    # --- Echo Data (PC_REAL -> Little Endian <f) ---
     ("ECHO_DATA", 115, 8192, '<2048f'),
-    
     ("QUALITY_STATE", 8307, 1, 'B')
 ]
 
-#* Make directories
+# ==========================================
+# メイン処理
+# ==========================================
+
+if not os.path.exists(data_folder_path):
+    print(f'Error: Folder not found: {data_folder_path}')
+    exit(1)
+
+print('Data folder is successfully loaded')
+print('Channel: LPR_2B (Fixed format)')
+
 loaded_data_dir = os.path.join(os.path.dirname(data_folder_path), 'loaded_data')
 os.makedirs(loaded_data_dir, exist_ok=True)
 ECHO_dir = os.path.join(os.path.dirname(data_folder_path), 'loaded_data_echo_position')
 os.makedirs(ECHO_dir, exist_ok=True)
 
-#* Check all file names
-file_list = natsorted(os.listdir(data_folder_path))
-print(f'Total {len(file_list)} files found in the data folder.')
+# 経路データ蓄積用リスト
+all_segments = []
 
-#* Process files
-for filename in tqdm(natsorted(os.listdir(data_folder_path)), desc='Total Progress'):
+file_list = natsorted([f for f in os.listdir(data_folder_path) if f.endswith('.2B') and not f.startswith('._')])
+print(f'Total {len(file_list)} files found to process.')
+
+for filename in tqdm(file_list, desc='Processing Files'):
     full_path = os.path.join(data_folder_path, filename)
     
-    if not full_path.endswith('.2B') or filename.startswith('._'):
-        continue
-
     file_size = os.path.getsize(full_path)
     RECORD_BYTES = 8307
-    
-    # --- Header Skip Logic ---
     LABEL_RECORDS = 5
     HEADER_OFFSET = LABEL_RECORDS * RECORD_BYTES
     
     if file_size < HEADER_OFFSET:
-        print(f"Skipping {filename}: File too small")
         continue
         
     records = int((file_size - HEADER_OFFSET) / RECORD_BYTES)
@@ -196,34 +111,11 @@ for filename in tqdm(natsorted(os.listdir(data_folder_path)), desc='Total Progre
     parts = filename.split('_')
     sequence_id = parts[-2] if len(parts) >= 2 else "unknown"
 
-    loaded_data_output_dir = os.path.join(loaded_data_dir, sequence_id) 
-    os.makedirs(loaded_data_output_dir, exist_ok=True)
-
     save_data = np.zeros((2055, records))
 
-    #* Load each record
     for record_index in range(records):
         current_offset = HEADER_OFFSET + (record_index * RECORD_BYTES)
-        
-        # Use Corrected Little Endian Format
         loaded_data = read_binary_data(full_path, current_offset, record_format_2B_corrected)
-
-        with open(f"{loaded_data_output_dir}/{filename}_{record_index}.txt", 'w') as file:
-            for key, value in loaded_data.items():
-                if key == 'FRAME_IDENTIFICATION':
-                    file.write(f'{key}: {value} ({read_frame_identification(value)})\n')
-                elif key == 'TIME':
-                    # HEADER: "first four bytes mean seconds, the last two bytes mean milliseconds"
-                    # LSB_UNSIGNED_INTEGER -> Little Endian
-                    bytes_val = bytes(value)
-                    seconds = int.from_bytes(bytes_val[:4], 'little')
-                    milliseconds = int.from_bytes(bytes_val[4:], 'little')
-                    ref_t = datetime(2009, 12, 31, 16, 0, 0)
-                    file.write(f'{key}: {ref_t + timedelta(seconds=seconds, milliseconds=milliseconds)}\n')
-                elif key == 'ECHO_DATA':
-                    file.write(f'{key}: [Array of {len(value)} floats omitted]\n')
-                else:
-                    file.write(f'{key}: {value}\n')
 
         if 'ECHO_DATA' in loaded_data:
             save_data[0, record_index] = loaded_data.get('VELOCITY', 0)
@@ -235,54 +127,127 @@ for filename in tqdm(natsorted(os.listdir(data_folder_path)), desc='Total Progre
             save_data[6, record_index] = loaded_data.get('REFERENCE_POINT_ZPOSITION', 0)
             save_data[7:, record_index] = loaded_data['ECHO_DATA']
 
-    header_txt = ['VELOCITY', 'XPOSITION', 'YPOSITION', 'ZPOSITION',
-                  'REFERENCE_POINT_XPOSITION', 'REFERENCE_POINT_YPOSITION', 'REFERENCE_POINT_ZPOSITION',
+    # 数値データ保存
+    header_txt = ['VELOCITY', 'XPOSITION(North)', 'YPOSITION(East)', 'ZPOSITION',
+                  'REFERENCE_POINT_XPOSITION(East)', 'REFERENCE_POINT_YPOSITION(North)', 'REFERENCE_POINT_ZPOSITION',
                   'Observed amplitude (7:)']
     base_name = os.path.splitext(filename)[0]
     np.savetxt(f"{ECHO_dir}/data_{base_name}.txt", save_data, header=' '.join(header_txt), comments='# ')
-    
-    #* ---------------------------------------------------------
-    #* Generate 4-Panel Plot
-    #* ---------------------------------------------------------
+
+    # ---------------------------------------------------------
+    # 1. 個別ファイルの4パネルプロット作成
+    # ---------------------------------------------------------
     fig, axes = plt.subplots(4, 1, figsize=(12, 12), sharex=True)
     
-    # 1. B-scan
+    # B-scan
     max_val = np.percentile(np.abs(save_data[7:, :]), 98) if records > 0 else 1
     axes[0].imshow(save_data[7:, :], aspect='auto', cmap='seismic', 
                         interpolation='nearest', vmin=-max_val/10, vmax=max_val/10)
     axes[0].set_title(f'B-scan: {filename}')
     axes[0].set_ylabel('Time Sample')
-    axes[0].grid(True, linestyle=':', alpha=0.6)
 
-    # 2. Velocity
+    # Velocity
     axes[1].plot(save_data[0, :], label='Velocity', color='black', linewidth=1)
-    axes[1].set_title('Velocity ') # Unit is likely m/s in PDS float
-    axes[1].set_ylabel('Velocity (cm/s)')
+    axes[1].set_title('Velocity [m/s]') 
+    axes[1].set_ylabel('Value')
     axes[1].grid(True, linestyle=':', alpha=0.6)
 
-    # 3. Rover Position (XYZ)
-    axes[2].plot(save_data[1, :], label='X (N-S)', color='red', linewidth=1)
-    axes[2].plot(save_data[2, :], label='Y (E-W)', color='green', linewidth=1)
+    # Rover Position (X=North, Y=East based on Header)
+    axes[2].plot(save_data[1, :], label='X (North)', color='red', linewidth=1)
+    axes[2].plot(save_data[2, :], label='Y (East)', color='green', linewidth=1)
     axes[2].plot(save_data[3, :], label='Z', color='blue', linewidth=1)
-    axes[2].set_title('Rover Position')
+    axes[2].set_title('Rover Position (Relative)')
     axes[2].set_ylabel('Position (m)')
-    axes[2].legend(fontsize='small')
+    axes[2].legend(loc='upper right', fontsize='small')
     axes[2].grid(True, linestyle=':', alpha=0.6)
 
-    # 4. Reference Point Position (XYZ)
-    axes[3].plot(save_data[4, :], label='Ref X (N-S)', color='red', linestyle='--', linewidth=1)
-    axes[3].plot(save_data[5, :], label='Ref Y (E-W)', color='green', linestyle='--', linewidth=1)
+    # Reference Point Position (X=East, Y=North based on Header)
+    axes[3].plot(save_data[4, :], label='Ref X (East)', color='red', linestyle='--', linewidth=1)
+    axes[3].plot(save_data[5, :], label='Ref Y (North)', color='green', linestyle='--', linewidth=1)
     axes[3].plot(save_data[6, :], label='Ref Z', color='blue', linestyle='--', linewidth=1)
     axes[3].set_title('Reference Point Position')
     axes[3].set_xlabel('Trace Number (Record Index)')
     axes[3].set_ylabel('Position (m)')
-    axes[3].legend(fontsize='small')
+    axes[3].legend(loc='upper right', fontsize='small')
     axes[3].grid(True, linestyle=':', alpha=0.6)
 
     plt.subplots_adjust(hspace=0.15, left=0.1, right=0.95, top=0.95, bottom=0.05)
-    
     plot_path = os.path.join(ECHO_dir, f"plot_{base_name}.png")
     plt.savefig(plot_path, dpi=150)
     plt.close()
+
+    # ---------------------------------------------------------
+    # 経路データの蓄積 (絶対座標計算)
+    # 
+    # Global East (Map X)  = Ref X (East)  + Rover Y (East)
+    # Global North (Map Y) = Ref Y (North) + Rover X (North)
+    # ---------------------------------------------------------
     
+    # Rover: save_data[2] is Y (East)
+    # Ref:   save_data[4] is X (East)
+    segment_east  = save_data[4, :] + save_data[2, :]
+    
+    # Rover: save_data[1] is X (North)
+    # Ref:   save_data[5] is Y (North)
+    segment_north = save_data[5, :] + save_data[1, :] 
+    
+    all_segments.append({
+        'filename': filename,
+        'north': segment_north,
+        'east': segment_east
+    })
+
+# ---------------------------------------------------------
+# 2. 全体経路マップ作成 (RGBCMY色分け)
+# ---------------------------------------------------------
+print("Generating color-coded trajectory map...")
+
+if all_segments:
+    plt.figure(figsize=(8, 6))
+    
+    # 指定された色リスト
+    custom_colors = ['r', 'g', 'b', 'c', 'm', 'y', 'k']
+    
+    for i, seg in enumerate(all_segments):
+        color = custom_colors[i % len(custom_colors)]
+        short_name = seg['filename'].split('_')[-2] + '_' + seg['filename'].split('_')[-1].replace('.2B', '')
+        
+        # 経路プロット (横軸=East, 縦軸=North)
+        plt.plot(seg['east'], seg['north'], 
+                 marker='.', markersize=4, linewidth=1, 
+                 color=color, label=f"{i+1}: {short_name}", alpha=0.8)
+        
+        # 開始点
+        plt.scatter(seg['east'][0], seg['north'][0], color=color, marker='o', s=80, edgecolors='k', zorder=5)
+        
+        # データが動いていない場合の注釈
+        if np.ptp(seg['east']) < 0.1 and np.ptp(seg['north']) < 0.1:
+             plt.text(seg['east'][0], seg['north'][0], f" {short_name}", fontsize=9, color=color, fontweight='bold')
+
+    # ミッション全体の開始点・終了点
+    first_seg = all_segments[0]
+    last_seg = all_segments[-1]
+    
+    plt.scatter(first_seg['east'][0], first_seg['north'][0], 
+                c='lime', marker='^', s=250, label='Mission Start', zorder=10, edgecolors='k', linewidth=1.5)
+    plt.scatter(last_seg['east'][-1], last_seg['north'][-1], 
+                c='red', marker='X', s=250, label='Mission End', zorder=10, edgecolors='k', linewidth=1.5)
+    
+    plt.title(f'Combined Rover Trajectory (Color by File)\nX axis: East (Ref_X + Rov_Y), Y axis: North (Ref_Y + Rov_X)')
+    plt.xlabel('Global East Position (m)')
+    plt.ylabel('Global North Position (m)')
+    plt.axis('equal')
+    plt.grid(True, linestyle='--', alpha=0.5)
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+    
+    plt.tight_layout()
+    
+    # 保存先を ECHO_dir に変更
+    map_path = os.path.join(ECHO_dir, 'trajectory_map_colored.png')
+    plt.savefig(map_path, dpi=300)
+    print(f"Trajectory map saved to: {map_path}")
+
+else:
+    print("No trajectory data found.")
+
 print('All processes finished.')
