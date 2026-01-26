@@ -137,8 +137,8 @@ for filename in tqdm(file_list, desc='Processing Files'):
     # --- B-scan (Top) ---
     # コントラスト調整: max_valの1/10を範囲とする
     max_val = np.percentile(np.abs(save_data[7:, :]), 98) if records > 0 else 1
-    intensity_limit = max_val / 10.0
-    
+    #intensity_limit = max_val / 10.0
+    intensity_limit = 15
     axes[0].imshow(save_data[7:, :], aspect='auto', cmap='seismic', 
                         interpolation='nearest', vmin=-intensity_limit, vmax=intensity_limit)
     axes[0].set_title(f'B-scan: {filename}')
