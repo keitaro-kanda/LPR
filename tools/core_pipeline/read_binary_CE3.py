@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 # ==========================================
 # 設定: データフォルダのパス
 # ==========================================
-data_folder_path = '/Volumes/SSD_Kanda_SAMSUNG/CE3_LPR/LPR_2B_all/original_binary'  # ←ここに実際のパスを記入してください
+data_folder_path = '/Volumes/SSD_Kanda_SAMSUNG/CE3_LPR/LPR_2B_0005-0009/original_binary'  # ←ここに実際のパスを記入してください
 
 # ==========================================
 # 関数定義
