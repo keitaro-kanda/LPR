@@ -269,10 +269,11 @@ class Analyzer:
             
         plt.xscale('log')
         plt.yscale('log')
-        plt.xlabel('Diameter [m]')
-        plt.ylabel('Cumulative Number N(>D)')
-        plt.title(f'Cumulative Size-Frequency Distribution\n(Input True r = {r_true})')
-        plt.legend()
+        plt.xlabel('Diameter [m]', fontsize=18)
+        plt.ylabel('Cumulative Number N(>D)', fontsize=18)
+        # plt.title(f'Cumulative Size-Frequency Distribution\n(Input True r = {r_true})', fontsize=18)
+        plt.tick_params(axis='both', which='major', labelsize=16)
+        plt.legend(fontsize=16)
         plt.grid(True, which="both", ls="-")
         plt.savefig(output_path)
         plt.close()
@@ -304,7 +305,7 @@ def main():
         f.write(f"True Slope (r): {r_true}\n")
         f.write(f"Frequency: {config.FREQ/1e6} MHz\n")
         f.write(f"Regolith Epsilon: {config.EPSILON_R_REG}\n")
-        f.write(f"Attenuation: {config.ATTENUATION_DB_M} dB/m\n")
+        f.write(f"Loss Tangent: {config.LOSS_TANGENT}\n")
         f.write(f"Noise Floor: {config.NOISE_FLOOR_DBM} dBm\n")
 
     # 1. 岩石生成 (Ground Truth)
@@ -325,14 +326,15 @@ def main():
     analysis_results.to_csv(f"{output_dir}/depth_analysis_results.csv", index=False)
 
     # 5. 結果プロット (深さ vs べき指数)
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(8, 6))
     plt.plot(analysis_results['depth_range'], analysis_results['r_apparent'], 'o-', label='Apparent r')
     plt.axhline(y=r_true, color='r', linestyle='--', label=f'True r ({r_true})')
     
-    plt.xlabel('Depth Range Used for Analysis [m]')
-    plt.ylabel('Apparent Power-Law Index (r)')
-    plt.title(f'Change in Apparent Power-Law Index by Depth\n(True r = {r_true})')
-    plt.legend()
+    plt.xlabel('Depth Range Used for Analysis [m]', fontsize=18)
+    plt.ylabel('Apparent Power-Law Index (r)', fontsize=18)
+    # plt.title(f'Change in Apparent Power-Law Index by Depth\n(True r = {r_true})')
+    plt.tick_params(axis='both', which='major', labelsize=16)
+    plt.legend(fontsize=16)
     plt.grid(True)
     plt.ylim(0, r_true * 1.5) # グラフを見やすく調整
     
@@ -340,6 +342,5 @@ def main():
     plt.close()
 
     print("処理完了。")
-
 if __name__ == "__main__":
     main()
