@@ -11,7 +11,7 @@ class RadarConfig:
     """
     def __init__(self):
         # --- A. レーダーシステム (Chang'e-3 LPR Channel 2 参考) ---
-        self.FREQ = 500e6  # 周波数 [Hz] (500 MHz)
+        self.FREQ = 500e6  # 周波数 [Hz] (500 MHz), Fang+2014
         self.C_0 = 3e8     # 光速 [m/s]
         
         # システム定数・電力設定 (簡易モデル用)
@@ -32,13 +32,13 @@ class RadarConfig:
         self.ATTENUATION_DB_M = 0.5  # 減衰定数 [dB/m] (往復ではなく片道の減衰)
         # 注: 月のレゴリス減衰は 0.1~2.0 dB/m 程度。ここでは標準的な値を採用
         
-        self.EPSILON_R_ROCK = 7.0    # 岩石の比誘電率
+        self.EPSILON_R_ROCK = 9.0    # 岩石の比誘電率, Chung+1970
         
         # --- C. シミュレーション空間設定 ---
-        self.MAX_DEPTH = 20.0        # 最大深度 [m]
+        self.MAX_DEPTH = 12.0        # 最大深度 [m]、CE-4/LPRで見えたレゴリス層の厚みを想定
         self.AREA_SIZE_M2 = 10000.0  # シミュレーション領域面積 [m^2]
-        self.ROCK_SIZE_MIN = 0.05    # 最小岩石サイズ [m] (5cm)
-        self.ROCK_SIZE_MAX = 5.0     # 最大岩石サイズ [m]
+        self.ROCK_SIZE_MIN = 0.01    # 最小岩石サイズ [m] (1cm), Di+2016
+        self.ROCK_SIZE_MAX = 1.0     # 最大岩石サイズ [m], Di+2016
         self.TOTAL_ROCKS = 50000     # 生成する岩石の総数 (統計的有意性のため多めに)
 
     @property
