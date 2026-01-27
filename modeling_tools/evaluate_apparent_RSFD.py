@@ -69,13 +69,13 @@ class RadarConfig:
         
         # 減衰係数 alpha (Neper/m) の計算
         # sqrt(mu * epsilon) = 1/v = sqrt(epsilon_r)/c
-        term1 = omega * (np.sqrt(self.EPSILON_R_REG) / self.C_0)
+        term1 = omega * (np.sqrt(mu * epsilon))
         term2 = np.sqrt(0.5 * (np.sqrt(1 + self.LOSS_TANGENT**2) - 1))
         
         alpha_nepers = term1 * term2
         
         # dB/m に変換
-        return alpha_nepers * 8.686
+        return alpha_nepers * 8.686 # 8.686は20*log10(e)の近似値
 
     @property
     def reflection_coeff(self):
