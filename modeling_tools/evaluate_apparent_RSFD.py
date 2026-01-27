@@ -16,30 +16,31 @@ class RadarConfig:
         
         # システム定数・電力設定 (簡易モデル用)
         # 基準: 深さ0mの最小岩石が十分検出でき、かつ深部で減衰するレベルに設定
-        # 論文値より: 送信電圧~400V, インピーダンス100Ω -> Pt ~ 1600W (62 dBm)
+        # 論文値より: 送信電圧~400V (Zhang+2014), インピーダンス100Ω (Fang+2014) -> Pt ~ 1600W (62 dBm)
         # しかしここでは相対的なS/Nが重要なので、システム利得等を調整した「実効的な定数」として扱う
         self.TX_POWER_DBM = 62.0  # 送信電力 [dBm]
-        self.ANTENNA_GAIN_DBI = -7.5 # アンテナ利得 [dBi] (送受合計で2倍する)
-        self.SYSTEM_LOSS_DB = 10.0   # システム損失 (ケーブルロス等) [dB]
+        self.ANTENNA_GAIN_DBI = -7.5 # アンテナ利得 [dBi] (送受合計で2倍する), Fang+2014
+        self.SYSTEM_LOSS_DB = 0   # システム損失 (ケーブルロス等) [dB]、文献には記載されていなかったので0と仮定
         
         # ノイズフロア (検出限界)
-        # 論文のダイナミックレンジ 96.7dB と変動(sigma=0.6)を考慮
+        # 論文のダイナミックレンジ 96.7dB (Zhang+2014) と変動(sigma=0.6, Su+2014)を考慮
         # 受信最大電力が 0dBm 付近とした場合、ノイズは -90dBm 程度と仮定
         self.NOISE_FLOOR_DBM = -90.0
         
         # --- B. 環境・媒質パラメータ ---
-        self.EPSILON_R_REG = 3.1     # レゴリスの比誘電率 (実部)
-        self.ATTENUATION_DB_M = 0.5  # 減衰定数 [dB/m] (往復ではなく片道の減衰)
+        self.EPSILON_R_REG = 3.0     # レゴリスの比誘電率 (実部)、Chen+2022 (2.3-3.7), Dong+2020 (2-4くらい), Feng+2022 (2.64-3.85)の平均くらいとして設定
+        #self.ATTENUATION_DB_M = 0.5  # 減衰定数 [dB/m] (往復ではなく片道の減衰)
         # 注: 月のレゴリス減衰は 0.1~2.0 dB/m 程度。ここでは標準的な値を採用
-        
+        self.LOSS_TANGENT = 0.004     # ロスタンジェント (tan δ) [-], Feng+2022 (0.0032-0.0044), Lai+2019 (0.004-0.005)の平均くらいとして設定
+
         self.EPSILON_R_ROCK = 9.0    # 岩石の比誘電率, Chung+1970
         
         # --- C. シミュレーション空間設定 ---
         self.MAX_DEPTH = 12.0        # 最大深度 [m]、CE-4/LPRで見えたレゴリス層の厚みを想定
-        self.AREA_SIZE_M2 = 10000.0  # シミュレーション領域面積 [m^2]
+        self.AREA_SIZE_M2 = 4500.0  # シミュレーション領域面積 [m^2]、CE-4ローバーの移動距離1500 m x 幅3 m程度を想定
         self.ROCK_SIZE_MIN = 0.01    # 最小岩石サイズ [m] (1cm), Di+2016
         self.ROCK_SIZE_MAX = 1.0     # 最大岩石サイズ [m], Di+2016
-        self.TOTAL_ROCKS = 50000     # 生成する岩石の総数 (統計的有意性のため多めに)
+        self.TOTAL_ROCKS = 10000     # 生成する岩石の総数 (統計的有意性のため多めに)
 
     @property
     def lambda_0(self):
@@ -49,6 +50,32 @@ class RadarConfig:
     def lambda_g(self):
         # 媒質(レゴリス)中の波長
         return self.lambda_0 / np.sqrt(self.EPSILON_R_REG)
+
+    @property
+    def attenuation_db_m(self):
+        """
+        Loss Tangent から減衰定数 [dB/m] を計算するプロパティ
+        計算式は Zhang et al. (2014) Eq.(2) に基づく
+        alpha [Np/m] = omega * sqrt(mu * epsilon) * sqrt(0.5 * (sqrt(1 + tan_delta^2) - 1))
+        dB/mへの変換: 1 Np = 20 * log10(e) approx 8.686 dB
+        """
+        omega = 2 * np.pi * self.FREQ
+        mu_0 = 4 * np.pi * 1e-7      # 真空の透磁率
+        epsilon_0 = 8.854e-12        # 真空の誘電率
+        
+        # 媒質の透磁率(mu)と誘電率(epsilon)
+        mu = mu_0 # 非磁性と仮定
+        epsilon = self.EPSILON_R_REG * epsilon_0
+        
+        # 減衰係数 alpha (Neper/m) の計算
+        # sqrt(mu * epsilon) = 1/v = sqrt(epsilon_r)/c
+        term1 = omega * (np.sqrt(self.EPSILON_R_REG) / self.C_0)
+        term2 = np.sqrt(0.5 * (np.sqrt(1 + self.LOSS_TANGENT**2) - 1))
+        
+        alpha_nepers = term1 * term2
+        
+        # dB/m に変換
+        return alpha_nepers * 8.686
 
     @property
     def reflection_coeff(self):
@@ -127,7 +154,8 @@ class RockModel:
         spread_loss_db = 40 * np.log10(rocks_df['depth'].values + 0.1)
         
         # 3. 媒質による減衰 (Attenuation): 2 * alpha * depth
-        attenuation_loss_db = 2 * config.ATTENUATION_DB_M * rocks_df['depth'].values
+        # config.attenuation_db_m は Loss Tangent から自動計算される
+        attenuation_loss_db = 2 * config.attenuation_db_m * rocks_df['depth'].values
         
         # 4. 受信電力計算 [dBm]
         # Pr = Pt + G_tx + G_rx + Sigma - Loss_spread - Loss_atten - Loss_sys
