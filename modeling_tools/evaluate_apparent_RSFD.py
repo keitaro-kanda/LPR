@@ -289,8 +289,8 @@ def main():
         r_true = 2.5
 
     # ディレクトリ作成
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_dir = f"output_r{r_true}_{timestamp}"
+    base_dir = '/Users/keitarokanda/LPR/modeling_tools/evaluate_apparent_RSFD_output'
+    output_dir = base_dir + f"/r_{r_true}"
     os.makedirs(output_dir, exist_ok=True)
     print(f"出力ディレクトリ: {output_dir}")
 
