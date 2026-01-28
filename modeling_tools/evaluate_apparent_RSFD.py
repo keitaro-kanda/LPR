@@ -51,6 +51,10 @@ class RadarConfig:
         """
         omega = 2 * np.pi * self.FREQ
         epsilon_0 = 8.854e-12        # 真空の誘電率
+        mu_0 = 4 * np.pi * 1e-7      # 真空の透磁率
+
+        epsilon = self.EPSILON_R_REG * epsilon_0
+        mu = mu_0  # 非磁性体と仮定
         
         # 減衰係数 alpha (Neper/m) の計算
         # sqrt(mu * epsilon) = 1/v = sqrt(epsilon_r)/c
