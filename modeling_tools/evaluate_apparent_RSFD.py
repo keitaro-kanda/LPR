@@ -14,33 +14,26 @@ class RadarConfig:
         self.FREQ = 500e6  # 周波数 [Hz] (500 MHz), Fang+2014
         self.C_0 = 3e8     # 光速 [m/s]
         
-        # システム定数・電力設定 (簡易モデル用)
-        # 基準: 深さ0mの最小岩石が十分検出でき、かつ深部で減衰するレベルに設定
-        # 論文値より: 送信電圧~400V (Zhang+2014), インピーダンス100Ω (Fang+2014) -> Pt ~ 1600W (62 dBm)
-        # しかしここでは相対的なS/Nが重要なので、システム利得等を調整した「実効的な定数」として扱う
+        # システム定数・電力設定
         self.TX_POWER_DBM = 62.0  # 送信電力 [dBm]
         self.ANTENNA_GAIN_DBI = -7.5 # アンテナ利得 [dBi] (送受合計で2倍する), Fang+2014
-        self.SYSTEM_LOSS_DB = 0   # システム損失 (ケーブルロス等) [dB]、文献には記載されていなかったので0と仮定
+        self.SYSTEM_LOSS_DB = 0   # システム損失 [dB]
         
         # ノイズフロア (検出限界)
-        # 論文のダイナミックレンジ 96.7dB (Zhang+2014) と変動(sigma=0.6, Su+2014)を考慮
-        # 受信最大電力が 0dBm 付近とした場合、ノイズは -90dBm 程度と仮定
         self.NOISE_FLOOR_DBM = -90.0
         
         # --- B. 環境・媒質パラメータ ---
-        self.EPSILON_R_REG = 3.0     # レゴリスの比誘電率 (実部)、Chen+2022 (2.3-3.7), Dong+2020 (2-4くらい), Feng+2022 (2.64-3.85)の平均くらいとして設定
-        #self.ATTENUATION_DB_M = 0.5  # 減衰定数 [dB/m] (往復ではなく片道の減衰)
-        # 注: 月のレゴリス減衰は 0.1~2.0 dB/m 程度。ここでは標準的な値を採用
-        self.LOSS_TANGENT = 0.004     # ロスタンジェント (tan δ) [-], Feng+2022 (0.0032-0.0044), Lai+2019 (0.004-0.005)の平均くらいとして設定
+        self.EPSILON_R_REG = 3.0     # レゴリスの比誘電率
+        self.LOSS_TANGENT = 0.004    # ロスタンジェント (tan δ)
 
-        self.EPSILON_R_ROCK = 9.0    # 岩石の比誘電率, Chung+1970
+        self.EPSILON_R_ROCK = 9.0    # 岩石の比誘電率
         
         # --- C. シミュレーション空間設定 ---
-        self.MAX_DEPTH = 12.0        # 最大深度 [m]、CE-4/LPRで見えたレゴリス層の厚みを想定
-        self.AREA_SIZE_M2 = 4500.0  # シミュレーション領域面積 [m^2]、CE-4ローバーの移動距離1500 m x 幅3 m程度を想定
-        self.ROCK_SIZE_MIN = 0.01    # 最小岩石サイズ [m] (1cm), Di+2016
-        self.ROCK_SIZE_MAX = 1.0     # 最大岩石サイズ [m], Di+2016
-        self.TOTAL_ROCKS = 10000     # 生成する岩石の総数 (統計的有意性のため多めに)
+        self.MAX_DEPTH = 12.0        # 最大深度 [m]
+        self.AREA_SIZE_M2 = 4500.0   # シミュレーション領域面積 [m^2]
+        self.ROCK_SIZE_MIN = 0.01    # 最小岩石サイズ [m]
+        self.ROCK_SIZE_MAX = 1.0     # 最大岩石サイズ [m]
+        self.TOTAL_ROCKS = 10000     # 生成する岩石の総数
 
     @property
     def lambda_0(self):
@@ -55,17 +48,9 @@ class RadarConfig:
     def attenuation_db_m(self):
         """
         Loss Tangent から減衰定数 [dB/m] を計算するプロパティ
-        計算式は Zhang et al. (2014) Eq.(2) に基づく
-        alpha [Np/m] = omega * sqrt(mu * epsilon) * sqrt(0.5 * (sqrt(1 + tan_delta^2) - 1))
-        dB/mへの変換: 1 Np = 20 * log10(e) approx 8.686 dB
         """
         omega = 2 * np.pi * self.FREQ
-        mu_0 = 4 * np.pi * 1e-7      # 真空の透磁率
         epsilon_0 = 8.854e-12        # 真空の誘電率
-        
-        # 媒質の透磁率(mu)と誘電率(epsilon)
-        mu = mu_0 # 非磁性と仮定
-        epsilon = self.EPSILON_R_REG * epsilon_0
         
         # 減衰係数 alpha (Neper/m) の計算
         # sqrt(mu * epsilon) = 1/v = sqrt(epsilon_r)/c
@@ -79,7 +64,7 @@ class RadarConfig:
 
     @property
     def reflection_coeff(self):
-        # 岩石表面の反射係数 (簡易的なフレネル反射垂直入射近似)
+        # 岩石表面の反射係数
         n1 = np.sqrt(self.EPSILON_R_REG)
         n2 = np.sqrt(self.EPSILON_R_ROCK)
         return ((n1 - n2) / (n1 + n2))**2
@@ -91,9 +76,7 @@ class RockModel:
     """
     def generate_rocks(self, r_true, config):
         """
-        指定されたべき指数 r_true (累積分布の傾き) に従う岩石を生成する
-        N(>D) ∝ D^(-r)  => PDF(D) ∝ D^(-r-1)
-        逆関数法を用いて乱数生成する
+        指定されたべき指数 r_true に従う岩石を生成する
         """
         print(f"岩石を生成中... (True Slope = -{r_true}, N={config.TOTAL_ROCKS})")
         
@@ -101,13 +84,12 @@ class RockModel:
         u = np.random.rand(config.TOTAL_ROCKS)
         
         # べき分布に従う直径 D を生成
-        # D = D_min * (1 - u) ^ (-1/r)
         diameters = config.ROCK_SIZE_MIN * (1 - u) ** (-1.0 / r_true)
         
-        # 設定した最大サイズを超えるものは除外（あるいはクリップ）
+        # 設定した最大サイズを超えるものは除外
         diameters = diameters[diameters <= config.ROCK_SIZE_MAX]
         
-        # 深さをランダムに割り当て (0 ~ MAX_DEPTH)
+        # 深さをランダムに割り当て
         depths = np.random.uniform(0, config.MAX_DEPTH, size=len(diameters))
         
         df = pd.DataFrame({
@@ -119,17 +101,14 @@ class RockModel:
     def calculate_rcs_db(self, diameter_array, config):
         """
         岩石のレーダー断面積(RCS)を計算する [dBsm]
-        レイリー散乱と光学領域の分岐を含む
         """
         lambda_g = config.lambda_g
         boundary_size = lambda_g / 2.0 # 境界値 (波長の半分)
         
-        # 光学領域 (Optical Region) のRCS: 幾何学的断面積 * 反射係数
-        # σ = Γ * π * (D/2)^2
+        # 光学領域
         sigma_optical = config.reflection_coeff * np.pi * (diameter_array / 2.0)**2
         
-        # レイリー領域 (Rayleigh Region): σ ∝ D^6
-        # 境界値で連続になるように係数 k を決める: k * D_bound^6 = sigma_optical_at_bound
+        # レイリー領域
         sigma_opt_at_bound = config.reflection_coeff * np.pi * (boundary_size / 2.0)**2
         k_rayleigh = sigma_opt_at_bound / (boundary_size ** 6)
         sigma_rayleigh = k_rayleigh * (diameter_array ** 6)
@@ -148,32 +127,20 @@ class RockModel:
         # 1. RCS計算
         rcs_db = self.calculate_rcs_db(rocks_df['diameter'].values, config)
         
-        # 2. 幾何学的減衰 (Spreading Loss): 40 log10(R) (往復なのでR^4比例 -> dBで40log)
-        # R = depth. (アンテナ高さ=0と仮定、あるいはdepthに含まれるとする)
-        # log(0)回避のため微小値を加える
+        # 2. 幾何学的減衰
         spread_loss_db = 40 * np.log10(rocks_df['depth'].values + 0.1)
         
-        # 3. 媒質による減衰 (Attenuation): 2 * alpha * depth
-        # config.attenuation_db_m は Loss Tangent から自動計算される
+        # 3. 媒質による減衰
         attenuation_loss_db = 2 * config.attenuation_db_m * rocks_df['depth'].values
         
         # 4. 受信電力計算 [dBm]
-        # Pr = Pt + G_tx + G_rx + Sigma - Loss_spread - Loss_atten - Loss_sys
-        # (定数項をまとめる)
         const_gain = config.TX_POWER_DBM + 2 * config.ANTENNA_GAIN_DBI - config.SYSTEM_LOSS_DB
-        
-        # レーダー方程式の定数項 (波長λ^2 / (4π)^3 ) の寄与
-        # Pr = (Pt G^2 λ^2 σ) / ((4π)^3 R^4)
-        # dB: 10log(λ^2 / (4π)^3) を加算する必要がある
-        # ここではアンテナ利得GはdBi、σはdBsm
         wavelength_factor = 10 * np.log10(config.lambda_0**2 / ((4 * np.pi)**3))
         
         received_power = (const_gain + wavelength_factor + rcs_db 
                           - spread_loss_db - attenuation_loss_db)
         
-        # 5. ノイズ付加 (オプション: ガウスノイズを加える場合)
-        # 今回は閾値判定のみ行うため、信号自体にはノイズを乗せず、閾値を固定とする
-        # 判定
+        # 5. 判定
         is_detected = received_power > config.NOISE_FLOOR_DBM
         
         # 結果をDataFrameに追加
@@ -198,11 +165,8 @@ class Analyzer:
             return np.nan, np.nan, [], []
             
         # 累積分布の作成
-        # 大きい順にソート
         sorted_d = np.sort(diameters)
-        # 累積個数 (N > D): 大きい方から数えた順位
-        # 例: [10, 5, 2] -> 10は1個, 5以上は2個, 2以上は3個
-        # n = len(d) -> 1 まで
+        # 累積個数 (N > D)
         y_cumulative = np.arange(len(sorted_d), 0, -1)
         
         # 最小二乗法のためにログをとる
@@ -221,11 +185,9 @@ class Analyzer:
         print("深さ方向の感度解析を実行中...")
         results = []
         
-        # 深さスライス
         depth_ranges = np.arange(1.0, max_depth + 0.1, step)
         
         for d in depth_ranges:
-            # 深さd以下の検出岩石を抽出
             subset = detected_df[
                 (detected_df['is_detected'] == True) & 
                 (detected_df['depth'] <= d)
@@ -234,9 +196,7 @@ class Analyzer:
             count = len(subset)
             if count > 10:
                 slope, _, _, _ = self.calculate_slope(subset['diameter'].values)
-                # 傾きは負の値なので、絶対値(べき指数)にするなら -slope
-                # ここでは slope そのもの（負の値）と、見かけのr（正）を保存
-                r_apparent = -slope
+                r_apparent = -slope # 傾きは負なので、正のべき指数に変換
             else:
                 r_apparent = np.nan
             
@@ -248,35 +208,63 @@ class Analyzer:
             
         return pd.DataFrame(results)
 
-    def plot_csfd(self, detected_df, output_path, r_true):
+    def plot_csfd(self, detected_df, all_rocks_df, output_path, r_true):
         """
-        全検出岩石のCSFDプロットを作成 (確認用)
+        真のRSFD（生成された全岩石）と見かけのRSFD（検出された岩石）を
+        重ねてプロットし、比較できるようにする。
         """
-        diameters = detected_df[detected_df['is_detected'] == True]['diameter'].values
-        if len(diameters) == 0:
-            return
+        plt.figure(figsize=(10, 8))
 
-        slope, intercept, x_log, y_log = self.calculate_slope(diameters)
+        # --- 1. 真の分布 (Ground Truth) のプロット ---
+        # 全岩石データの取得
+        diameters_true = all_rocks_df['diameter'].values
         
-        plt.figure(figsize=(8, 6))
-        plt.scatter(10**x_log, 10**y_log, s=10, alpha=0.5, label='Detected Rocks')
-        
-        # フィッティング線
-        if not np.isnan(slope):
-            x_fit = np.linspace(min(x_log), max(x_log), 100)
-            y_fit = slope * x_fit + intercept
-            plt.plot(10**x_fit, 10**y_fit, 'r--', label=f'Fit Slope = {slope:.2f}')
+        if len(diameters_true) > 0:
+            slope_true, intercept_true, x_log_true, y_log_true = self.calculate_slope(diameters_true)
             
+            # 散布図 (薄いグレーで背景に表示)
+            plt.scatter(10**x_log_true, 10**y_log_true, s=20, color='gray', label='Generated Rocks', marker='D')
+            
+            # 近似直線 (真の分布のフィッティング)
+            if not np.isnan(slope_true):
+                x_fit_true = np.linspace(min(x_log_true), max(x_log_true), 100)
+                y_fit_true = slope_true * x_fit_true + intercept_true
+                # r_true (入力値) と 計算された slope_true はほぼ一致するはずだが、確認のため表示
+                plt.plot(10**x_fit_true, 10**y_fit_true, 'k--', linewidth=1.5, 
+                         label=f'True Fit (r = {-slope_true:.2f})')
+
+        # --- 2. 見かけの分布 (Apparent / Detected) のプロット ---
+        # 検出された岩石のみ抽出
+        diameters_det = detected_df[detected_df['is_detected'] == True]['diameter'].values
+        
+        if len(diameters_det) > 0:
+            slope_det, intercept_det, x_log_det, y_log_det = self.calculate_slope(diameters_det)
+            
+            # 散布図 (目立つ色で表示)
+            plt.scatter(10**x_log_det, 10**y_log_det, s=20, color='blue', label='Detected Rocks', marker='o')
+            
+            # 近似直線 (検出データのフィッティング)
+            if not np.isnan(slope_det):
+                x_fit_det = np.linspace(min(x_log_det), max(x_log_det), 100)
+                y_fit_det = slope_det * x_fit_det + intercept_det
+                plt.plot(10**x_fit_det, 10**y_fit_det, 'r-', linewidth=2.5, 
+                         label=f'Apparent Fit (r = {-slope_det:.2f})')
+
+        # グラフの装飾
         plt.xscale('log')
         plt.yscale('log')
         plt.xlabel('Diameter [m]', fontsize=18)
         plt.ylabel('Cumulative Number N(>D)', fontsize=18)
-        # plt.title(f'Cumulative Size-Frequency Distribution\n(Input True r = {r_true})', fontsize=18)
+        plt.title(f'Comparison of True vs Apparent RSFD\n(Input True r = {r_true})', fontsize=18)
         plt.tick_params(axis='both', which='major', labelsize=16)
-        plt.legend(fontsize=16)
-        plt.grid(True, which="both", ls="-")
+        
+        # 凡例の表示
+        plt.legend(fontsize=14)
+        plt.grid(True, which="both", ls="-", alpha=0.5)
+        
+        plt.tight_layout()
         plt.savefig(output_path)
-        plt.close()
+        plt.show()
 
 # --- 4. メイン処理 ---
 def main():
@@ -291,7 +279,7 @@ def main():
 
     # ディレクトリ作成
     base_dir = '/Users/keitarokanda/LPR/modeling_tools/evaluate_apparent_RSFD_output'
-    output_dir = base_dir + f"/r_{r_true}"
+    output_dir = f"{base_dir}/r_{r_true}"
     os.makedirs(output_dir, exist_ok=True)
     print(f"出力ディレクトリ: {output_dir}")
 
@@ -318,8 +306,9 @@ def main():
     
     print(f"検出数: {detected_df['is_detected'].sum()} / {len(detected_df)}")
 
-    # 3. CSFDプロット (全体)
-    analyzer.plot_csfd(detected_df, f"{output_dir}/csfd_all_detected.png", r_true)
+    # 3. CSFDプロット (全体: 真の値と見かけの値の比較)
+    # 【変更点】all_rocks_df を引数に追加
+    analyzer.plot_csfd(detected_df, all_rocks_df, f"{output_dir}/csfd_comparison.png", r_true)
 
     # 4. 深さごとの見かけべき指数解析
     analysis_results = analyzer.run_depth_analysis(detected_df, config.MAX_DEPTH, step=1.0)
@@ -332,7 +321,6 @@ def main():
     
     plt.xlabel('Depth Range Used for Analysis [m]', fontsize=18)
     plt.ylabel('Apparent Power-Law Index (r)', fontsize=18)
-    # plt.title(f'Change in Apparent Power-Law Index by Depth\n(True r = {r_true})')
     plt.tick_params(axis='both', which='major', labelsize=16)
     plt.legend(fontsize=16)
     plt.grid(True)
@@ -342,5 +330,6 @@ def main():
     plt.close()
 
     print("処理完了。")
+
 if __name__ == "__main__":
     main()
