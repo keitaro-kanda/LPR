@@ -282,7 +282,7 @@ def main():
         r_true = 2.5
 
     # ディレクトリ作成
-    base_dir = '/Users/keitarokanda/LPR/modeling_tools/evaluate_apparent_RSFD_output'
+    base_dir = '/Volumes/SSD_Kanda_SAMSUNG/modeling_tools_output/evaluate_apparent_RSFD'
     output_dir = f"{base_dir}/r_{r_true}"
     os.makedirs(output_dir, exist_ok=True)
     print(f"出力ディレクトリ: {output_dir}")

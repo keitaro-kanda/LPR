@@ -1,5 +1,0 @@
-True Slope (r): 4.0
-Frequency: 500.0 MHz
-Regolith Epsilon: 3.0
-Loss Tangent: 0.004
-Noise Floor: -90.0 dBm
