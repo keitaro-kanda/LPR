@@ -28,92 +28,29 @@ def format_p_value(p):
     if p < 0.001:
         return "p < 0.001"
     else:
-        return f"p={p:.3f}"
+        return f"p = {p:.3f}"
 
-def save_legend_info_to_txt(output_path, legend_entries):
+def format_k_value(k):
     """
-    Legend情報をTXTファイルに保存
-
-    Parameters:
-    -----------
-    output_path : str
-        出力パス（拡張子なし）
-    legend_entries : list of dict
-        Legendエントリのリスト [{'label': str, 'color': str, 'linestyle': str}, ...]
+    kを10^-3オーダーで統一して表記する
+    例: 1.2e-2 → "12×10⁻³", 5.0e-4 → "0.5×10⁻³"
     """
-    with open(f'{output_path}_legend.txt', 'w', encoding='utf-8') as f:
-        f.write('# Legend Information\n')
-        f.write('# -------------------\n')
-        for entry in legend_entries:
-            f.write(f"Label: {entry['label']}\n")
-            if 'color' in entry:
-                f.write(f"  Color: {entry['color']}\n")
-            if 'linestyle' in entry:
-                f.write(f"  Linestyle: {entry['linestyle']}\n")
-            if 'marker' in entry:
-                f.write(f"  Marker: {entry['marker']}\n")
-            f.write('\n')
-    print(f'Legend情報保存: {output_path}_legend.txt')
-
-def save_legend_only_pdf(output_path, legend_entries):
-    """
-    Legend専用のPDFファイルを作成
-
-    Parameters:
-    -----------
-    output_path : str
-        出力パス（拡張子なし）
-    legend_entries : list of dict
-        Legendエントリのリスト [{'label': str, 'color': str, 'linestyle': str, 'marker': str}, ...]
-    """
-    fig = plt.figure(figsize=(8, len(legend_entries) * 0.5 + 1))
-    ax = fig.add_subplot(111)
-
-    # 空のプロットを作成し、legend用のハンドルを生成
-    handles = []
-    labels = []
-    for entry in legend_entries:
-        label = entry['label']
-        color = entry.get('color', 'black')
-        linestyle = entry.get('linestyle', '-')
-        marker = entry.get('marker', '')
-        linewidth = entry.get('linewidth', 1.5)
-
-        # ダミーのプロット（表示されない）
-        if marker and linestyle and linestyle != '':
-            line, = ax.plot([], [], color=color, linestyle=linestyle,
-                           marker=marker, linewidth=linewidth, label=label)
-        elif marker:
-            line, = ax.plot([], [], color=color, marker=marker,
-                           linestyle='', label=label)
-        else:
-            line, = ax.plot([], [], color=color, linestyle=linestyle,
-                           linewidth=linewidth, label=label)
-        handles.append(line)
-        labels.append(label)
-
-    # 軸を非表示にする
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
-    ax.axis('off')
-
-    # Legendのみを表示
-    legend = ax.legend(handles, labels, loc='center', fontsize=14,
-                      frameon=True, fancybox=True, shadow=False)
-
-    plt.tight_layout()
-    plt.savefig(f'{output_path}_legend.pdf', dpi=600, bbox_inches='tight')
-    plt.close()
-
-    print(f'Legend専用PDF保存: {output_path}_legend.pdf')
+    # kを10^-3オーダーの係数に変換
+    coefficient = k / 1e-3
+    if coefficient >= 10:
+        return f"{coefficient:.1f}×10⁻³"
+    elif coefficient >= 1:
+        return f"{coefficient:.2f}×10⁻³"
+    else:
+        return f"{coefficient:.2f}×10⁻³"
 
 def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
-                     scale_type='linear', fit_lines=None,
+                     fit_x=None, fit_y=None, fit_params=None,
                      show_plot=False, dpi_png=300, dpi_pdf=600,
-                     marker='o', linestyle='-', linewidth=1.5, color=None, label=None,
+                     data_color='black', fit_color='red',
                      xlim=None):
     """
-    RSFDプロットを作成・保存する汎用関数
+    RSFDプロットを作成・保存する汎用関数（両対数グラフのみ）
 
     Parameters:
     -----------
@@ -123,58 +60,40 @@ def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
         軸ラベル
     output_path : str
         出力パス（拡張子なし）
-    scale_type : str
-        'linear', 'semilog', 'loglog'
-    fit_lines : list of dict, optional
-        フィット曲線のリスト [{'x': x, 'y': y, 'label': label, 'color': color, 'linestyle': style}, ...]
+    fit_x, fit_y : array, optional
+        フィット曲線のデータ
+    fit_params : dict, optional
+        フィッティングパラメータ {'k': float, 'r': float, 'R2': float, 'p_str': str}
     show_plot : bool
         プロット表示の有無
     dpi_png, dpi_pdf : int
         解像度
-    marker, linestyle, linewidth, color, label :
-        データプロットのスタイル設定
+    data_color, fit_color : str
+        データ点とフィット曲線の色
     xlim : tuple, optional
         x軸範囲 (xmin, xmax)
     """
-    plt.figure(figsize=(10, 8))
+    plt.figure(figsize=(8, 6))
 
     # データプロット
-    if marker and linestyle:
-        plot_kwargs = {'marker': marker, 'linestyle': linestyle, 'linewidth': linewidth}
-        if color:
-            plot_kwargs['color'] = color
-        if label:
-            plot_kwargs['label'] = label
-        plt.plot(x_data, y_data, **plot_kwargs)
-    elif marker:  # scatter plot
-        scatter_kwargs = {'marker': marker}
-        if color:
-            scatter_kwargs['color'] = color
-        if label:
-            scatter_kwargs['label'] = label
-        plt.scatter(x_data, y_data, **scatter_kwargs)
+    plt.plot(x_data, y_data, marker='o', linestyle='', color=data_color, label='Observed data')
 
     # フィット曲線の追加
-    if fit_lines:
-        for fit_line in fit_lines:
-            plt.plot(fit_line['x'], fit_line['y'],
-                    linestyle=fit_line.get('linestyle', '--'),
-                    linewidth=fit_line.get('linewidth', 1.5),
-                    color=fit_line.get('color', 'red'),
-                    label=fit_line.get('label', ''))
+    if fit_x is not None and fit_y is not None and fit_params is not None:
+        k_str = format_k_value(fit_params['k'])
+        r_val = fit_params['r']
+        R2_val = fit_params['R2']
+        p_str = fit_params['p_str']
+        fit_label = f'Fit: N = {k_str} D^{-r_val:.2f}, R²={R2_val:.3f}, {p_str}'
+        plt.plot(fit_x, fit_y, linestyle='--', linewidth=1.5, color=fit_color, label=fit_label)
 
-    # 軸スケール設定
-    if scale_type == 'semilog':
-        plt.yscale('log')
-    elif scale_type == 'loglog':
-        plt.xscale('log')
-        plt.yscale('log')
+    # 軸スケール設定（両対数のみ）
+    plt.xscale('log')
+    plt.yscale('log')
 
-    # x軸範囲の設定（軸スケール設定の直後に実行）
-    if xlim and scale_type == 'loglog':
-        plt.xlim(max(xlim[0], 0.5), xlim[1])  # logスケールで負またはゼロを避ける
-    elif xlim:
-        plt.xlim(xlim)
+    # x軸範囲の設定
+    plt.xlim(0.7, 70)
+    plt.ylim(3e-5, 5e-2)
 
     # 軸ラベルとグリッド
     plt.xlabel(xlabel, fontsize=20)
@@ -182,11 +101,8 @@ def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
     plt.tick_params(labelsize=16)
     plt.grid(True, linestyle='--', alpha=0.5)
 
-    # y軸のtick設定（最大値1-20の場合は2刻みに固定）
-    ax = plt.gca()
-    ylim = ax.get_ylim()
-    if 1 <= ylim[1] <= 20:
-        ax.yaxis.set_major_locator(MultipleLocator(2))
+    # 凡例を右上に配置
+    plt.legend(loc='upper right', fontsize=16, frameon=True, fancybox=True)
 
     plt.tight_layout()
 
@@ -201,35 +117,6 @@ def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
         plt.close()
 
     print(f'プロット保存: {output_path}.png')
-
-    # Legend情報の保存（ラベルがある場合のみ）
-    if label or fit_lines:
-        legend_entries = []
-
-        # データラベル
-        if label:
-            legend_entries.append({
-                'label': label,
-                'color': color if color else 'black',
-                'linestyle': linestyle if linestyle else '',
-                'marker': marker if marker else ''
-            })
-
-        # フィット曲線ラベル
-        if fit_lines:
-            for fit_line in fit_lines:
-                legend_entries.append({
-                    'label': fit_line.get('label', ''),
-                    'color': fit_line.get('color', 'red'),
-                    'linestyle': fit_line.get('linestyle', '--'),
-                    'linewidth': fit_line.get('linewidth', 1.5)
-                })
-
-        # TXT形式で保存
-        save_legend_info_to_txt(output_path, legend_entries)
-
-        # Legend専用PDF出力
-        save_legend_only_pdf(output_path, legend_entries)
 
 def calc_fitting(sizes, counts):
     """べき則と指数関数のフィッティングを実行"""
@@ -393,11 +280,10 @@ def load_all_configs():
     return data_path, config["processing_history"]
 
 def create_multi_range_comparison_plot(ranges_data_list, xlabel, ylabel, output_path,
-                                       scale_type='linear', fit_type='power',
                                        show_plot=False, dpi_png=300, dpi_pdf=600,
                                        xlim=None):
     """
-    複数範囲のRSFDを1つのプロットに重ねて表示する関数
+    複数範囲のRSFDを1つのプロットに重ねて表示する関数（両対数グラフのみ）
 
     Parameters:
     -----------
@@ -412,10 +298,6 @@ def create_multi_range_comparison_plot(ranges_data_list, xlabel, ylabel, output_
         軸ラベル
     output_path : str
         出力パス（拡張子なし）
-    scale_type : str
-        'linear', 'semilog', 'loglog'
-    fit_type : str
-        'power' or 'exponential'
     show_plot : bool
         プロット表示の有無
     dpi_png, dpi_pdf : int
@@ -431,28 +313,25 @@ def create_multi_range_comparison_plot(ranges_data_list, xlabel, ylabel, output_
         plt.plot(range_data['x_data'], range_data['y_data'],
                 marker='o', linestyle='',
                 color=range_data['color'],
-                label=f"{range_data['label']} (Data)")
+                label=f"{range_data['label']} (Observed)")
 
         # フィット曲線プロット
+        k_str = format_k_value(range_data['fit_params']['k'])
+        r_val = range_data['fit_params']['r']
+        R2_val = range_data['fit_params']['R2']
+        p_str = range_data['fit_params']['p_str']
         plt.plot(range_data['fit_x'], range_data['fit_y'],
                 linestyle='--', linewidth=1.5,
                 color=range_data['color'],
-                label=f"{range_data['label']} ({fit_type}: k={range_data['fit_params']['k']:.2e}, "
-                      f"r={range_data['fit_params']['r']:.3f}, R²={range_data['fit_params']['R2']:.4f}, "
-                      f"{range_data['fit_params']['p_str']})")
+                label=f"{range_data['label']} (Fit: N = {k_str} D⁻{r_val:.2f}, R²={R2_val:.3f}, {p_str})")
 
-    # 軸スケール設定
-    if scale_type == 'semilog':
-        plt.yscale('log')
-    elif scale_type == 'loglog':
-        plt.xscale('log')
-        plt.yscale('log')
+    # 軸スケール設定（両対数のみ）
+    plt.xscale('log')
+    plt.yscale('log')
 
     # x軸範囲の設定
-    if xlim and scale_type == 'loglog':
+    if xlim:
         plt.xlim(max(xlim[0], 0.5), xlim[1])
-    elif xlim:
-        plt.xlim(xlim)
 
     # 軸ラベルとグリッド
     plt.xlabel(xlabel, fontsize=20)
@@ -460,11 +339,8 @@ def create_multi_range_comparison_plot(ranges_data_list, xlabel, ylabel, output_
     plt.tick_params(labelsize=16)
     plt.grid(True, linestyle='--', alpha=0.5)
 
-    # y軸のtick設定（最大値1-20の場合は2刻みに固定）
-    ax = plt.gca()
-    ylim = ax.get_ylim()
-    if 1 <= ylim[1] <= 20:
-        ax.yaxis.set_major_locator(MultipleLocator(2))
+    # 凡例を右上に配置
+    plt.legend(loc='upper right', fontsize=10, frameon=True, fancybox=True)
 
     plt.tight_layout()
 
@@ -479,32 +355,6 @@ def create_multi_range_comparison_plot(ranges_data_list, xlabel, ylabel, output_
         plt.close()
 
     print(f'プロット保存: {output_path}.png')
-
-    # Legend情報の保存
-    legend_entries = []
-    for range_data in ranges_data_list:
-        # データプロットのエントリ
-        legend_entries.append({
-            'label': f"{range_data['label']} (Data)",
-            'color': range_data['color'],
-            'marker': 'o',
-            'linestyle': ''
-        })
-        # フィット曲線のエントリ
-        legend_entries.append({
-            'label': f"{range_data['label']} ({fit_type}: k={range_data['fit_params']['k']:.2e}, "
-                     f"r={range_data['fit_params']['r']:.3f}, R²={range_data['fit_params']['R2']:.4f}, "
-                     f"{range_data['fit_params']['p_str']})",
-            'color': range_data['color'],
-            'linestyle': '--',
-            'linewidth': 1.5
-        })
-
-    # TXT形式で保存
-    save_legend_info_to_txt(output_path, legend_entries)
-
-    # Legend専用PDF出力
-    save_legend_only_pdf(output_path, legend_entries)
 
 # ------------------------------------------------------------------
 # 1. 起動モード選択
@@ -677,38 +527,21 @@ if startup_mode == '1':
 
     if mode != '4':
         # モード1-3: Group2-3専用のディレクトリのみ作成
-        # プロット用サブフォルダ（Group2-3専用）
-        output_dir_power_2_3 = os.path.join(output_dir, '1_power_law_fit_2-3')
-        os.makedirs(output_dir_power_2_3, exist_ok=True)
-
-        # 面積規格化用サブフォルダ
-        output_dir_area_normalized_est = os.path.join(output_dir, '4_area_normalized_fit_estimate_group2')
-        output_dir_area_normalized_2_3 = os.path.join(output_dir, '5_area_normalized_fit_group2-3')
-        os.makedirs(output_dir_area_normalized_est, exist_ok=True)
-        os.makedirs(output_dir_area_normalized_2_3, exist_ok=True)
-
-        # Group比較用サブフォルダ
-        output_dir_group_comparison = os.path.join(output_dir, '6_group_comparison')
-        output_dir_group_comparison_area = os.path.join(output_dir, '7_group_comparison_area_normalized')
-        os.makedirs(output_dir_group_comparison, exist_ok=True)
-        os.makedirs(output_dir_group_comparison_area, exist_ok=True)
+        # 面積規格化用サブフォルダ（両対数グラフのみ）
+        output_dir_group1_3 = os.path.join(output_dir, 'RSFD_group1-3')
+        output_dir_group2_3 = os.path.join(output_dir, 'RSFD_group2-3')
+        output_dir_comparison = os.path.join(output_dir, 'RSFD_comparison')
+        os.makedirs(output_dir_group1_3, exist_ok=True)
+        os.makedirs(output_dir_group2_3, exist_ok=True)
+        os.makedirs(output_dir_comparison, exist_ok=True)
     else:
-        # モード4: Group2-3専用の比較プロット用ディレクトリのみ作成
-        # Group2-3専用ディレクトリ
-        output_dir_power_2_3 = os.path.join(output_dir, '1_power_law_comparison_2-3')
-        os.makedirs(output_dir_power_2_3, exist_ok=True)
-
-        # 面積規格化用ディレクトリ
-        output_dir_area_normalized_est = os.path.join(output_dir, '4_area_normalized_comparison_estimate_group2')
-        output_dir_area_normalized_2_3 = os.path.join(output_dir, '5_area_normalized_comparison_group2-3')
-        os.makedirs(output_dir_area_normalized_est, exist_ok=True)
-        os.makedirs(output_dir_area_normalized_2_3, exist_ok=True)
-
-        # Group比較用ディレクトリ
-        output_dir_group_comparison = os.path.join(output_dir, '6_group_comparison')
-        output_dir_group_comparison_area = os.path.join(output_dir, '7_group_comparison_area_normalized')
-        os.makedirs(output_dir_group_comparison, exist_ok=True)
-        os.makedirs(output_dir_group_comparison_area, exist_ok=True)
+        # モード4: 比較プロット用ディレクトリのみ作成
+        output_dir_group1_3 = os.path.join(output_dir, 'RSFD_group1-3_comparison')
+        output_dir_group2_3 = os.path.join(output_dir, 'RSFD_group2-3_comparison')
+        output_dir_comparison = os.path.join(output_dir, 'RSFD_comparison')
+        os.makedirs(output_dir_group1_3, exist_ok=True)
+        os.makedirs(output_dir_group2_3, exist_ok=True)
+        os.makedirs(output_dir_comparison, exist_ok=True)
 
 else:  # startup_mode == '2'
     # 設定ファイルから全ての処理履歴を読み込み
@@ -746,39 +579,21 @@ else:  # startup_mode == '2'
             os.makedirs(output_dir, exist_ok=True)
 
             if mode != '4':
-                # モード1-3: Group2-3専用のディレクトリのみ作成
-                # プロット用サブフォルダ（Group2-3専用）
-                output_dir_power_2_3 = os.path.join(output_dir, '1_power_law_fit_2-3')
-                os.makedirs(output_dir_power_2_3, exist_ok=True)
-
-                # 面積規格化用サブフォルダ
-                output_dir_area_normalized_est = os.path.join(output_dir, '4_area_normalized_fit_estimate_group2')
-                output_dir_area_normalized_2_3 = os.path.join(output_dir, '5_area_normalized_fit_group2-3')
-                os.makedirs(output_dir_area_normalized_est, exist_ok=True)
-                os.makedirs(output_dir_area_normalized_2_3, exist_ok=True)
-
-                # Group比較用サブフォルダ
-                output_dir_group_comparison = os.path.join(output_dir, '6_group_comparison')
-                output_dir_group_comparison_area = os.path.join(output_dir, '7_group_comparison_area_normalized')
-                os.makedirs(output_dir_group_comparison, exist_ok=True)
-                os.makedirs(output_dir_group_comparison_area, exist_ok=True)
+                # モード1-3: 面積規格化用サブフォルダ（両対数グラフのみ）
+                output_dir_group1_3 = os.path.join(output_dir, 'RSFD_group1-3')
+                output_dir_group2_3 = os.path.join(output_dir, 'RSFD_group2-3')
+                output_dir_comparison = os.path.join(output_dir, 'RSFD_comparison')
+                os.makedirs(output_dir_group1_3, exist_ok=True)
+                os.makedirs(output_dir_group2_3, exist_ok=True)
+                os.makedirs(output_dir_comparison, exist_ok=True)
             else:
-                # モード4: Group2-3専用の比較プロット用ディレクトリのみ作成
-                # Group2-3専用ディレクトリ
-                output_dir_power_2_3 = os.path.join(output_dir, '1_power_law_comparison_2-3')
-                os.makedirs(output_dir_power_2_3, exist_ok=True)
-
-                # 面積規格化用ディレクトリ
-                output_dir_area_normalized_est = os.path.join(output_dir, '4_area_normalized_comparison_estimate_group2')
-                output_dir_area_normalized_2_3 = os.path.join(output_dir, '5_area_normalized_comparison_group2-3')
-                os.makedirs(output_dir_area_normalized_est, exist_ok=True)
-                os.makedirs(output_dir_area_normalized_2_3, exist_ok=True)
-
-                # Group比較用ディレクトリ
-                output_dir_group_comparison = os.path.join(output_dir, '6_group_comparison')
-                output_dir_group_comparison_area = os.path.join(output_dir, '7_group_comparison_area_normalized')
-                os.makedirs(output_dir_group_comparison, exist_ok=True)
-                os.makedirs(output_dir_group_comparison_area, exist_ok=True)
+                # モード4: 比較プロット用ディレクトリのみ作成
+                output_dir_group1_3 = os.path.join(output_dir, 'RSFD_group1-3_comparison')
+                output_dir_group2_3 = os.path.join(output_dir, 'RSFD_group2-3_comparison')
+                output_dir_comparison = os.path.join(output_dir, 'RSFD_comparison')
+                os.makedirs(output_dir_group1_3, exist_ok=True)
+                os.makedirs(output_dir_group2_3, exist_ok=True)
+                os.makedirs(output_dir_comparison, exist_ok=True)
 
                 # モード4用の変数を復元
                 num_ranges = selected_record.get('num_ranges', 1)
@@ -1077,36 +892,21 @@ else:  # startup_mode == '2'
                 # プロット生成
                 print('\n=== 比較プロット生成中 ===')
 
-                # 従来手法とGroup2推定の比較プロットは削除（フィッティングなしのlinear-linearプロットのみ出力ディレクトリ直下に保存）
-                # Group2-3のみの比較プロットと面積規格化比較プロットのみ実施
+                # 面積規格化プロットのみ作成（両対数グラフのみ）
 
-                # Group2-3のみのプロット
-                power_data_grp2_3 = [d for d in all_ranges_data_grp2_3 if 'fit_type' not in d]
-                for scale in ['linear', 'semilog', 'loglog']:
-                    output_path = os.path.join(output_dir_power_2_3, f'RSFD_power_law_comparison_group2-3_{scale}')
-                    create_multi_range_comparison_plot(
-                        power_data_grp2_3, 'Rock size [cm]', 'Cumulative number of rocks',
-                        output_path, scale_type=scale, fit_type='Power-law',
-                        show_plot=False, xlim=(0, 50)
-                    )
-
-                # 面積規格化Group2推定のプロット
-                for scale in ['linear', 'semilog', 'loglog']:
-                    output_path = os.path.join(output_dir_area_normalized_est, f'RSFD_area_normalized_estimate_group2_comparison_{scale}')
-                    create_multi_range_comparison_plot(
-                        all_ranges_data_area_normalized_est, 'Rock size [cm]', 'Cumulative number of rocks /m²',
-                        output_path, scale_type=scale, fit_type='Power-law',
-                        show_plot=False, xlim=(0, 50)
-                    )
+                # 面積規格化Group1-3のプロット
+                output_path = os.path.join(output_dir_group1_3, 'RSFD_group1-3')
+                create_multi_range_comparison_plot(
+                    all_ranges_data_area_normalized_est, 'Rock size [cm]', 'Cumulative number of rocks /m²',
+                    output_path, show_plot=False, xlim=(0, 50)
+                )
 
                 # 面積規格化Group2-3のプロット
-                for scale in ['linear', 'semilog', 'loglog']:
-                    output_path = os.path.join(output_dir_area_normalized_2_3, f'RSFD_area_normalized_group2-3_comparison_{scale}')
-                    create_multi_range_comparison_plot(
-                        all_ranges_data_area_normalized_2_3, 'Rock size [cm]', 'Cumulative number of rocks /m²',
-                        output_path, scale_type=scale, fit_type='Power-law',
-                        show_plot=False, xlim=(0, 50)
-                    )
+                output_path = os.path.join(output_dir_group2_3, 'RSFD_group2-3')
+                create_multi_range_comparison_plot(
+                    all_ranges_data_area_normalized_2_3, 'Rock size [cm]', 'Cumulative number of rocks /m²',
+                    output_path, show_plot=False, xlim=(0, 50)
+                )
 
                 print('複数範囲比較プロット完了')
             else:
@@ -1240,143 +1040,11 @@ else:  # startup_mode == '2'
                     else:
                         return f"p={p:.3f}"
                 
-                def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
-                                     scale_type='linear', fit_lines=None,
-                                     show_plot=False, dpi_png=300, dpi_pdf=600,
-                                     marker='o', linestyle='-', linewidth=1.5, color=None, label=None,
-                                     xlim=None):
-                    """
-                    RSFDプロットを作成・保存する汎用関数
-                
-                    Parameters:
-                    -----------
-                    x_data, y_data : array
-                        プロットするデータ
-                    xlabel, ylabel : str
-                        軸ラベル
-                    output_path : str
-                        出力パス（拡張子なし）
-                    scale_type : str
-                        'linear', 'semilog', 'loglog'
-                    fit_lines : list of dict, optional
-                        フィット曲線のリスト [{'x': x, 'y': y, 'label': label, 'color': color, 'linestyle': style}, ...]
-                    show_plot : bool
-                        プロット表示の有無
-                    dpi_png, dpi_pdf : int
-                        解像度
-                    marker, linestyle, linewidth, color, label :
-                        データプロットのスタイル設定
-                    xlim : tuple, optional
-                        x軸範囲 (xmin, xmax)
-                    """
-                    plt.figure(figsize=(8, 6))
-                
-                    # データプロット
-                    if marker and linestyle:
-                        plot_kwargs = {'marker': marker, 'linestyle': linestyle, 'linewidth': linewidth}
-                        if color:
-                            plot_kwargs['color'] = color
-                        if label:
-                            plot_kwargs['label'] = label
-                        plt.plot(x_data, y_data, **plot_kwargs)
-                    elif marker:  # scatter plot
-                        scatter_kwargs = {'marker': marker}
-                        if color:
-                            scatter_kwargs['color'] = color
-                        if label:
-                            scatter_kwargs['label'] = label
-                        plt.scatter(x_data, y_data, **scatter_kwargs)
-                
-                    # フィット曲線の追加
-                    if fit_lines:
-                        for fit_line in fit_lines:
-                            plt.plot(fit_line['x'], fit_line['y'],
-                                    linestyle=fit_line.get('linestyle', '--'),
-                                    linewidth=fit_line.get('linewidth', 1.5),
-                                    color=fit_line.get('color', 'red'),
-                                    label=fit_line.get('label', ''))
-                
-                    # 軸スケール設定
-                    if scale_type == 'semilog':
-                        plt.yscale('log')
-                    elif scale_type == 'loglog':
-                        plt.xscale('log')
-                        plt.yscale('log')
-                
-                    # x軸範囲の設定（軸スケール設定の直後に実行）
-                    if xlim and scale_type == 'loglog':
-                        plt.xlim(max(xlim[0], 0.5), xlim[1])  # logスケールで負またはゼロを避ける
-                    elif xlim:
-                        plt.xlim(xlim)
+                # create_rsfd_plot関数はグローバルに定義済みのものを使用
 
-                    # 軸ラベルとグリッド
-                    plt.xlabel(xlabel, fontsize=20)
-                    plt.ylabel(ylabel, fontsize=20)
-                    plt.tick_params(labelsize=16)
-                    plt.grid(True, linestyle='--', alpha=0.5)
-
-                    # y軸のtick設定（最大値1-20の場合は2刻みに固定）
-                    ax = plt.gca()
-                    ylim = ax.get_ylim()
-                    if 1 <= ylim[1] <= 20:
-                        ax.yaxis.set_major_locator(MultipleLocator(2))
-
-                    plt.tight_layout()
-
-                    # 保存
-                    plt.savefig(f'{output_path}.png', dpi=dpi_png)
-                    plt.savefig(f'{output_path}.pdf', dpi=dpi_pdf)
-
-                    # 表示
-                    if show_plot:
-                        plt.show()
-                    else:
-                        plt.close()
-
-                    print(f'プロット保存: {output_path}.png')
-
-                    # Legend情報の保存（ラベルがある場合のみ）
-                    if label or fit_lines:
-                        legend_entries = []
-
-                        # データラベル
-                        if label:
-                            legend_entries.append({
-                                'label': label,
-                                'color': color if color else 'black',
-                                'linestyle': linestyle if linestyle else '',
-                                'marker': marker if marker else ''
-                            })
-
-                        # フィット曲線ラベル
-                        if fit_lines:
-                            for fit_line in fit_lines:
-                                legend_entries.append({
-                                    'label': fit_line.get('label', ''),
-                                    'color': fit_line.get('color', 'red'),
-                                    'linestyle': fit_line.get('linestyle', '--'),
-                                    'linewidth': fit_line.get('linewidth', 1.5)
-                                })
-
-                        # TXT形式で保存
-                        save_legend_info_to_txt(output_path, legend_entries)
-
-                        # Legend専用PDF出力
-                        save_legend_only_pdf(output_path, legend_entries)
-                
                 # ------------------------------------------------------------------
-                # 7. 従来手法（Traditional）のプロット保存
+                # 7. 従来手法（Traditional）データのTXT保存（プロットは面積規格化のみ）
                 # ------------------------------------------------------------------
-                # フィッティングなしのlinear-linearプロットのみ、出力ディレクトリ直下に保存
-                output_path = os.path.join(output_dir, 'RSFD_traditional_linear')
-                create_rsfd_plot(
-                    unique_sizes_traditional, cum_counts_traditional,
-                    'Rock size [cm]', 'Cumulative number of rocks',
-                    output_path, scale_type='linear',
-                    show_plot=False,
-                    xlim=(0, 50)
-                )
-
                 # TXT保存
                 with open(os.path.join(output_dir, 'RSFD_traditional.txt'), 'w') as f:
                     f.write('# size_cm\tcumulative_count\n')
@@ -1507,242 +1175,110 @@ else:  # startup_mode == '2'
             }]
 
             # ------------------------------------------------------------------
-            # 10. プロット: フィッティング比較（3種類のスケール）
+            # 10. 面積規格化フィッティングとプロット作成（両対数グラフのみ）
             # ------------------------------------------------------------------
-            # 従来手法の比較プロットは削除（フィッティングプロット自体を削除したため）
-            # Group2推定の比較プロットのみ実施
-            
-            # ------------------------------------------------------------------
-            # 11. プロット: Group2-3のみのフィッティング（3種類のスケール）
-            # ------------------------------------------------------------------
-            # 11.1 べき則フィット（Group2-3のみ）
-            p_str_pow_grp2_3 = format_p_value(p_pow_grp2_3)  # p値の書式設定
-            fit_lines_pow_grp2_3 = [{
-                'x': D_fit_grp2_3, 'y': N_pow_fit_grp2_3,
-                'label': f'Power-law: k={k_pow_grp2_3:.2e}, r={r_pow_grp2_3:.3f}, R²={R2_pow_grp2_3:.4f}, {p_str_pow_grp2_3}',
-                'color': 'red', 'linestyle': '--'
-            }]
-            
-            for scale in ['linear', 'semilog', 'loglog']:
-                output_path = os.path.join(output_dir_power_2_3, f'RSFD_power_law_fit_group2-3_{scale}')
-                create_rsfd_plot(
-                    unique_sizes_group2_3, cum_counts_group2_3,
-                    'Rock size [cm]', 'Cumulative number of rocks',
-                    output_path, scale_type=scale,
-                    fit_lines=fit_lines_pow_grp2_3,
-                    marker='o', linestyle='', label='Data (Group2-3)',
-                    show_plot=False,
-                    xlim=(0, 50)
-                )
 
-            # 11.2 Group比較プロット（Group1-3 vs Group2-3、area normalizeなし）
-            for scale in ['linear', 'semilog', 'loglog']:
-                output_path = os.path.join(output_dir_group_comparison, f'RSFD_group_comparison_{scale}')
-
-                plt.figure(figsize=(10, 8))
-
-                # データ点（Group1-3のみ表示）
-                plt.plot(unique_sizes_estimate_group2, cum_counts_estimate_group2,
-                        marker='o', linestyle='', color='black', label='Data')
-
-                # Group 1-3のフィット線
-                plt.plot(D_fit_est_grp2, N_pow_fit_est_grp2,
-                        linestyle='--', linewidth=1.5, color='blue',
-                        label=f'Group1-3 fit: k={k_pow_est_grp2:.2e}, r={r_pow_est_grp2:.3f}, R²={R2_pow_est_grp2:.4f}, {p_str_pow_est_grp2}')
-
-                # Group 2-3のフィット線
-                plt.plot(D_fit_grp2_3, N_pow_fit_grp2_3,
-                        linestyle='--', linewidth=1.5, color='red',
-                        label=f'Group2-3 fit: k={k_pow_grp2_3:.2e}, r={r_pow_grp2_3:.3f}, R²={R2_pow_grp2_3:.4f}, {p_str_pow_grp2_3}')
-
-                # 軸スケール設定
-                if scale == 'semilog':
-                    plt.yscale('log')
-                elif scale == 'loglog':
-                    plt.xscale('log')
-                    plt.yscale('log')
-
-                # x軸範囲
-                if scale == 'loglog':
-                    plt.xlim(max(0, 0.5), 50)
-                else:
-                    plt.xlim(0, 50)
-
-                # 軸ラベルとグリッド
-                plt.xlabel('Rock size [cm]', fontsize=20)
-                plt.ylabel('Cumulative number of rocks', fontsize=20)
-                plt.tick_params(labelsize=16)
-                plt.grid(True, linestyle='--', alpha=0.5)
-
-                # y軸のtick設定（最大値1-20の場合は2刻みに固定）
-                ax = plt.gca()
-                ylim = ax.get_ylim()
-                if 1 <= ylim[1] <= 20:
-                    ax.yaxis.set_major_locator(MultipleLocator(2))
-
-                plt.tight_layout()
-
-                # 保存
-                plt.savefig(f'{output_path}.png', dpi=300)
-                plt.savefig(f'{output_path}.pdf', dpi=600)
-                plt.close()
-
-                print(f'Group比較プロット保存: {output_path}.png')
-
-                # Legend情報の保存
-                legend_entries = [
-                    {'label': 'Data', 'color': 'black', 'marker': 'o', 'linestyle': ''},
-                    {'label': f'Group1-3 fit: k={k_pow_est_grp2:.2e}, r={r_pow_est_grp2:.3f}, R²={R2_pow_est_grp2:.4f}, {p_str_pow_est_grp2}',
-                     'color': 'blue', 'linestyle': '--', 'linewidth': 1.5},
-                    {'label': f'Group2-3 fit: k={k_pow_grp2_3:.2e}, r={r_pow_grp2_3:.3f}, R²={R2_pow_grp2_3:.4f}, {p_str_pow_grp2_3}',
-                     'color': 'red', 'linestyle': '--', 'linewidth': 1.5}
-                ]
-                save_legend_info_to_txt(output_path, legend_entries)
-                save_legend_only_pdf(output_path, legend_entries)
-
-            # TXT保存（Group2-3）
-            with open(os.path.join(output_dir, 'RSFD_linear_group2-3.txt'), 'w') as f:
-                f.write('# size_cm\tcumulative_count\n')
-                for s, n in zip(unique_sizes_group2_3, cum_counts_group2_3):
-                    f.write(f'{s:.3f}\t{n}\n')
-            print('Group2-3累積データTXT保存: RSFD_linear_group2-3.txt')
-
-            # ------------------------------------------------------------------
-            # 11.4 面積規格化フィッティング（Group2推定）
-            # ------------------------------------------------------------------
+            # Group1-3（Label 1-3）の面積規格化フィッティング
             (k_pow_area_est, r_pow_area_est, R2_pow_area_est, N_pow_fit_area_est,
              t_pow_area_est, p_pow_area_est, se_pow_area_est, n_pow_area_est, dof_pow_area_est), \
             D_fit_area_est, cum_counts_area_est = calc_fitting_area_normalized(
                 unique_sizes_estimate_group2, cum_counts_estimate_group2, area)
-
             p_str_pow_area_est = format_p_value(p_pow_area_est)
-            fit_lines_pow_area_est = [{
-                'x': D_fit_area_est, 'y': N_pow_fit_area_est,
-                'label': f'Power-law: k={k_pow_area_est:.2e}, r={r_pow_area_est:.3f}, R²={R2_pow_area_est:.4f}, {p_str_pow_area_est}',
-                'color': 'red', 'linestyle': '--'
-            }]
 
-            for scale in ['linear', 'semilog', 'loglog']:
-                output_path = os.path.join(output_dir_area_normalized_est, f'RSFD_area_normalized_estimate_group2_{scale}')
-                create_rsfd_plot(
-                    unique_sizes_estimate_group2, cum_counts_area_est,
-                    'Rock size [cm]', 'Cumulative number of rocks /m²',
-                    output_path, scale_type=scale,
-                    fit_lines=fit_lines_pow_area_est,
-                    marker='o', linestyle='', label='Data (Estimate Group2, Area-normalized)',
-                    show_plot=(scale == 'linear' and show_plot_flag),
-                    xlim=(0, 50)
-                )
+            # Group1-3のプロット作成
+            output_path = os.path.join(output_dir_group1_3, 'RSFD_group1-3')
+            fit_params_est = {'k': k_pow_area_est, 'r': r_pow_area_est, 'R2': R2_pow_area_est, 'p_str': p_str_pow_area_est}
+            create_rsfd_plot(
+                unique_sizes_estimate_group2, cum_counts_area_est,
+                'Rock size [cm]', 'Cumulative number of rocks /m²',
+                output_path,
+                fit_x=D_fit_area_est, fit_y=N_pow_fit_area_est, fit_params=fit_params_est,
+                show_plot=show_plot_flag,
+                xlim=(0, 50)
+            )
 
-            # TXT保存（面積規格化Group2推定）
-            with open(os.path.join(output_dir, 'RSFD_area_normalized_estimate_group2.txt'), 'w') as f:
+            # TXT保存（面積規格化Group1-3）
+            with open(os.path.join(output_dir, 'RSFD_group1-3.txt'), 'w') as f:
                 f.write(f'# Area: {area} m²\n')
                 f.write('# size_cm\tcumulative_count_per_m2\n')
                 for s, n in zip(unique_sizes_estimate_group2, cum_counts_area_est):
                     f.write(f'{s:.3f}\t{n:.6f}\n')
-            print('面積規格化Group2推定累積データTXT保存: RSFD_area_normalized_estimate_group2.txt')
+            print('面積規格化Group1-3累積データTXT保存: RSFD_group1-3.txt')
 
-            # ------------------------------------------------------------------
-            # 11.5 面積規格化フィッティング（Group2-3）
-            # ------------------------------------------------------------------
+            # Group2-3（Label 2-3）の面積規格化フィッティング
             (k_pow_area_2_3, r_pow_area_2_3, R2_pow_area_2_3, N_pow_fit_area_2_3,
              t_pow_area_2_3, p_pow_area_2_3, se_pow_area_2_3, n_pow_area_2_3, dof_pow_area_2_3), \
             D_fit_area_2_3, cum_counts_area_2_3 = calc_fitting_area_normalized(
                 unique_sizes_group2_3, cum_counts_group2_3, area)
-
             p_str_pow_area_2_3 = format_p_value(p_pow_area_2_3)
-            fit_lines_pow_area_2_3 = [{
-                'x': D_fit_area_2_3, 'y': N_pow_fit_area_2_3,
-                'label': f'Power-law: k={k_pow_area_2_3:.2e}, r={r_pow_area_2_3:.3f}, R²={R2_pow_area_2_3:.4f}, {p_str_pow_area_2_3}',
-                'color': 'red', 'linestyle': '--'
-            }]
 
-            for scale in ['linear', 'semilog', 'loglog']:
-                output_path = os.path.join(output_dir_area_normalized_2_3, f'RSFD_area_normalized_group2-3_{scale}')
-                create_rsfd_plot(
-                    unique_sizes_group2_3, cum_counts_area_2_3,
-                    'Rock size [cm]', 'Cumulative number of rocks /m²',
-                    output_path, scale_type=scale,
-                    fit_lines=fit_lines_pow_area_2_3,
-                    marker='o', linestyle='', label='Data (Group2-3, Area-normalized)',
-                    show_plot=(scale == 'linear' and show_plot_flag),
-                    xlim=(0, 50)
-                )
+            # Group2-3のプロット作成
+            output_path = os.path.join(output_dir_group2_3, 'RSFD_group2-3')
+            fit_params_2_3 = {'k': k_pow_area_2_3, 'r': r_pow_area_2_3, 'R2': R2_pow_area_2_3, 'p_str': p_str_pow_area_2_3}
+            create_rsfd_plot(
+                unique_sizes_group2_3, cum_counts_area_2_3,
+                'Rock size [cm]', 'Cumulative number of rocks /m²',
+                output_path,
+                fit_x=D_fit_area_2_3, fit_y=N_pow_fit_area_2_3, fit_params=fit_params_2_3,
+                show_plot=False,
+                xlim=(0, 50)
+            )
 
             # TXT保存（面積規格化Group2-3）
-            with open(os.path.join(output_dir, 'RSFD_area_normalized_group2-3.txt'), 'w') as f:
+            with open(os.path.join(output_dir, 'RSFD_group2-3.txt'), 'w') as f:
                 f.write(f'# Area: {area} m²\n')
                 f.write('# size_cm\tcumulative_count_per_m2\n')
                 for s, n in zip(unique_sizes_group2_3, cum_counts_area_2_3):
                     f.write(f'{s:.3f}\t{n:.6f}\n')
-            print('面積規格化Group2-3累積データTXT保存: RSFD_area_normalized_group2-3.txt')
+            print('面積規格化Group2-3累積データTXT保存: RSFD_group2-3.txt')
 
             # ------------------------------------------------------------------
-            # 11.6 Group比較プロット（Group1-3 vs Group2-3、area normalizeあり）
+            # 11. Group比較プロット（Group1-3 vs Group2-3、面積規格化、両対数グラフ）
             # ------------------------------------------------------------------
-            for scale in ['linear', 'semilog', 'loglog']:
-                output_path = os.path.join(output_dir_group_comparison_area, f'RSFD_group_comparison_area_normalized_{scale}')
+            output_path = os.path.join(output_dir_comparison, 'RSFD_comparison')
 
-                plt.figure(figsize=(10, 8))
+            plt.figure(figsize=(10, 8))
 
-                # データ点（Group1-3のみ表示、面積規格化）
-                plt.plot(unique_sizes_estimate_group2, cum_counts_area_est,
-                        marker='o', linestyle='', color='black', label='Data')
+            # データ点（Group1-3）
+            plt.plot(unique_sizes_estimate_group2, cum_counts_area_est,
+                    marker='o', linestyle='', color='black', label='Observed data')
 
-                # Group 1-3のフィット線（面積規格化）
-                plt.plot(D_fit_area_est, N_pow_fit_area_est,
-                        linestyle='--', linewidth=1.5, color='blue',
-                        label=f'Group1-3 fit: k={k_pow_area_est:.2e}, r={r_pow_area_est:.3f}, R²={R2_pow_area_est:.4f}, {p_str_pow_area_est}')
+            # Group 1-3のフィット線
+            k_str_est = format_k_value(k_pow_area_est)
+            plt.plot(D_fit_area_est, N_pow_fit_area_est,
+                    linestyle='--', linewidth=1.5, color='blue',
+                    label=f'Group1-3 Fit: N = {k_str_est} D⁻{r_pow_area_est:.2f}, R²={R2_pow_area_est:.3f}, {p_str_pow_area_est}')
 
-                # Group 2-3のフィット線（面積規格化）
-                plt.plot(D_fit_area_2_3, N_pow_fit_area_2_3,
-                        linestyle='--', linewidth=1.5, color='red',
-                        label=f'Group2-3 fit: k={k_pow_area_2_3:.2e}, r={r_pow_area_2_3:.3f}, R²={R2_pow_area_2_3:.4f}, {p_str_pow_area_2_3}')
+            # Group 2-3のフィット線
+            k_str_2_3 = format_k_value(k_pow_area_2_3)
+            plt.plot(D_fit_area_2_3, N_pow_fit_area_2_3,
+                    linestyle='--', linewidth=1.5, color='red',
+                    label=f'Group2-3 Fit: N = {k_str_2_3} D⁻{r_pow_area_2_3:.2f}, R²={R2_pow_area_2_3:.3f}, {p_str_pow_area_2_3}')
 
-                # 軸スケール設定
-                if scale == 'semilog':
-                    plt.yscale('log')
-                elif scale == 'loglog':
-                    plt.xscale('log')
-                    plt.yscale('log')
+            # 軸スケール設定（両対数のみ）
+            plt.xscale('log')
+            plt.yscale('log')
 
-                # x軸範囲
-                if scale == 'loglog':
-                    plt.xlim(max(0, 0.5), 50)
-                else:
-                    plt.xlim(0, 50)
+            # x軸範囲
+            plt.xlim(0.5, 50)
 
-                # 軸ラベルとグリッド
-                plt.xlabel('Rock size [cm]', fontsize=20)
-                plt.ylabel('Cumulative number of rocks /m²', fontsize=20)
-                plt.tick_params(labelsize=16)
-                plt.grid(True, linestyle='--', alpha=0.5)
+            # 軸ラベルとグリッド
+            plt.xlabel('Rock size [cm]', fontsize=20)
+            plt.ylabel('Cumulative number of rocks /m²', fontsize=20)
+            plt.tick_params(labelsize=16)
+            plt.grid(True, linestyle='--', alpha=0.5)
 
-                # y軸のtick設定（最大値1-20の場合は2刻みに固定）
-                ax = plt.gca()
-                ylim = ax.get_ylim()
-                if 1 <= ylim[1] <= 20:
-                    ax.yaxis.set_major_locator(MultipleLocator(2))
+            # 凡例を右上に配置
+            plt.legend(loc='upper right', fontsize=10, frameon=True, fancybox=True)
 
-                plt.tight_layout()
+            plt.tight_layout()
 
-                # 保存
-                plt.savefig(f'{output_path}.png', dpi=300)
-                plt.savefig(f'{output_path}.pdf', dpi=600)
-                plt.close()
+            # 保存
+            plt.savefig(f'{output_path}.png', dpi=300)
+            plt.savefig(f'{output_path}.pdf', dpi=600)
+            plt.close()
 
-                print(f'Group比較プロット（面積規格化）保存: {output_path}.png')
-
-                # Legend情報の保存
-                legend_entries = [
-                    {'label': 'Data', 'color': 'black', 'marker': 'o', 'linestyle': ''},
-                    {'label': f'Group1-3 fit: k={k_pow_area_est:.2e}, r={r_pow_area_est:.3f}, R²={R2_pow_area_est:.4f}, {p_str_pow_area_est}',
-                     'color': 'blue', 'linestyle': '--', 'linewidth': 1.5},
-                    {'label': f'Group2-3 fit: k={k_pow_area_2_3:.2e}, r={r_pow_area_2_3:.3f}, R²={R2_pow_area_2_3:.4f}, {p_str_pow_area_2_3}',
-                     'color': 'red', 'linestyle': '--', 'linewidth': 1.5}
-                ]
-                save_legend_info_to_txt(output_path, legend_entries)
-                save_legend_only_pdf(output_path, legend_entries)
+            print(f'Group比較プロット保存: {output_path}.png')
 
             # ------------------------------------------------------------------
             # 12. フィッティングサマリーファイルの出力
@@ -1929,143 +1465,11 @@ if mode != '4':
         else:
             return f"p={p:.3f}"
     
-    def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
-                         scale_type='linear', fit_lines=None,
-                         show_plot=False, dpi_png=300, dpi_pdf=600,
-                         marker='o', linestyle='-', linewidth=1.5, color=None, label=None,
-                         xlim=None):
-        """
-        RSFDプロットを作成・保存する汎用関数
-    
-        Parameters:
-        -----------
-        x_data, y_data : array
-            プロットするデータ
-        xlabel, ylabel : str
-            軸ラベル
-        output_path : str
-            出力パス（拡張子なし）
-        scale_type : str
-            'linear', 'semilog', 'loglog'
-        fit_lines : list of dict, optional
-            フィット曲線のリスト [{'x': x, 'y': y, 'label': label, 'color': color, 'linestyle': style}, ...]
-        show_plot : bool
-            プロット表示の有無
-        dpi_png, dpi_pdf : int
-            解像度
-        marker, linestyle, linewidth, color, label :
-            データプロットのスタイル設定
-        xlim : tuple, optional
-            x軸範囲 (xmin, xmax)
-        """
-        plt.figure(figsize=(8, 6))
-    
-        # データプロット
-        if marker and linestyle:
-            plot_kwargs = {'marker': marker, 'linestyle': linestyle, 'linewidth': linewidth}
-            if color:
-                plot_kwargs['color'] = color
-            if label:
-                plot_kwargs['label'] = label
-            plt.plot(x_data, y_data, **plot_kwargs)
-        elif marker:  # scatter plot
-            scatter_kwargs = {'marker': marker}
-            if color:
-                scatter_kwargs['color'] = color
-            if label:
-                scatter_kwargs['label'] = label
-            plt.scatter(x_data, y_data, **scatter_kwargs)
-    
-        # フィット曲線の追加
-        if fit_lines:
-            for fit_line in fit_lines:
-                plt.plot(fit_line['x'], fit_line['y'],
-                        linestyle=fit_line.get('linestyle', '--'),
-                        linewidth=fit_line.get('linewidth', 1.5),
-                        color=fit_line.get('color', 'red'),
-                        label=fit_line.get('label', ''))
-    
-        # 軸スケール設定
-        if scale_type == 'semilog':
-            plt.yscale('log')
-        elif scale_type == 'loglog':
-            plt.xscale('log')
-            plt.yscale('log')
-    
-        # x軸範囲の設定（軸スケール設定の直後に実行）
-        if xlim and scale_type == 'loglog':
-            plt.xlim(max(xlim[0], 0.5), xlim[1])  # logスケールで負またはゼロを避ける
-        elif xlim:
-            plt.xlim(xlim)
-    
-        # 軸ラベルとグリッド
-        plt.xlabel(xlabel, fontsize=20)
-        plt.ylabel(ylabel, fontsize=20)
-        plt.tick_params(labelsize=16)
-        plt.grid(True, linestyle='--', alpha=0.5)
-
-        # y軸のtick設定（最大値1-20の場合は2刻みに固定）
-        ax = plt.gca()
-        ylim = ax.get_ylim()
-        if 1 <= ylim[1] <= 20:
-            ax.yaxis.set_major_locator(MultipleLocator(2))
-
-        plt.tight_layout()
-
-        # 保存
-        plt.savefig(f'{output_path}.png', dpi=dpi_png)
-        plt.savefig(f'{output_path}.pdf', dpi=dpi_pdf)
-
-        # 表示
-        if show_plot:
-            plt.show()
-        else:
-            plt.close()
-
-        print(f'プロット保存: {output_path}.png')
-
-        # Legend情報の保存（ラベルがある場合のみ）
-        if label or fit_lines:
-            legend_entries = []
-
-            # データラベル
-            if label:
-                legend_entries.append({
-                    'label': label,
-                    'color': color if color else 'black',
-                    'linestyle': linestyle if linestyle else '',
-                    'marker': marker if marker else ''
-                })
-
-            # フィット曲線ラベル
-            if fit_lines:
-                for fit_line in fit_lines:
-                    legend_entries.append({
-                        'label': fit_line.get('label', ''),
-                        'color': fit_line.get('color', 'red'),
-                        'linestyle': fit_line.get('linestyle', '--'),
-                        'linewidth': fit_line.get('linewidth', 1.5)
-                    })
-
-            # TXT形式で保存
-            save_legend_info_to_txt(output_path, legend_entries)
-
-            # Legend専用PDF出力
-            save_legend_only_pdf(output_path, legend_entries)
+    # create_rsfd_plot関数はグローバルに定義済みのものを使用
     
     # ------------------------------------------------------------------
-    # 7. 従来手法（Traditional）のプロット保存
+    # 7. 従来手法（Traditional）データのTXT保存（プロットは面積規格化のみ）
     # ------------------------------------------------------------------
-    # フィッティングなしのlinear-linearプロットのみ、出力ディレクトリ直下に保存
-    output_path = os.path.join(output_dir, 'RSFD_traditional_linear')
-    create_rsfd_plot(
-        unique_sizes_traditional, cum_counts_traditional,
-        'Rock size [cm]', 'Cumulative number of rocks',
-        output_path, scale_type='linear',
-        show_plot=False,
-        xlim=(0, 50)
-    )
-
     # TXT保存
     with open(os.path.join(output_dir, 'RSFD_traditional.txt'), 'w') as f:
         f.write('# size_cm\tcumulative_count\n')
@@ -2169,246 +1573,118 @@ if mode != '4':
     (k_pow_est_grp2, r_pow_est_grp2, R2_pow_est_grp2, N_pow_fit_est_grp2, t_pow_est_grp2, p_pow_est_grp2, se_pow_est_grp2, n_pow_est_grp2, dof_pow_est_grp2),\
         (k_exp_est_grp2, r_exp_est_grp2, R2_exp_est_grp2, N_exp_fit_est_grp2, t_exp_est_grp2, p_exp_est_grp2, se_exp_est_grp2, n_exp_est_grp2, dof_exp_est_grp2), D_fit_est_grp2\
         = calc_fitting(unique_sizes_estimate_group2, cum_counts_estimate_group2)
-    
+
+    p_str_pow_est_grp2 = format_p_value(p_pow_est_grp2)  # p値の書式設定（Group1-3用）
+
     (k_pow_grp2_3, r_pow_grp2_3, R2_pow_grp2_3, N_pow_fit_grp2_3, t_pow_grp2_3, p_pow_grp2_3, se_pow_grp2_3, n_pow_grp2_3, dof_pow_grp2_3),\
         (k_exp_grp2_3, r_exp_grp2_3, R2_exp_grp2_3, N_exp_fit_grp2_3, t_exp_grp2_3, p_exp_grp2_3, se_exp_grp2_3, n_exp_grp2_3, dof_exp_grp2_3), D_fit_grp2_3\
         = calc_fitting(unique_sizes_group2_3, cum_counts_group2_3)
     
     # ------------------------------------------------------------------
-    # 9. プロット: Group2-3のみのフィッティング（3種類のスケール）
+    # 9. 面積規格化フィッティングとプロット作成（両対数グラフのみ）
     # ------------------------------------------------------------------
-    # 従来手法のフィッティングプロットは削除（フィッティングなしのlinear-linearプロットのみ出力ディレクトリ直下に保存済み）
-    # Group2推定のフィッティング比較プロットも削除
 
-    # 9.1 べき則フィット（Group2-3のみ）
-    p_str_pow_grp2_3 = format_p_value(p_pow_grp2_3)  # p値の書式設定
-    fit_lines_pow_grp2_3 = [{
-        'x': D_fit_grp2_3, 'y': N_pow_fit_grp2_3,
-        'label': f'Power-law: k={k_pow_grp2_3:.2e}, r={r_pow_grp2_3:.3f}, R²={R2_pow_grp2_3:.4f}, {p_str_pow_grp2_3}',
-        'color': 'red', 'linestyle': '--'
-    }]
-
-    for scale in ['linear', 'semilog', 'loglog']:
-        output_path = os.path.join(output_dir_power_2_3, f'RSFD_power_law_fit_group2-3_{scale}')
-        create_rsfd_plot(
-            unique_sizes_group2_3, cum_counts_group2_3,
-            'Rock size [cm]', 'Cumulative number of rocks',
-            output_path, scale_type=scale,
-            fit_lines=fit_lines_pow_grp2_3,
-            marker='o', linestyle='', label='Data (Group2-3)',
-            show_plot=False,
-            xlim=(0, 50)
-        )
-
-
-    # 9.2 Group比較プロット（Group1-3 vs Group2-3、area normalizeなし）
-    for scale in ['linear', 'semilog', 'loglog']:
-        output_path = os.path.join(output_dir_group_comparison, f'RSFD_group_comparison_{scale}')
-
-        plt.figure(figsize=(10, 8))
-
-        # データ点（Group1-3のみ表示）
-        plt.plot(unique_sizes_estimate_group2, cum_counts_estimate_group2,
-                marker='o', linestyle='', color='black', label='Data')
-
-        # Group 1-3のフィット線
-        plt.plot(D_fit_est_grp2, N_pow_fit_est_grp2,
-                linestyle='--', linewidth=1.5, color='blue',
-                label=f'Group1-3 fit: k={k_pow_est_grp2:.2e}, r={r_pow_est_grp2:.3f}, R²={R2_pow_est_grp2:.4f}, {p_str_pow_est_grp2}')
-
-        # Group 2-3のフィット線
-        plt.plot(D_fit_grp2_3, N_pow_fit_grp2_3,
-                linestyle='--', linewidth=1.5, color='red',
-                label=f'Group2-3 fit: k={k_pow_grp2_3:.2e}, r={r_pow_grp2_3:.3f}, R²={R2_pow_grp2_3:.4f}, {p_str_pow_grp2_3}')
-
-        # 軸スケール設定
-        if scale == 'semilog':
-            plt.yscale('log')
-        elif scale == 'loglog':
-            plt.xscale('log')
-            plt.yscale('log')
-
-        # x軸範囲
-        if scale == 'loglog':
-            plt.xlim(max(0, 0.5), 50)
-        else:
-            plt.xlim(0, 50)
-
-        # 軸ラベルとグリッド
-        plt.xlabel('Rock size [cm]', fontsize=20)
-        plt.ylabel('Cumulative number of rocks', fontsize=20)
-        plt.tick_params(labelsize=16)
-        plt.grid(True, linestyle='--', alpha=0.5)
-
-        # y軸のtick設定（最大値1-20の場合は2刻みに固定）
-        ax = plt.gca()
-        ylim = ax.get_ylim()
-        if 1 <= ylim[1] <= 20:
-            ax.yaxis.set_major_locator(MultipleLocator(2))
-
-        plt.tight_layout()
-
-        # 保存
-        plt.savefig(f'{output_path}.png', dpi=300)
-        plt.savefig(f'{output_path}.pdf', dpi=600)
-        plt.close()
-
-        print(f'Group比較プロット保存: {output_path}.png')
-
-        # Legend情報の保存
-        legend_entries = [
-            {'label': 'Data', 'color': 'black', 'marker': 'o', 'linestyle': ''},
-            {'label': f'Group1-3 fit: k={k_pow_est_grp2:.2e}, r={r_pow_est_grp2:.3f}, R²={R2_pow_est_grp2:.4f}, {p_str_pow_est_grp2}',
-             'color': 'blue', 'linestyle': '--', 'linewidth': 1.5},
-            {'label': f'Group2-3 fit: k={k_pow_grp2_3:.2e}, r={r_pow_grp2_3:.3f}, R²={R2_pow_grp2_3:.4f}, {p_str_pow_grp2_3}',
-             'color': 'red', 'linestyle': '--', 'linewidth': 1.5}
-        ]
-        save_legend_info_to_txt(output_path, legend_entries)
-        save_legend_only_pdf(output_path, legend_entries)
-
-    # TXT保存（Group2-3）
-    with open(os.path.join(output_dir, 'RSFD_linear_group2-3.txt'), 'w') as f:
-        f.write('# size_cm\tcumulative_count\n')
-        for s, n in zip(unique_sizes_group2_3, cum_counts_group2_3):
-            f.write(f'{s:.3f}\t{n}\n')
-    print('Group2-3累積データTXT保存: RSFD_linear_group2-3.txt')
-
-    # ------------------------------------------------------------------
-    # 9.4 面積規格化フィッティング（Group2推定）
-    # ------------------------------------------------------------------
+    # Group1-3（Label 1-3）の面積規格化フィッティング
     (k_pow_area_est, r_pow_area_est, R2_pow_area_est, N_pow_fit_area_est,
      t_pow_area_est, p_pow_area_est, se_pow_area_est, n_pow_area_est, dof_pow_area_est), \
     D_fit_area_est, cum_counts_area_est = calc_fitting_area_normalized(
         unique_sizes_estimate_group2, cum_counts_estimate_group2, area)
-
     p_str_pow_area_est = format_p_value(p_pow_area_est)
-    fit_lines_pow_area_est = [{
-        'x': D_fit_area_est, 'y': N_pow_fit_area_est,
-        'label': f'Power-law: k={k_pow_area_est:.2e}, r={r_pow_area_est:.3f}, R²={R2_pow_area_est:.4f}, {p_str_pow_area_est}',
-        'color': 'red', 'linestyle': '--'
-    }]
 
-    for scale in ['linear', 'semilog', 'loglog']:
-        output_path = os.path.join(output_dir_area_normalized_est, f'RSFD_area_normalized_estimate_group2_{scale}')
-        create_rsfd_plot(
-            unique_sizes_estimate_group2, cum_counts_area_est,
-            'Rock size [cm]', 'Cumulative number of rocks /m²',
-            output_path, scale_type=scale,
-            fit_lines=fit_lines_pow_area_est,
-            marker='o', linestyle='', label='Data (Estimate Group2, Area-normalized)',
-            show_plot=(scale == 'linear' and show_plot_flag),
-            xlim=(0, 50)
-        )
+    # Group1-3のプロット作成
+    output_path = os.path.join(output_dir_group1_3, 'RSFD_group1-3')
+    fit_params_est = {'k': k_pow_area_est, 'r': r_pow_area_est, 'R2': R2_pow_area_est, 'p_str': p_str_pow_area_est}
+    create_rsfd_plot(
+        unique_sizes_estimate_group2, cum_counts_area_est,
+        'Rock size [cm]', 'Cumulative number of rocks /m²',
+        output_path,
+        fit_x=D_fit_area_est, fit_y=N_pow_fit_area_est, fit_params=fit_params_est,
+        show_plot=show_plot_flag,
+        xlim=(0, 50)
+    )
 
-    # TXT保存（面積規格化Group2推定）
-    with open(os.path.join(output_dir, 'RSFD_area_normalized_estimate_group2.txt'), 'w') as f:
+    # TXT保存（面積規格化Group1-3）
+    with open(os.path.join(output_dir, 'RSFD_group1-3.txt'), 'w') as f:
         f.write(f'# Area: {area} m²\n')
         f.write('# size_cm\tcumulative_count_per_m2\n')
         for s, n in zip(unique_sizes_estimate_group2, cum_counts_area_est):
             f.write(f'{s:.3f}\t{n:.6f}\n')
-    print('面積規格化Group2推定累積データTXT保存: RSFD_area_normalized_estimate_group2.txt')
+    print('面積規格化Group1-3累積データTXT保存: RSFD_group1-3.txt')
 
-    # ------------------------------------------------------------------
-    # 9.5 面積規格化フィッティング（Group2-3）
-    # ------------------------------------------------------------------
+    # Group2-3（Label 2-3）の面積規格化フィッティング
     (k_pow_area_2_3, r_pow_area_2_3, R2_pow_area_2_3, N_pow_fit_area_2_3,
      t_pow_area_2_3, p_pow_area_2_3, se_pow_area_2_3, n_pow_area_2_3, dof_pow_area_2_3), \
     D_fit_area_2_3, cum_counts_area_2_3 = calc_fitting_area_normalized(
         unique_sizes_group2_3, cum_counts_group2_3, area)
-
     p_str_pow_area_2_3 = format_p_value(p_pow_area_2_3)
-    fit_lines_pow_area_2_3 = [{
-        'x': D_fit_area_2_3, 'y': N_pow_fit_area_2_3,
-        'label': f'Power-law: k={k_pow_area_2_3:.2e}, r={r_pow_area_2_3:.3f}, R²={R2_pow_area_2_3:.4f}, {p_str_pow_area_2_3}',
-        'color': 'red', 'linestyle': '--'
-    }]
 
-    for scale in ['linear', 'semilog', 'loglog']:
-        output_path = os.path.join(output_dir_area_normalized_2_3, f'RSFD_area_normalized_group2-3_{scale}')
-        create_rsfd_plot(
-            unique_sizes_group2_3, cum_counts_area_2_3,
-            'Rock size [cm]', 'Cumulative number of rocks /m²',
-            output_path, scale_type=scale,
-            fit_lines=fit_lines_pow_area_2_3,
-            marker='o', linestyle='', label='Data (Group2-3, Area-normalized)',
-            show_plot=(scale == 'linear' and show_plot_flag),
-            xlim=(0, 50)
-        )
+    # Group2-3のプロット作成
+    output_path = os.path.join(output_dir_group2_3, 'RSFD_group2-3')
+    fit_params_2_3 = {'k': k_pow_area_2_3, 'r': r_pow_area_2_3, 'R2': R2_pow_area_2_3, 'p_str': p_str_pow_area_2_3}
+    create_rsfd_plot(
+        unique_sizes_group2_3, cum_counts_area_2_3,
+        'Rock size [cm]', 'Cumulative number of rocks /m²',
+        output_path,
+        fit_x=D_fit_area_2_3, fit_y=N_pow_fit_area_2_3, fit_params=fit_params_2_3,
+        show_plot=False,
+        xlim=(0, 50)
+    )
 
     # TXT保存（面積規格化Group2-3）
-    with open(os.path.join(output_dir, 'RSFD_area_normalized_group2-3.txt'), 'w') as f:
+    with open(os.path.join(output_dir, 'RSFD_group2-3.txt'), 'w') as f:
         f.write(f'# Area: {area} m²\n')
         f.write('# size_cm\tcumulative_count_per_m2\n')
         for s, n in zip(unique_sizes_group2_3, cum_counts_area_2_3):
             f.write(f'{s:.3f}\t{n:.6f}\n')
-    print('面積規格化Group2-3累積データTXT保存: RSFD_area_normalized_group2-3.txt')
+    print('面積規格化Group2-3累積データTXT保存: RSFD_group2-3.txt')
 
     # ------------------------------------------------------------------
-    # 9.6 Group比較プロット（Group1-3 vs Group2-3、area normalizeあり）
+    # 10. Group比較プロット（Group1-3 vs Group2-3、面積規格化、両対数グラフ）
     # ------------------------------------------------------------------
-    for scale in ['linear', 'semilog', 'loglog']:
-        output_path = os.path.join(output_dir_group_comparison_area, f'RSFD_group_comparison_area_normalized_{scale}')
+    output_path = os.path.join(output_dir_comparison, 'RSFD_comparison')
 
-        plt.figure(figsize=(10, 8))
+    plt.figure(figsize=(10, 8))
 
-        # データ点（Group1-3のみ表示、面積規格化）
-        plt.plot(unique_sizes_estimate_group2, cum_counts_area_est,
-                marker='o', linestyle='', color='black', label='Data')
+    # データ点（Group1-3）
+    plt.plot(unique_sizes_estimate_group2, cum_counts_area_est,
+            marker='o', linestyle='', color='black', label='Observed data')
 
-        # Group 1-3のフィット線（面積規格化）
-        plt.plot(D_fit_area_est, N_pow_fit_area_est,
-                linestyle='--', linewidth=1.5, color='blue',
-                label=f'Group1-3 fit: k={k_pow_area_est:.2e}, r={r_pow_area_est:.3f}, R²={R2_pow_area_est:.4f}, {p_str_pow_area_est}')
+    # Group 1-3のフィット線
+    k_str_est = format_k_value(k_pow_area_est)
+    plt.plot(D_fit_area_est, N_pow_fit_area_est,
+            linestyle='--', linewidth=1.5, color='blue',
+            label=f'Group1-3 Fit: N = {k_str_est} D⁻{r_pow_area_est:.2f}, R²={R2_pow_area_est:.3f}, {p_str_pow_area_est}')
 
-        # Group 2-3のフィット線（面積規格化）
-        plt.plot(D_fit_area_2_3, N_pow_fit_area_2_3,
-                linestyle='--', linewidth=1.5, color='red',
-                label=f'Group2-3 fit: k={k_pow_area_2_3:.2e}, r={r_pow_area_2_3:.3f}, R²={R2_pow_area_2_3:.4f}, {p_str_pow_area_2_3}')
+    # Group 2-3のフィット線
+    k_str_2_3 = format_k_value(k_pow_area_2_3)
+    plt.plot(D_fit_area_2_3, N_pow_fit_area_2_3,
+            linestyle='--', linewidth=1.5, color='red',
+            label=f'Group2-3 Fit: N = {k_str_2_3} D⁻{r_pow_area_2_3:.2f}, R²={R2_pow_area_2_3:.3f}, {p_str_pow_area_2_3}')
 
-        # 軸スケール設定
-        if scale == 'semilog':
-            plt.yscale('log')
-        elif scale == 'loglog':
-            plt.xscale('log')
-            plt.yscale('log')
+    # 軸スケール設定（両対数のみ）
+    plt.xscale('log')
+    plt.yscale('log')
 
-        # x軸範囲
-        if scale == 'loglog':
-            plt.xlim(max(0, 0.5), 50)
-        else:
-            plt.xlim(0, 50)
+    # x軸範囲
+    plt.xlim(0.5, 50)
 
-        # 軸ラベルとグリッド
-        plt.xlabel('Rock size [cm]', fontsize=20)
-        plt.ylabel('Cumulative number of rocks /m²', fontsize=20)
-        plt.tick_params(labelsize=16)
-        plt.grid(True, linestyle='--', alpha=0.5)
+    # 軸ラベルとグリッド
+    plt.xlabel('Rock size [cm]', fontsize=20)
+    plt.ylabel('Cumulative number of rocks /m²', fontsize=20)
+    plt.tick_params(labelsize=16)
+    plt.grid(True, linestyle='--', alpha=0.5)
 
-        # y軸のtick設定（最大値1-20の場合は2刻みに固定）
-        ax = plt.gca()
-        ylim = ax.get_ylim()
-        if 1 <= ylim[1] <= 20:
-            ax.yaxis.set_major_locator(MultipleLocator(2))
+    # 凡例を右上に配置
+    plt.legend(loc='upper right', fontsize=10, frameon=True, fancybox=True)
 
-        plt.tight_layout()
+    plt.tight_layout()
 
-        # 保存
-        plt.savefig(f'{output_path}.png', dpi=300)
-        plt.savefig(f'{output_path}.pdf', dpi=600)
-        plt.close()
+    # 保存
+    plt.savefig(f'{output_path}.png', dpi=300)
+    plt.savefig(f'{output_path}.pdf', dpi=600)
+    plt.close()
 
-        print(f'Group比較プロット（面積規格化）保存: {output_path}.png')
-
-        # Legend情報の保存
-        legend_entries = [
-            {'label': 'Data', 'color': 'black', 'marker': 'o', 'linestyle': ''},
-            {'label': f'Group1-3 fit: k={k_pow_area_est:.2e}, r={r_pow_area_est:.3f}, R²={R2_pow_area_est:.4f}, {p_str_pow_area_est}',
-             'color': 'blue', 'linestyle': '--', 'linewidth': 1.5},
-            {'label': f'Group2-3 fit: k={k_pow_area_2_3:.2e}, r={r_pow_area_2_3:.3f}, R²={R2_pow_area_2_3:.4f}, {p_str_pow_area_2_3}',
-             'color': 'red', 'linestyle': '--', 'linewidth': 1.5}
-        ]
-        save_legend_info_to_txt(output_path, legend_entries)
-        save_legend_only_pdf(output_path, legend_entries)
+    print(f'Group比較プロット保存: {output_path}.png')
 
     # ------------------------------------------------------------------
     # 12. フィッティングサマリーファイルの出力
@@ -2744,38 +2020,22 @@ else:  # mode == '4'
     # ------------------------------------------------------------------
     print('\n=== 比較プロット生成中 ===')
 
-    # 従来手法とGroup2推定の比較プロットは削除（フィッティングなしのlinear-linearプロットのみ出力ディレクトリ直下に保存）
-    # Group2-3のみの比較プロットと面積規格化比較プロットのみ実施
+    # 面積規格化プロットのみ作成（両対数グラフのみ）
 
-    # Group2-3のみのプロット
-    power_data_grp2_3 = [d for d in all_ranges_data_grp2_3 if 'fit_type' not in d]
-    for scale in ['linear', 'semilog', 'loglog']:
-        output_path = os.path.join(output_dir_power_2_3, f'RSFD_power_law_comparison_group2-3_{scale}')
-        create_multi_range_comparison_plot(
-            power_data_grp2_3, 'Rock size [cm]', 'Cumulative number of rocks',
-            output_path, scale_type=scale, fit_type='Power-law',
-            show_plot=False, xlim=(0, 50)
-        )
-
-    # 面積規格化Group2推定のプロット
-    for scale in ['linear', 'semilog', 'loglog']:
-        output_path = os.path.join(output_dir_area_normalized_est, f'RSFD_area_normalized_estimate_group2_comparison_{scale}')
-        create_multi_range_comparison_plot(
-            all_ranges_data_area_normalized_est, 'Rock size [cm]', 'Cumulative number of rocks /m²',
-            output_path, scale_type=scale, fit_type='Power-law',
-            show_plot=False, xlim=(0, 50)
-        )
+    # 面積規格化Group1-3のプロット
+    output_path = os.path.join(output_dir_group1_3, 'RSFD_group1-3')
+    create_multi_range_comparison_plot(
+        all_ranges_data_area_normalized_est, 'Rock size [cm]', 'Cumulative number of rocks /m²',
+        output_path, show_plot=False, xlim=(0, 50)
+    )
 
     # 面積規格化Group2-3のプロット
-    for scale in ['linear', 'semilog', 'loglog']:
-        output_path = os.path.join(output_dir_area_normalized_2_3, f'RSFD_area_normalized_group2-3_comparison_{scale}')
-        create_multi_range_comparison_plot(
-            all_ranges_data_area_normalized_2_3, 'Rock size [cm]', 'Cumulative number of rocks /m²',
-            output_path, scale_type=scale, fit_type='Power-law',
-            show_plot=False, xlim=(0, 50)
-        )
+    output_path = os.path.join(output_dir_group2_3, 'RSFD_group2-3')
+    create_multi_range_comparison_plot(
+        all_ranges_data_area_normalized_2_3, 'Rock size [cm]', 'Cumulative number of rocks /m²',
+        output_path, show_plot=False, xlim=(0, 50)
+    )
 
-    # 両方のフィッティング比較プロットは複雑になるため、Power lawのみで実施
     print('複数範囲比較プロット完了')
 
 # ------------------------------------------------------------------
