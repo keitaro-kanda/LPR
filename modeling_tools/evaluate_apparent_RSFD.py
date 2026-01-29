@@ -221,6 +221,23 @@ class Analyzer:
         plt.tight_layout()
         plt.savefig(output_path)
         plt.show()
+    
+    def plot_depth_analysis(self, analysis_df, output_path, r_true):
+        plt.figure(figsize=(10, 8))
+        plt.plot(analysis_df['depth_range'], analysis_df['r_apparent'], marker='o', linestyle='-')
+        plt.axhline(y=r_true, color='r', linestyle='--', label='True r')
+        
+        plt.xlabel('Depth Range [m]', fontsize=18)
+        plt.ylabel('Apparent Slope r', fontsize=18)
+        plt.title('Depth-wise Apparent Slope Analysis', fontsize=18)
+        plt.tick_params(axis='both', which='major', labelsize=16)
+        plt.ylim(0, max(r_true + 1, 5))
+        plt.legend(fontsize=14)
+        plt.grid(True, ls='--', alpha=0.5)
+        
+        plt.tight_layout()
+        plt.savefig(output_path)
+        plt.show()
 
 # --- 4. メイン処理 (変更なし) ---
 def main():
@@ -262,6 +279,7 @@ def main():
     # 4. 深さ解析 (全データ使用)
     analysis_results = analyzer.run_depth_analysis(detected_df, config.MAX_DEPTH, step=1.0)
     analysis_results.to_csv(f"{output_dir}/depth_analysis_results.csv", index=False)
+    analyzer.plot_depth_analysis(analysis_results, f"{output_dir}/depth_analysis.png", r_true)
 
     print("処理完了。")
 
