@@ -224,15 +224,15 @@ class Analyzer:
     
     def plot_depth_analysis(self, analysis_df, output_path, r_true):
         plt.figure(figsize=(10, 8))
-        plt.plot(analysis_df['depth_range'], analysis_df['r_apparent'], marker='o', linestyle='-')
+        plt.plot(analysis_df['depth_range'], analysis_df['r_apparent'], marker='o', linestyle='-', color='blue', label='Apparent r')
         plt.axhline(y=r_true, color='r', linestyle='--', label='True r')
         
         plt.xlabel('Depth Range [m]', fontsize=18)
         plt.ylabel('Apparent Slope r', fontsize=18)
         plt.title('Depth-wise Apparent Slope Analysis', fontsize=18)
         plt.tick_params(axis='both', which='major', labelsize=16)
-        plt.ylim(0, max(r_true + 1, 5))
-        plt.legend(fontsize=14)
+        plt.ylim(0, r_true + 1)
+        plt.legend(fontsize=16)
         plt.grid(True, ls='--', alpha=0.5)
         
         plt.tight_layout()
