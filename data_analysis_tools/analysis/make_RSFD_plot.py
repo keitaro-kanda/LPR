@@ -84,7 +84,7 @@ def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
         r_val = fit_params['r']
         R2_val = fit_params['R2']
         p_str = fit_params['p_str']
-        fit_label = f'Fit: N = {k_str} D^{-r_val:.2f}, R²={R2_val:.3f}, {p_str}'
+        fit_label = f'Fit: N = {k_str} D^({-r_val:.2f}), R²={R2_val:.3f}, {p_str}'
         plt.plot(fit_x, fit_y, linestyle='--', linewidth=1.5, color=fit_color, label=fit_label)
 
     # 軸スケール設定（両対数のみ）
