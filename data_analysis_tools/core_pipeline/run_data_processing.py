@@ -117,7 +117,12 @@ trace_interval = 3.6e-2 # [m], [Li et al. (2020), Sci. Adv.]
 epsilon_0 = 8.854187817e-12  # [F/m]
 c = 299792458  # [m/s]
 reciever_time_delay = 28.203e-9  # [s], [Su et al., 2014]
-epsilon_r = 4.5 # Relative permittivity of the medium [Zhang et al., 2025, ApJL]
+if rover_name == 'CE-3':
+    epsilon_r = 3.0 # assumed value
+    loss_tangent = 0.006 # assumed value
+else:
+    epsilon_r = 3.0 # Almost an average value between Chen+2022 (2.3-3.7), Dong+2020 (2-4くらい), Feng+2022 (2.64-3.85).
+    loss_tangent = 0.004 # Almost an average valude between Feng+2022 (0.0032-0.0044), Lai+2019 (0.004-0.005).
 
 
 
@@ -437,7 +442,7 @@ if function_type == 'calc':
             prev_step = processing_order[i-1] if i > 0 else 0
             input_data = processed_data[prev_step]
             if rover_name == 'CE-4':
-                processed_data[4] = gain(input_data, 3.4, 0.006, 500e6, dir_dict[4])
+                processed_data[4] = gain(input_data, epsilon_r, loss_tangent, 500e6, dir_dict[4])
             else:
                 epsilon_r = 2.9 # [Dong+2017]
                 conductivity = 0.0016 # [Dong+2017]
@@ -453,7 +458,10 @@ if function_type == 'calc':
             prev_step = processing_order[i-1] if i > 0 else 0
             input_data = processed_data[prev_step]
             #* Load z-profile data
-            position_profile_path = "/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Resampled_Data/position_plot/total_position.txt"
+            if rover_name == 'CE-3':
+                position_profile_path = "path_to_CE3_position_profile/total_position.txt"
+            else:
+                position_profile_path = "/Volumes/SSD_Kanda_SAMSUNG/CE4_LPR/LPR_2B/Resampled_Data/position_plot/total_position.txt"
             z_profile = np.loadtxt(position_profile_path, delimiter=' ', skiprows=1)[:, 2]
             processed_data[5], time_min, time_max = terrain_correction(input_data, z_profile)
             np.savetxt(dir_dict[5] + '/5_Terrain_correction.txt', processed_data[5], delimiter=' ')
