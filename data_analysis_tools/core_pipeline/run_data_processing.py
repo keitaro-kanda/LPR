@@ -497,7 +497,10 @@ elif function_type == 'plot':
     
     #* Special handling for terrain correction time range
     if 5 in processed_data:
-        position_profile_path = "/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Resampled_Data/position_plot/total_position.txt"
+        if rover_name == 'CE-3':
+                position_profile_path = "path_to_CE3_position_profile/total_position.txt"
+        else:
+            position_profile_path = "/Volumes/SSD_Kanda_SAMSUNG/CE4_LPR/LPR_2B/Resampled_Data/position_plot/total_position.txt"
         z_profile = np.loadtxt(position_profile_path, delimiter=' ', skiprows=1)[:, 2]
         time_min = - np.amax(z_profile) / c  # Convert depth to time [s]
         time_max = processed_data[0].shape[0] * sample_interval - np.amin(z_profile) / c  # Convert depth to time [s]
@@ -581,7 +584,7 @@ for i in range(len(plot_data)):
     depth_max = (t_max * 1e-9) * c / np.sqrt(epsilon_r) / 2
     # 新しいY軸に深さの範囲とラベルを設定
     ax2.set_ylim(depth_min, depth_max)
-    ax2.set_ylabel(r'Depth [m] ($\varepsilon_r = 4.5$)', fontsize=font_medium)
+    ax2.set_ylabel(r'Depth [m] ($\varepsilon_r = ' + str(epsilon_r) + '$)', fontsize=font_medium)
     ax2.tick_params(axis='y', which='major', labelsize=font_small)
 
     # * Adjust layout for colorbar layout
@@ -650,7 +653,7 @@ if rover_name == 'CE-3':
         depth_max = (t_max * 1e-9) * c / np.sqrt(epsilon_r) / 2
         # 新しいY軸に深さの範囲とラベルを設定
         ax2.set_ylim(depth_min, depth_max)
-        ax2.set_ylabel(r'Depth [m] ($\varepsilon_r = 4.5$)', fontsize=font_medium)
+        ax2.set_ylabel(r'Depth [m] ($\varepsilon_r = ' + str(epsilon_r) + '$)', fontsize=font_medium)
         ax2.tick_params(axis='y', which='major', labelsize=font_small)
 
         # * Adjust layout for colorbar layout
