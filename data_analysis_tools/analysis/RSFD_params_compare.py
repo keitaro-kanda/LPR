@@ -109,7 +109,7 @@ plt.show()
 
 # depth VS k plot
 plt.figure(figsize=(8, 6))
-plt.plot(depths, k_values, marker='o', linestyle='-', color='green')
+plt.plot(depths, k_values, marker='o', linestyle='-', color='red')
 
 plt.xlabel('Depth [m]', fontsize=18)
 plt.xticks(depths, labels)
@@ -125,7 +125,7 @@ plt.show()
 
 # depth VS p plot
 plt.figure(figsize=(8, 6))
-plt.plot(depths, p_values, marker='o', linestyle='-', color='red')
+plt.plot(depths, p_values, marker='o', linestyle='-', color='green')
 plt.axhline(y=0.05, color='gray', linestyle='--')
 
 plt.xlabel('Depth [m]', fontsize=18)
