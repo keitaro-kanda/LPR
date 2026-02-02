@@ -568,12 +568,22 @@ if __name__ == '__main__':
 
     if grid_input_mode == '1':
         # モード1: 分割幅を入力
-        time_bin_width = float(input('時間方向の分割幅 [ns] を入力してください: ').strip())
-        dist_bin_width = float(input('距離方向の分割幅 [m] を入力してください: ').strip())
+        time_bin_width_input = input('時間方向の分割幅 [ns] を入力してください (Enter：全範囲使用): ').strip()
+        if time_bin_width_input == '':
+            time_bin_width = None
+        else:
+            time_bin_width = float(time_bin_width_input)
 
-        if time_bin_width <= 0 or dist_bin_width <= 0:
-            raise ValueError('分割幅は正の値を指定してください。')
+        dist_bin_width_input = input('距離方向の分割幅 [m] を入力してください (Enter：全範囲使用): ').strip()
+        if dist_bin_width_input == '':
+            dist_bin_width = None
+        else:
+            dist_bin_width = float(dist_bin_width_input)
 
+        if time_bin_width is not None and time_bin_width <= 0:
+            raise ValueError('時間方向の分割幅は正の値を指定してください。')
+        if dist_bin_width is not None and dist_bin_width <= 0:
+            raise ValueError('距離方向の分割幅は正の値を指定してください。')
         # 分割数は後で計算される
         num_time_bins_input = None
         num_dist_bins_input = None
@@ -654,8 +664,16 @@ if __name__ == '__main__':
     # 入力モードに応じて分割数または分割幅を計算
     if grid_input_mode == '1':
         # モード1: 分割幅から分割数を計算
-        num_time_bins = int(np.ceil((time_max_data - time_min_data) / time_bin_width))
-        num_dist_bins = int(np.ceil((dist_max_data - dist_min_data) / dist_bin_width))
+        if time_bin_width is None:
+            time_bin_width = time_max_data - time_min_data  # 全範囲使用
+            num_time_bins = 1  # 全範囲使用
+        else:
+            num_time_bins = int(np.ceil((time_max_data - time_min_data) / time_bin_width))
+        if dist_bin_width is None:
+            dist_bin_width = dist_max_data - dist_min_data  # 全範囲使用
+            num_dist_bins = 1  # 全範囲使用
+        else:
+            num_dist_bins = int(np.ceil((dist_max_data - dist_min_data) / dist_bin_width))
     else:
         # モード2: 分割数から分割幅を計算
         num_time_bins = num_time_bins_input
