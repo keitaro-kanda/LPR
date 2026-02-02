@@ -460,7 +460,7 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     r_nan_value = 1.6  # NaN値の代替値
     r_values_plot = np.where(np.isnan(r_values), r_nan_value, r_values)
     ax1_twin.plot(window_centers, r_values_plot,
-                  'b-', linewidth=2, marker='o', markersize=15, label='r (power-law exponent)')
+                  'b-', linewidth=2, marker='o', markersize=10, label='r (power-law exponent)')
     ax1_twin.set_ylabel('r (power-law exponent)', fontsize=font_medium, color='blue')
     ax1_twin.tick_params(axis='y', labelcolor='blue', labelsize=font_small)
 
@@ -489,7 +489,7 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     k_nan_value = 8e-3  # NaN値の代替値
     k_values_plot = np.where(np.isnan(k_values), k_nan_value, k_values)
     ax2_twin.plot(window_centers, k_values_plot,
-                  'r-', linewidth=2, marker='s', markersize=15, label='k (scaling factor)')
+                  'r-', linewidth=2, marker='s', markersize=10, label='k (scaling factor)')
     ax2_twin.set_ylabel('k [/m²]', fontsize=font_medium, color='red')
     ax2_twin.tick_params(axis='y', labelcolor='red', labelsize=font_small)
     # y軸範囲設定（k値）: 1e-3〜8e-3に拡張（8e-3はNaN用）
@@ -518,7 +518,7 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     p_nan_value = 1.5  # NaN値の代替値
     p_values_plot = np.where(np.isnan(p_values_array) | (p_values_array <= 0), p_nan_value, p_values_array)
     ax3_twin.semilogy(window_centers, p_values_plot,
-                      'g-', linewidth=2, marker='^', markersize=15, label='p-value')
+                      'g-', linewidth=2, marker='^', markersize=10, label='p-value')
     # p=0.05の横線を追加
     ax3_twin.axhline(y=0.05, color='black', linestyle='--', linewidth=1.5, label='p = 0.05')
     ax3_twin.set_ylabel('p-value', fontsize=font_medium, color='green')
@@ -682,7 +682,7 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     r_nan_value = 1.6  # NaN値の代替値
     r_values_plot = np.where(np.isnan(r_values), r_nan_value, r_values)
     ax1_twin.plot(r_values_plot, window_centers,
-                  'b-', linewidth=2, marker='o', markersize=15, label='r (power-law exponent)')
+                  'b-', linewidth=2, marker='o', markersize=10, label='r (power-law exponent)')
     ax1_twin.set_xlabel('r (power-law exponent)', fontsize=font_medium, color='blue')
     ax1_twin.tick_params(axis='x', labelcolor='blue', labelsize=font_small)
 
@@ -712,7 +712,7 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     k_nan_value = 22e-3  # NaN値の代替値
     k_values_plot = np.where(np.isnan(k_values), k_nan_value, k_values)
     ax2_twin.plot(k_values_plot, window_centers,
-                  'r-', linewidth=2, marker='s', markersize=15, label='k (scaling factor)')
+                  'r-', linewidth=2, marker='s', markersize=10, label='k (scaling factor)')
     ax2_twin.tick_params(axis='x', labelcolor='red', labelsize=font_small)
     # x軸範囲設定（k値）: 0〜22e-3に拡張（22e-3はNaN用）
     ax2_twin.set_xlim(0, 22e-3)
@@ -741,7 +741,7 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     p_nan_value = 1.5  # NaN値の代替値
     p_values_plot = np.where(np.isnan(p_values_array) | (p_values_array <= 0), p_nan_value, p_values_array)
     ax3_twin.semilogx(p_values_plot, window_centers,
-                      'g-', linewidth=2, marker='^', markersize=15, label='p-value')
+                      'g-', linewidth=2, marker='^', markersize=10, label='p-value')
     # p=0.05の縦線を追加
     ax3_twin.axvline(x=0.05, color='black', linestyle='--', linewidth=1.5, label='p = 0.05')
     ax3_twin.set_xlabel('p-value', fontsize=font_medium, color='green')
@@ -930,7 +930,7 @@ os.makedirs(output_dir, exist_ok=True)
 if analysis_direction == 'horizontal':
     sub_dir_name = f'horizontal_window{window_width:.0f}m'
 else:
-    sub_dir_name = f'vertical_window{window_width:.0f}ns'
+    sub_dir_name = f'vertical_window{window_width:.1f}ns'
 
 sub_dir = os.path.join(output_dir, sub_dir_name)
 os.makedirs(sub_dir, exist_ok=True)
