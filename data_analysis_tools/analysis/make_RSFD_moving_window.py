@@ -458,6 +458,7 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
                       time_array[-1], time_array[0]],
                vmin=vmin, vmax=vmax, alpha=0.5)
 
+
     # 岩石数を第2軸にプロット（リニアスケール）
     ax1_twin = ax1.twinx()
     ax1_twin.plot(window_centers, num_rocks_array,
@@ -468,6 +469,7 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     ax1.set_ylabel('Time [ns]', fontsize=font_medium)
     ax1.set_ylim(time_max_data, time_min_data)
     ax1.tick_params(axis='both', which='major', labelsize=font_small)
+    ax1.grid(True, ls='--', alpha=1.0, axis='both')
 
     # === 2段目: rのプロット ===
     # B-scan背景
@@ -496,6 +498,7 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     ax2.set_ylabel('Time [ns]', fontsize=font_medium)
     ax2.set_ylim(time_max_data, time_min_data)
     ax2.tick_params(axis='both', which='major', labelsize=font_small)
+    ax2.grid(True, ls='--', alpha=1.0, axis='both')
 
     # === 3段目: kのプロット ===
     # B-scan背景
@@ -523,6 +526,7 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     ax3.set_ylabel('Time [ns]', fontsize=font_medium)
     ax3.set_ylim(time_max_data, time_min_data)
     ax3.tick_params(axis='both', which='major', labelsize=font_small)
+    ax3.grid(True, ls='--', alpha=1.0, axis='both')
 
     # === 4段目: p値のプロット ===
     # B-scan背景
@@ -553,6 +557,7 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     ax4.set_ylabel('Time [ns]', fontsize=font_medium)
     ax4.set_ylim(time_max_data, time_min_data)
     ax4.tick_params(axis='both', which='major', labelsize=font_small)
+    ax4.grid(True, ls='--', alpha=1.0, axis='both')
 
     plt.tight_layout()
 
@@ -583,6 +588,7 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     ax_num.set_ylabel('Time [ns]', fontsize=font_medium)
     ax_num.set_ylim(time_max_data, time_min_data)
     ax_num.tick_params(axis='both', which='major', labelsize=font_small)
+    ax_num.grid(True, ls='--', alpha=1.0, axis='both')
     plt.tight_layout()
     plt.savefig(os.path.join(individual_plots_dir, 'num_rocks_plot.png'), dpi=dpi_png)
     plt.savefig(os.path.join(individual_plots_dir, 'num_rocks_plot.pdf'), dpi=dpi_pdf)
@@ -606,6 +612,7 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     ax_r.set_ylabel('Time [ns]', fontsize=font_medium)
     ax_r.set_ylim(time_max_data, time_min_data)
     ax_r.tick_params(axis='both', which='major', labelsize=font_small)
+    ax_r.grid(True, ls='--', alpha=1.0, axis='both')
     plt.tight_layout()
     plt.savefig(os.path.join(individual_plots_dir, 'r_plot.png'), dpi=dpi_png)
     plt.savefig(os.path.join(individual_plots_dir, 'r_plot.pdf'), dpi=dpi_pdf)
@@ -629,6 +636,7 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     ax_k.set_ylabel('Time [ns]', fontsize=font_medium)
     ax_k.set_ylim(time_max_data, time_min_data)
     ax_k.tick_params(axis='both', which='major', labelsize=font_small)
+    ax_k.grid(True, ls='--', alpha=1.0, axis='both')
     plt.tight_layout()
     plt.savefig(os.path.join(individual_plots_dir, 'k_plot.png'), dpi=dpi_png)
     plt.savefig(os.path.join(individual_plots_dir, 'k_plot.pdf'), dpi=dpi_pdf)
@@ -653,6 +661,7 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     ax_p.set_ylabel('Time [ns]', fontsize=font_medium)
     ax_p.set_ylim(time_max_data, time_min_data)
     ax_p.tick_params(axis='both', which='major', labelsize=font_small)
+    ax_p.grid(True, ls='--', alpha=1.0, axis='both')
     plt.tight_layout()
     plt.savefig(os.path.join(individual_plots_dir, 'p_value_plot.png'), dpi=dpi_png)
     plt.savefig(os.path.join(individual_plots_dir, 'p_value_plot.pdf'), dpi=dpi_pdf)
@@ -805,6 +814,7 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     ax1.set_ylabel('Time [ns]', fontsize=font_medium)
     ax1.set_ylim(time_max_data, time_min_data)
     ax1.tick_params(axis='both', which='major', labelsize=font_small)
+    ax1.grid(True, ls='--', alpha=1.0, axis='both')
 
     # === 2段目: rのプロット ===
     # B-scan背景
@@ -834,6 +844,7 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     ax2.set_ylabel('Time [ns]', fontsize=font_medium)
     ax2.set_ylim(time_max_data, time_min_data)
     ax2.tick_params(axis='both', which='major', labelsize=font_small)
+    ax2.grid(True, ls='--', alpha=1.0, axis='both')
 
     # === 3段目: kのプロット ===
     # B-scan背景
@@ -862,6 +873,7 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     ax3.set_ylabel('Time [ns]', fontsize=font_medium)
     ax3.set_ylim(time_max_data, time_min_data)
     ax3.tick_params(axis='both', which='major', labelsize=font_small)
+    ax3.grid(True, ls='--', alpha=1.0, axis='both')
 
     # === 4段目: p値のプロット ===
     # B-scan背景
@@ -892,6 +904,7 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     ax4.set_ylabel('Time [ns]', fontsize=font_medium)
     ax4.set_ylim(time_max_data, time_min_data)
     ax4.tick_params(axis='both', which='major', labelsize=font_small)
+    ax4.grid(True, ls='--', alpha=1.0, axis='both')
 
     plt.tight_layout()
 
@@ -922,6 +935,7 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     ax_num.set_ylabel('Time [ns]', fontsize=font_medium)
     ax_num.set_ylim(time_max_data, time_min_data)
     ax_num.tick_params(axis='both', which='major', labelsize=font_small)
+    ax_num.grid(True, ls='--', alpha=1.0, axis='both')
     plt.tight_layout()
     plt.savefig(os.path.join(individual_plots_dir, 'num_rocks_plot.png'), dpi=dpi_png)
     plt.savefig(os.path.join(individual_plots_dir, 'num_rocks_plot.pdf'), dpi=dpi_pdf)
@@ -945,6 +959,7 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     ax_r.set_ylabel('Time [ns]', fontsize=font_medium)
     ax_r.set_ylim(time_max_data, time_min_data)
     ax_r.tick_params(axis='both', which='major', labelsize=font_small)
+    ax_r.grid(True, ls='--', alpha=1.0, axis='both')
     plt.tight_layout()
     plt.savefig(os.path.join(individual_plots_dir, 'r_plot.png'), dpi=dpi_png)
     plt.savefig(os.path.join(individual_plots_dir, 'r_plot.pdf'), dpi=dpi_pdf)
@@ -968,6 +983,7 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     ax_k.set_ylabel('Time [ns]', fontsize=font_medium)
     ax_k.set_ylim(time_max_data, time_min_data)
     ax_k.tick_params(axis='both', which='major', labelsize=font_small)
+    ax_k.grid(True, ls='--', alpha=1.0, axis='both')
     plt.tight_layout()
     plt.savefig(os.path.join(individual_plots_dir, 'k_plot.png'), dpi=dpi_png)
     plt.savefig(os.path.join(individual_plots_dir, 'k_plot.pdf'), dpi=dpi_pdf)
@@ -992,6 +1008,7 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     ax_p.set_ylabel('Time [ns]', fontsize=font_medium)
     ax_p.set_ylim(time_max_data, time_min_data)
     ax_p.tick_params(axis='both', which='major', labelsize=font_small)
+    ax_p.grid(True, ls='--', alpha=1.0, axis='both')
     plt.tight_layout()
     plt.savefig(os.path.join(individual_plots_dir, 'p_value_plot.png'), dpi=dpi_png)
     plt.savefig(os.path.join(individual_plots_dir, 'p_value_plot.pdf'), dpi=dpi_pdf)
