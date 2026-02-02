@@ -445,97 +445,114 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     # p値の配列化
     p_values_array = np.array(p_values)
 
-    # Figure作成（3つのサブプロット：上がr、中がk、下がp値）
-    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(18, 16), sharex=True)
+    # 岩石数の配列化
+    num_rocks_array = np.array(num_rocks_list)
 
-    # === 上段: rのプロット ===
+    # Figure作成（4つのサブプロット：上から岩石数、r、k、p値）
+    fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(18, 20), sharex=True)
+
+    # === 1段目: 岩石数のプロット ===
     # B-scan背景
     ax1.imshow(bscan_data, aspect='auto', cmap='seismic',
                extent=[0, bscan_data.shape[1] * trace_interval,
                       time_array[-1], time_array[0]],
                vmin=vmin, vmax=vmax, alpha=0.5)
 
-    # rの値を第2軸にプロット（NaN値は1.6としてプロット）
+    # 岩石数を第2軸にプロット（リニアスケール）
     ax1_twin = ax1.twinx()
-    r_nan_value = 1.6  # NaN値の代替値
-    r_values_plot = np.where(np.isnan(r_values), r_nan_value, r_values)
-    ax1_twin.plot(window_centers, r_values_plot,
-                  'b-', linewidth=2, marker='o', markersize=10, label='r (power-law exponent)')
-    ax1_twin.set_ylabel('r (power-law exponent)', fontsize=font_medium, color='blue')
-    ax1_twin.tick_params(axis='y', labelcolor='blue', labelsize=font_small)
-
-    # y軸範囲設定（r値）: 0.3〜1.6に拡張（1.6はNaN用）
-    ax1_twin.set_ylim(0.3, 1.6)
-    # カスタム目盛り設定（1.6を「nan」と表示）
-    r_ticks = [0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6]
-    r_tick_labels = ['0.4', '0.6', '0.8', '1.0', '1.2', '1.4', 'nan']
-    ax1_twin.set_yticks(r_ticks)
-    ax1_twin.set_yticklabels(r_tick_labels)
+    ax1_twin.plot(window_centers, num_rocks_array,
+                  'k-', linewidth=2, marker='D', markersize=10, label='Number of rocks')
+    ax1_twin.set_ylabel('Number of detected rocks', fontsize=font_medium, color='black')
+    ax1_twin.tick_params(axis='y', labelcolor='black', labelsize=font_small)
 
     ax1.set_ylabel('Time [ns]', fontsize=font_medium)
     ax1.set_ylim(time_max_data, time_min_data)
     ax1.tick_params(axis='both', which='major', labelsize=font_small)
-    # ax1.set_title('Power-law exponent (r) vs. Distance', fontsize=font_large)
 
-    # === 中段: kのプロット ===
+    # === 2段目: rのプロット ===
     # B-scan背景
     ax2.imshow(bscan_data, aspect='auto', cmap='seismic',
                extent=[0, bscan_data.shape[1] * trace_interval,
                       time_array[-1], time_array[0]],
                vmin=vmin, vmax=vmax, alpha=0.5)
 
-    # kの値を第2軸にプロット（リニアスケール、NaN値は8e-3としてプロット）
+    # rの値を第2軸にプロット（NaN値は1.6としてプロット）
     ax2_twin = ax2.twinx()
-    k_nan_value = 8e-3  # NaN値の代替値
-    k_values_plot = np.where(np.isnan(k_values), k_nan_value, k_values)
-    ax2_twin.plot(window_centers, k_values_plot,
-                  'r-', linewidth=2, marker='s', markersize=10, label='k (scaling factor)')
-    ax2_twin.set_ylabel('k [/m²]', fontsize=font_medium, color='red')
-    ax2_twin.tick_params(axis='y', labelcolor='red', labelsize=font_small)
-    # y軸範囲設定（k値）: 1e-3〜8e-3に拡張（8e-3はNaN用）
-    ax2_twin.set_ylim(1e-3, 8e-3)
-    # カスタム目盛り設定（8e-3を「nan」と表示）
-    k_ticks = [1e-3, 2e-3, 3e-3, 4e-3, 5e-3, 6e-3, 7e-3, 8e-3]
-    k_tick_labels = ['1', '2', '3', '4', '5', '6', '7', 'nan']
-    ax2_twin.set_yticks(k_ticks)
-    ax2_twin.set_yticklabels(k_tick_labels)
-    ax2_twin.set_ylabel('k [×10⁻³ /m²]', fontsize=font_medium, color='red')
+    r_nan_value = 1.6  # NaN値の代替値
+    r_values_plot = np.where(np.isnan(r_values), r_nan_value, r_values)
+    ax2_twin.plot(window_centers, r_values_plot,
+                  'b-', linewidth=2, marker='o', markersize=10, label='r (power-law exponent)')
+    ax2_twin.set_ylabel('r (power-law exponent)', fontsize=font_medium, color='blue')
+    ax2_twin.tick_params(axis='y', labelcolor='blue', labelsize=font_small)
+
+    # y軸範囲設定（r値）: 0.3〜1.6に拡張（1.6はNaN用）
+    ax2_twin.set_ylim(0.3, 1.6)
+    # カスタム目盛り設定（1.6を「nan」と表示）
+    r_ticks = [0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6]
+    r_tick_labels = ['0.4', '0.6', '0.8', '1.0', '1.2', '1.4', 'nan']
+    ax2_twin.set_yticks(r_ticks)
+    ax2_twin.set_yticklabels(r_tick_labels)
 
     ax2.set_ylabel('Time [ns]', fontsize=font_medium)
     ax2.set_ylim(time_max_data, time_min_data)
     ax2.tick_params(axis='both', which='major', labelsize=font_small)
-    # ax2.set_title('Scaling factor (k) vs. Distance', fontsize=font_large)
 
-    # === 下段: p値のプロット ===
+    # === 3段目: kのプロット ===
     # B-scan背景
     ax3.imshow(bscan_data, aspect='auto', cmap='seismic',
                extent=[0, bscan_data.shape[1] * trace_interval,
                       time_array[-1], time_array[0]],
                vmin=vmin, vmax=vmax, alpha=0.5)
 
-    # p値を第2軸にプロット（対数スケール、NaN値は1.5としてプロット）
+    # kの値を第2軸にプロット（リニアスケール、NaN値は8e-3としてプロット）
     ax3_twin = ax3.twinx()
-    p_nan_value = 1.5  # NaN値の代替値
-    p_values_plot = np.where(np.isnan(p_values_array) | (p_values_array <= 0), p_nan_value, p_values_array)
-    ax3_twin.semilogy(window_centers, p_values_plot,
-                      'g-', linewidth=2, marker='^', markersize=10, label='p-value')
-    # p=0.05の横線を追加
-    ax3_twin.axhline(y=0.05, color='black', linestyle='--', linewidth=1.5, label='p = 0.05')
-    ax3_twin.set_ylabel('p-value', fontsize=font_medium, color='green')
-    ax3_twin.tick_params(axis='y', labelcolor='green', labelsize=font_small)
-    # y軸範囲設定（p値）: 1e-4〜1.5に拡張（1.5はNaN用）
-    ax3_twin.set_ylim(1e-4, 1.5)
-    # カスタム目盛り設定（1.5を「nan」と表示）
-    p_ticks = [1e-4, 1e-3, 1e-2, 0.05, 1e-1, 1.0, 1.5]
-    p_tick_labels = ['10⁻⁴', '10⁻³', '10⁻²', '0.05', '10⁻¹', '1', 'nan']
-    ax3_twin.set_yticks(p_ticks)
-    ax3_twin.set_yticklabels(p_tick_labels)
+    k_nan_value = 8e-3  # NaN値の代替値
+    k_values_plot = np.where(np.isnan(k_values), k_nan_value, k_values)
+    ax3_twin.plot(window_centers, k_values_plot,
+                  'r-', linewidth=2, marker='s', markersize=10, label='k (scaling factor)')
+    ax3_twin.tick_params(axis='y', labelcolor='red', labelsize=font_small)
+    # y軸範囲設定（k値）: 1e-3〜8e-3に拡張（8e-3はNaN用）
+    ax3_twin.set_ylim(1e-3, 8e-3)
+    # カスタム目盛り設定（8e-3を「nan」と表示）
+    k_ticks = [1e-3, 2e-3, 3e-3, 4e-3, 5e-3, 6e-3, 7e-3, 8e-3]
+    k_tick_labels = ['1', '2', '3', '4', '5', '6', '7', 'nan']
+    ax3_twin.set_yticks(k_ticks)
+    ax3_twin.set_yticklabels(k_tick_labels)
+    ax3_twin.set_ylabel('k [×10⁻³ /m²]', fontsize=font_medium, color='red')
 
-    ax3.set_xlabel('Moving distance [m]', fontsize=font_medium)
     ax3.set_ylabel('Time [ns]', fontsize=font_medium)
     ax3.set_ylim(time_max_data, time_min_data)
     ax3.tick_params(axis='both', which='major', labelsize=font_small)
-    # ax3.set_title('p-value vs. Distance', fontsize=font_large)
+
+    # === 4段目: p値のプロット ===
+    # B-scan背景
+    ax4.imshow(bscan_data, aspect='auto', cmap='seismic',
+               extent=[0, bscan_data.shape[1] * trace_interval,
+                      time_array[-1], time_array[0]],
+               vmin=vmin, vmax=vmax, alpha=0.5)
+
+    # p値を第2軸にプロット（対数スケール、NaN値は1.5としてプロット）
+    ax4_twin = ax4.twinx()
+    p_nan_value = 1.5  # NaN値の代替値
+    p_values_plot = np.where(np.isnan(p_values_array) | (p_values_array <= 0), p_nan_value, p_values_array)
+    ax4_twin.semilogy(window_centers, p_values_plot,
+                      'g-', linewidth=2, marker='^', markersize=10, label='p-value')
+    # p=0.05の横線を追加
+    ax4_twin.axhline(y=0.05, color='black', linestyle='--', linewidth=1.5, label='p = 0.05')
+    ax4_twin.set_ylabel('p-value', fontsize=font_medium, color='green')
+    ax4_twin.tick_params(axis='y', labelcolor='green', labelsize=font_small)
+    # y軸範囲設定（p値）: 1e-4〜1.5に拡張（1.5はNaN用）
+    ax4_twin.set_ylim(1e-4, 1.5)
+    # カスタム目盛り設定（1.5を「nan」と表示）
+    p_ticks = [1e-4, 1e-3, 1e-2, 0.05, 1e-1, 1.0, 1.5]
+    p_tick_labels = ['10⁻⁴', '10⁻³', '10⁻²', '0.05', '10⁻¹', '1', 'nan']
+    ax4_twin.set_yticks(p_ticks)
+    ax4_twin.set_yticklabels(p_tick_labels)
+
+    ax4.set_xlabel('Moving distance [m]', fontsize=font_medium)
+    ax4.set_ylabel('Time [ns]', fontsize=font_medium)
+    ax4.set_ylim(time_max_data, time_min_data)
+    ax4.tick_params(axis='both', which='major', labelsize=font_small)
 
     plt.tight_layout()
 
@@ -545,6 +562,103 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     plt.close()
 
     print(f'水平方向移動ウィンドウプロット保存: {output_path}.png')
+
+    # === 個別プロット作成 ===
+    # 個別プロット用サブディレクトリ
+    individual_plots_dir = os.path.join(os.path.dirname(output_path), 'individual_plots')
+    os.makedirs(individual_plots_dir, exist_ok=True)
+
+    # --- 岩石数の個別プロット ---
+    fig_num, ax_num = plt.subplots(figsize=(18, 6))
+    ax_num.imshow(bscan_data, aspect='auto', cmap='seismic',
+                  extent=[0, bscan_data.shape[1] * trace_interval,
+                         time_array[-1], time_array[0]],
+                  vmin=vmin, vmax=vmax, alpha=0.5)
+    ax_num_twin = ax_num.twinx()
+    ax_num_twin.plot(window_centers, num_rocks_array,
+                     'k-', linewidth=2, marker='D', markersize=10, label='Number of rocks')
+    ax_num_twin.set_ylabel('Number of detected rocks', fontsize=font_medium, color='black')
+    ax_num_twin.tick_params(axis='y', labelcolor='black', labelsize=font_small)
+    ax_num.set_xlabel('Moving distance [m]', fontsize=font_medium)
+    ax_num.set_ylabel('Time [ns]', fontsize=font_medium)
+    ax_num.set_ylim(time_max_data, time_min_data)
+    ax_num.tick_params(axis='both', which='major', labelsize=font_small)
+    plt.tight_layout()
+    plt.savefig(os.path.join(individual_plots_dir, 'num_rocks_plot.png'), dpi=dpi_png)
+    plt.savefig(os.path.join(individual_plots_dir, 'num_rocks_plot.pdf'), dpi=dpi_pdf)
+    plt.close()
+
+    # --- rの個別プロット ---
+    fig_r, ax_r = plt.subplots(figsize=(18, 6))
+    ax_r.imshow(bscan_data, aspect='auto', cmap='seismic',
+                extent=[0, bscan_data.shape[1] * trace_interval,
+                       time_array[-1], time_array[0]],
+                vmin=vmin, vmax=vmax, alpha=0.5)
+    ax_r_twin = ax_r.twinx()
+    ax_r_twin.plot(window_centers, r_values_plot,
+                   'b-', linewidth=2, marker='o', markersize=10, label='r (power-law exponent)')
+    ax_r_twin.set_ylabel('r (power-law exponent)', fontsize=font_medium, color='blue')
+    ax_r_twin.tick_params(axis='y', labelcolor='blue', labelsize=font_small)
+    ax_r_twin.set_ylim(0.3, 1.6)
+    ax_r_twin.set_yticks(r_ticks)
+    ax_r_twin.set_yticklabels(r_tick_labels)
+    ax_r.set_xlabel('Moving distance [m]', fontsize=font_medium)
+    ax_r.set_ylabel('Time [ns]', fontsize=font_medium)
+    ax_r.set_ylim(time_max_data, time_min_data)
+    ax_r.tick_params(axis='both', which='major', labelsize=font_small)
+    plt.tight_layout()
+    plt.savefig(os.path.join(individual_plots_dir, 'r_plot.png'), dpi=dpi_png)
+    plt.savefig(os.path.join(individual_plots_dir, 'r_plot.pdf'), dpi=dpi_pdf)
+    plt.close()
+
+    # --- kの個別プロット ---
+    fig_k, ax_k = plt.subplots(figsize=(18, 6))
+    ax_k.imshow(bscan_data, aspect='auto', cmap='seismic',
+                extent=[0, bscan_data.shape[1] * trace_interval,
+                       time_array[-1], time_array[0]],
+                vmin=vmin, vmax=vmax, alpha=0.5)
+    ax_k_twin = ax_k.twinx()
+    ax_k_twin.plot(window_centers, k_values_plot,
+                   'r-', linewidth=2, marker='s', markersize=10, label='k (scaling factor)')
+    ax_k_twin.tick_params(axis='y', labelcolor='red', labelsize=font_small)
+    ax_k_twin.set_ylim(1e-3, 8e-3)
+    ax_k_twin.set_yticks(k_ticks)
+    ax_k_twin.set_yticklabels(k_tick_labels)
+    ax_k_twin.set_ylabel('k [×10⁻³ /m²]', fontsize=font_medium, color='red')
+    ax_k.set_xlabel('Moving distance [m]', fontsize=font_medium)
+    ax_k.set_ylabel('Time [ns]', fontsize=font_medium)
+    ax_k.set_ylim(time_max_data, time_min_data)
+    ax_k.tick_params(axis='both', which='major', labelsize=font_small)
+    plt.tight_layout()
+    plt.savefig(os.path.join(individual_plots_dir, 'k_plot.png'), dpi=dpi_png)
+    plt.savefig(os.path.join(individual_plots_dir, 'k_plot.pdf'), dpi=dpi_pdf)
+    plt.close()
+
+    # --- p値の個別プロット ---
+    fig_p, ax_p = plt.subplots(figsize=(18, 6))
+    ax_p.imshow(bscan_data, aspect='auto', cmap='seismic',
+                extent=[0, bscan_data.shape[1] * trace_interval,
+                       time_array[-1], time_array[0]],
+                vmin=vmin, vmax=vmax, alpha=0.5)
+    ax_p_twin = ax_p.twinx()
+    ax_p_twin.semilogy(window_centers, p_values_plot,
+                       'g-', linewidth=2, marker='^', markersize=10, label='p-value')
+    ax_p_twin.axhline(y=0.05, color='black', linestyle='--', linewidth=1.5, label='p = 0.05')
+    ax_p_twin.set_ylabel('p-value', fontsize=font_medium, color='green')
+    ax_p_twin.tick_params(axis='y', labelcolor='green', labelsize=font_small)
+    ax_p_twin.set_ylim(1e-4, 1.5)
+    ax_p_twin.set_yticks(p_ticks)
+    ax_p_twin.set_yticklabels(p_tick_labels)
+    ax_p.set_xlabel('Moving distance [m]', fontsize=font_medium)
+    ax_p.set_ylabel('Time [ns]', fontsize=font_medium)
+    ax_p.set_ylim(time_max_data, time_min_data)
+    ax_p.tick_params(axis='both', which='major', labelsize=font_small)
+    plt.tight_layout()
+    plt.savefig(os.path.join(individual_plots_dir, 'p_value_plot.png'), dpi=dpi_png)
+    plt.savefig(os.path.join(individual_plots_dir, 'p_value_plot.pdf'), dpi=dpi_pdf)
+    plt.close()
+
+    print(f'個別プロット保存: {individual_plots_dir}')
 
     # p値統計を計算（p値がnanの場合はp > 0.05とみなす）
     p_values_array = np.array(p_values)
@@ -667,98 +781,117 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     # p値の配列化
     p_values_array = np.array(p_values)
 
-    # Figure作成（3つのサブプロット：上がr、中がk、下がp値）
-    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(18, 16), sharey=True)
+    # 岩石数の配列化
+    num_rocks_array = np.array(num_rocks_list)
 
-    # === 上段: rのプロット ===
+    # Figure作成（4つのサブプロット：上から岩石数、r、k、p値）
+    fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(18, 20), sharey=True)
+
+    # === 1段目: 岩石数のプロット ===
     # B-scan背景
     ax1.imshow(bscan_data, aspect='auto', cmap='seismic',
                extent=[0, bscan_data.shape[1] * trace_interval,
                       time_array[-1], time_array[0]],
                vmin=vmin, vmax=vmax, alpha=0.5)
 
-    # rの値を第2横軸にプロット（縦方向に沿って、NaN値は1.6としてプロット）
+    # 岩石数を第2横軸にプロット（リニアスケール、縦方向に沿って）
     ax1_twin = ax1.twiny()
-    r_nan_value = 1.6  # NaN値の代替値
-    r_values_plot = np.where(np.isnan(r_values), r_nan_value, r_values)
-    ax1_twin.plot(r_values_plot, window_centers,
-                  'b-', linewidth=2, marker='o', markersize=10, label='r (power-law exponent)')
-    ax1_twin.set_xlabel('r (power-law exponent)', fontsize=font_medium, color='blue')
-    ax1_twin.tick_params(axis='x', labelcolor='blue', labelsize=font_small)
-
-    # x軸範囲設定（r値）: 0.3〜1.6に拡張（1.6はNaN用）
-    ax1_twin.set_xlim(0.3, 1.6)
-    # カスタム目盛り設定（1.6を「nan」と表示）
-    r_ticks = [0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6]
-    r_tick_labels = ['0.4', '0.6', '0.8', '1.0', '1.2', '1.4', 'nan']
-    ax1_twin.set_xticks(r_ticks)
-    ax1_twin.set_xticklabels(r_tick_labels)
+    ax1_twin.plot(num_rocks_array, window_centers,
+                  'k-', linewidth=2, marker='D', markersize=10, label='Number of rocks')
+    ax1_twin.set_xlabel('Number of detected rocks', fontsize=font_medium, color='black')
+    ax1_twin.tick_params(axis='x', labelcolor='black', labelsize=font_small)
 
     ax1.set_xlabel('Moving distance [m]', fontsize=font_medium)
     ax1.set_ylabel('Time [ns]', fontsize=font_medium)
     ax1.set_ylim(time_max_data, time_min_data)
     ax1.tick_params(axis='both', which='major', labelsize=font_small)
-    # ax1.set_title('Power-law exponent (r) vs. Depth', fontsize=font_large)
 
-    # === 中段: kのプロット ===
+    # === 2段目: rのプロット ===
     # B-scan背景
     ax2.imshow(bscan_data, aspect='auto', cmap='seismic',
                extent=[0, bscan_data.shape[1] * trace_interval,
                       time_array[-1], time_array[0]],
                vmin=vmin, vmax=vmax, alpha=0.5)
 
-    # kの値を第2横軸にプロット（リニアスケール、縦方向に沿って、NaN値は22e-3としてプロット）
+    # rの値を第2横軸にプロット（縦方向に沿って、NaN値は1.6としてプロット）
     ax2_twin = ax2.twiny()
-    k_nan_value = 22e-3  # NaN値の代替値
-    k_values_plot = np.where(np.isnan(k_values), k_nan_value, k_values)
-    ax2_twin.plot(k_values_plot, window_centers,
-                  'r-', linewidth=2, marker='s', markersize=10, label='k (scaling factor)')
-    ax2_twin.tick_params(axis='x', labelcolor='red', labelsize=font_small)
-    # x軸範囲設定（k値）: 0〜22e-3に拡張（22e-3はNaN用）
-    ax2_twin.set_xlim(0, 22e-3)
-    # カスタム目盛り設定（22e-3を「nan」と表示）
-    k_ticks = [0, 5e-3, 10e-3, 15e-3, 20e-3, 22e-3]
-    k_tick_labels = ['0', '5', '10', '15', '20', 'nan']
-    ax2_twin.set_xticks(k_ticks)
-    ax2_twin.set_xticklabels(k_tick_labels)
-    ax2_twin.set_xlabel('k [×10⁻³ /m²]', fontsize=font_medium, color='red')
+    r_nan_value = 1.6  # NaN値の代替値
+    r_values_plot = np.where(np.isnan(r_values), r_nan_value, r_values)
+    ax2_twin.plot(r_values_plot, window_centers,
+                  'b-', linewidth=2, marker='o', markersize=10, label='r (power-law exponent)')
+    ax2_twin.set_xlabel('r (power-law exponent)', fontsize=font_medium, color='blue')
+    ax2_twin.tick_params(axis='x', labelcolor='blue', labelsize=font_small)
+
+    # x軸範囲設定（r値）: 0.3〜1.6に拡張（1.6はNaN用）
+    ax2_twin.set_xlim(0.3, 1.6)
+    # カスタム目盛り設定（1.6を「nan」と表示）
+    r_ticks = [0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6]
+    r_tick_labels = ['0.4', '0.6', '0.8', '1.0', '1.2', '1.4', 'nan']
+    ax2_twin.set_xticks(r_ticks)
+    ax2_twin.set_xticklabels(r_tick_labels)
 
     ax2.set_xlabel('Moving distance [m]', fontsize=font_medium)
     ax2.set_ylabel('Time [ns]', fontsize=font_medium)
     ax2.set_ylim(time_max_data, time_min_data)
     ax2.tick_params(axis='both', which='major', labelsize=font_small)
-    # ax2.set_title('Scaling factor (k) vs. Depth', fontsize=font_large)
 
-    # === 下段: p値のプロット ===
+    # === 3段目: kのプロット ===
     # B-scan背景
     ax3.imshow(bscan_data, aspect='auto', cmap='seismic',
                extent=[0, bscan_data.shape[1] * trace_interval,
                       time_array[-1], time_array[0]],
                vmin=vmin, vmax=vmax, alpha=0.5)
 
-    # p値を第2横軸にプロット（対数スケール、縦方向に沿って、NaN値は1.5としてプロット）
+    # kの値を第2横軸にプロット（リニアスケール、縦方向に沿って、NaN値は22e-3としてプロット）
     ax3_twin = ax3.twiny()
-    p_nan_value = 1.5  # NaN値の代替値
-    p_values_plot = np.where(np.isnan(p_values_array) | (p_values_array <= 0), p_nan_value, p_values_array)
-    ax3_twin.semilogx(p_values_plot, window_centers,
-                      'g-', linewidth=2, marker='^', markersize=10, label='p-value')
-    # p=0.05の縦線を追加
-    ax3_twin.axvline(x=0.05, color='black', linestyle='--', linewidth=1.5, label='p = 0.05')
-    ax3_twin.set_xlabel('p-value', fontsize=font_medium, color='green')
-    ax3_twin.tick_params(axis='x', labelcolor='green', labelsize=font_small)
-    # x軸範囲設定（p値）: 1e-4〜1.5に拡張（1.5はNaN用）
-    ax3_twin.set_xlim(1e-4, 1.5)
-    # カスタム目盛り設定（1.5を「nan」と表示）
-    p_ticks = [1e-4, 1e-3, 1e-2, 0.05, 1e-1, 1.0, 1.5]
-    p_tick_labels = ['10⁻⁴', '10⁻³', '10⁻²', '0.05', '10⁻¹', '1', 'nan']
-    ax3_twin.set_xticks(p_ticks)
-    ax3_twin.set_xticklabels(p_tick_labels)
+    k_nan_value = 22e-3  # NaN値の代替値
+    k_values_plot = np.where(np.isnan(k_values), k_nan_value, k_values)
+    ax3_twin.plot(k_values_plot, window_centers,
+                  'r-', linewidth=2, marker='s', markersize=10, label='k (scaling factor)')
+    ax3_twin.tick_params(axis='x', labelcolor='red', labelsize=font_small)
+    # x軸範囲設定（k値）: 0〜22e-3に拡張（22e-3はNaN用）
+    ax3_twin.set_xlim(0, 22e-3)
+    # カスタム目盛り設定（22e-3を「nan」と表示）
+    k_ticks = [0, 5e-3, 10e-3, 15e-3, 20e-3, 22e-3]
+    k_tick_labels = ['0', '5', '10', '15', '20', 'nan']
+    ax3_twin.set_xticks(k_ticks)
+    ax3_twin.set_xticklabels(k_tick_labels)
+    ax3_twin.set_xlabel('k [×10⁻³ /m²]', fontsize=font_medium, color='red')
 
     ax3.set_xlabel('Moving distance [m]', fontsize=font_medium)
     ax3.set_ylabel('Time [ns]', fontsize=font_medium)
     ax3.set_ylim(time_max_data, time_min_data)
     ax3.tick_params(axis='both', which='major', labelsize=font_small)
-    # ax3.set_title('p-value vs. Depth', fontsize=font_large)
+
+    # === 4段目: p値のプロット ===
+    # B-scan背景
+    ax4.imshow(bscan_data, aspect='auto', cmap='seismic',
+               extent=[0, bscan_data.shape[1] * trace_interval,
+                      time_array[-1], time_array[0]],
+               vmin=vmin, vmax=vmax, alpha=0.5)
+
+    # p値を第2横軸にプロット（対数スケール、縦方向に沿って、NaN値は1.5としてプロット）
+    ax4_twin = ax4.twiny()
+    p_nan_value = 1.5  # NaN値の代替値
+    p_values_plot = np.where(np.isnan(p_values_array) | (p_values_array <= 0), p_nan_value, p_values_array)
+    ax4_twin.semilogx(p_values_plot, window_centers,
+                      'g-', linewidth=2, marker='^', markersize=10, label='p-value')
+    # p=0.05の縦線を追加
+    ax4_twin.axvline(x=0.05, color='black', linestyle='--', linewidth=1.5, label='p = 0.05')
+    ax4_twin.set_xlabel('p-value', fontsize=font_medium, color='green')
+    ax4_twin.tick_params(axis='x', labelcolor='green', labelsize=font_small)
+    # x軸範囲設定（p値）: 1e-4〜1.5に拡張（1.5はNaN用）
+    ax4_twin.set_xlim(1e-4, 1.5)
+    # カスタム目盛り設定（1.5を「nan」と表示）
+    p_ticks = [1e-4, 1e-3, 1e-2, 0.05, 1e-1, 1.0, 1.5]
+    p_tick_labels = ['10⁻⁴', '10⁻³', '10⁻²', '0.05', '10⁻¹', '1', 'nan']
+    ax4_twin.set_xticks(p_ticks)
+    ax4_twin.set_xticklabels(p_tick_labels)
+
+    ax4.set_xlabel('Moving distance [m]', fontsize=font_medium)
+    ax4.set_ylabel('Time [ns]', fontsize=font_medium)
+    ax4.set_ylim(time_max_data, time_min_data)
+    ax4.tick_params(axis='both', which='major', labelsize=font_small)
 
     plt.tight_layout()
 
@@ -768,6 +901,103 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     plt.close()
 
     print(f'深さ方向移動ウィンドウプロット保存: {output_path}.png')
+
+    # === 個別プロット作成 ===
+    # 個別プロット用サブディレクトリ
+    individual_plots_dir = os.path.join(os.path.dirname(output_path), 'individual_plots')
+    os.makedirs(individual_plots_dir, exist_ok=True)
+
+    # --- 岩石数の個別プロット ---
+    fig_num, ax_num = plt.subplots(figsize=(18, 6))
+    ax_num.imshow(bscan_data, aspect='auto', cmap='seismic',
+                  extent=[0, bscan_data.shape[1] * trace_interval,
+                         time_array[-1], time_array[0]],
+                  vmin=vmin, vmax=vmax, alpha=0.5)
+    ax_num_twin = ax_num.twiny()
+    ax_num_twin.plot(num_rocks_array, window_centers,
+                     'k-', linewidth=2, marker='D', markersize=10, label='Number of rocks')
+    ax_num_twin.set_xlabel('Number of detected rocks', fontsize=font_medium, color='black')
+    ax_num_twin.tick_params(axis='x', labelcolor='black', labelsize=font_small)
+    ax_num.set_xlabel('Moving distance [m]', fontsize=font_medium)
+    ax_num.set_ylabel('Time [ns]', fontsize=font_medium)
+    ax_num.set_ylim(time_max_data, time_min_data)
+    ax_num.tick_params(axis='both', which='major', labelsize=font_small)
+    plt.tight_layout()
+    plt.savefig(os.path.join(individual_plots_dir, 'num_rocks_plot.png'), dpi=dpi_png)
+    plt.savefig(os.path.join(individual_plots_dir, 'num_rocks_plot.pdf'), dpi=dpi_pdf)
+    plt.close()
+
+    # --- rの個別プロット ---
+    fig_r, ax_r = plt.subplots(figsize=(18, 6))
+    ax_r.imshow(bscan_data, aspect='auto', cmap='seismic',
+                extent=[0, bscan_data.shape[1] * trace_interval,
+                       time_array[-1], time_array[0]],
+                vmin=vmin, vmax=vmax, alpha=0.5)
+    ax_r_twin = ax_r.twiny()
+    ax_r_twin.plot(r_values_plot, window_centers,
+                   'b-', linewidth=2, marker='o', markersize=10, label='r (power-law exponent)')
+    ax_r_twin.set_xlabel('r (power-law exponent)', fontsize=font_medium, color='blue')
+    ax_r_twin.tick_params(axis='x', labelcolor='blue', labelsize=font_small)
+    ax_r_twin.set_xlim(0.3, 1.6)
+    ax_r_twin.set_xticks(r_ticks)
+    ax_r_twin.set_xticklabels(r_tick_labels)
+    ax_r.set_xlabel('Moving distance [m]', fontsize=font_medium)
+    ax_r.set_ylabel('Time [ns]', fontsize=font_medium)
+    ax_r.set_ylim(time_max_data, time_min_data)
+    ax_r.tick_params(axis='both', which='major', labelsize=font_small)
+    plt.tight_layout()
+    plt.savefig(os.path.join(individual_plots_dir, 'r_plot.png'), dpi=dpi_png)
+    plt.savefig(os.path.join(individual_plots_dir, 'r_plot.pdf'), dpi=dpi_pdf)
+    plt.close()
+
+    # --- kの個別プロット ---
+    fig_k, ax_k = plt.subplots(figsize=(18, 6))
+    ax_k.imshow(bscan_data, aspect='auto', cmap='seismic',
+                extent=[0, bscan_data.shape[1] * trace_interval,
+                       time_array[-1], time_array[0]],
+                vmin=vmin, vmax=vmax, alpha=0.5)
+    ax_k_twin = ax_k.twiny()
+    ax_k_twin.plot(k_values_plot, window_centers,
+                   'r-', linewidth=2, marker='s', markersize=10, label='k (scaling factor)')
+    ax_k_twin.tick_params(axis='x', labelcolor='red', labelsize=font_small)
+    ax_k_twin.set_xlim(0, 22e-3)
+    ax_k_twin.set_xticks(k_ticks)
+    ax_k_twin.set_xticklabels(k_tick_labels)
+    ax_k_twin.set_xlabel('k [×10⁻³ /m²]', fontsize=font_medium, color='red')
+    ax_k.set_xlabel('Moving distance [m]', fontsize=font_medium)
+    ax_k.set_ylabel('Time [ns]', fontsize=font_medium)
+    ax_k.set_ylim(time_max_data, time_min_data)
+    ax_k.tick_params(axis='both', which='major', labelsize=font_small)
+    plt.tight_layout()
+    plt.savefig(os.path.join(individual_plots_dir, 'k_plot.png'), dpi=dpi_png)
+    plt.savefig(os.path.join(individual_plots_dir, 'k_plot.pdf'), dpi=dpi_pdf)
+    plt.close()
+
+    # --- p値の個別プロット ---
+    fig_p, ax_p = plt.subplots(figsize=(18, 6))
+    ax_p.imshow(bscan_data, aspect='auto', cmap='seismic',
+                extent=[0, bscan_data.shape[1] * trace_interval,
+                       time_array[-1], time_array[0]],
+                vmin=vmin, vmax=vmax, alpha=0.5)
+    ax_p_twin = ax_p.twiny()
+    ax_p_twin.semilogx(p_values_plot, window_centers,
+                       'g-', linewidth=2, marker='^', markersize=10, label='p-value')
+    ax_p_twin.axvline(x=0.05, color='black', linestyle='--', linewidth=1.5, label='p = 0.05')
+    ax_p_twin.set_xlabel('p-value', fontsize=font_medium, color='green')
+    ax_p_twin.tick_params(axis='x', labelcolor='green', labelsize=font_small)
+    ax_p_twin.set_xlim(1e-4, 1.5)
+    ax_p_twin.set_xticks(p_ticks)
+    ax_p_twin.set_xticklabels(p_tick_labels)
+    ax_p.set_xlabel('Moving distance [m]', fontsize=font_medium)
+    ax_p.set_ylabel('Time [ns]', fontsize=font_medium)
+    ax_p.set_ylim(time_max_data, time_min_data)
+    ax_p.tick_params(axis='both', which='major', labelsize=font_small)
+    plt.tight_layout()
+    plt.savefig(os.path.join(individual_plots_dir, 'p_value_plot.png'), dpi=dpi_png)
+    plt.savefig(os.path.join(individual_plots_dir, 'p_value_plot.pdf'), dpi=dpi_pdf)
+    plt.close()
+
+    print(f'個別プロット保存: {individual_plots_dir}')
 
     # p値統計を計算（p値がnanの場合はp > 0.05とみなす）
     p_values_array = np.array(p_values)
