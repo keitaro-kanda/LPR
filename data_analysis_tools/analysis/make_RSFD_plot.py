@@ -616,6 +616,7 @@ else:  # startup_mode == '2'
                 all_ranges_data_grp2_3 = []
                 all_ranges_data_area_normalized_est = []  # 面積規格化Group2推定
                 all_ranges_data_area_normalized_2_3 = []  # 面積規格化Group2-3
+                all_ranges_summary = []  # サマリー情報格納用
 
                 # JSONデータ読み込み（一度だけ）
                 with open(data_path, 'r') as f:
@@ -889,6 +890,35 @@ else:  # startup_mode == '2'
                         'color': color
                     })
 
+                    # 6) サマリー情報を収集
+                    all_ranges_summary.append({
+                        'range_label': range_label,
+                        'time_range': range_info['time_range'],
+                        'horizontal_range': range_info['horizontal_range'],
+                        'time_min': time_min_range,
+                        'time_max': time_max_range,
+                        'horizontal_min': horizontal_min_range,
+                        'horizontal_max': horizontal_max_range,
+                        'area': area_range,
+                        'exclude': exclude_flag,
+                        'total_rocks': len(lab),
+                        'label_1_count': counts[1],
+                        'label_2_count': counts[2],
+                        'label_3_count': counts[3],
+                        'group1_3_fit': {
+                            'k': k_pow_area_est,
+                            'r': r_pow_area_est,
+                            'R2': R2_pow_area_est,
+                            'p': p_pow_area_est
+                        },
+                        'group2_3_fit': {
+                            'k': k_pow_area_2_3,
+                            'r': r_pow_area_2_3,
+                            'R2': R2_pow_area_2_3,
+                            'p': p_pow_area_2_3
+                        }
+                    })
+
                 # プロット生成
                 print('\n=== 比較プロット生成中 ===')
 
@@ -909,6 +939,49 @@ else:  # startup_mode == '2'
                 )
 
                 print('複数範囲比較プロット完了')
+
+                # サマリーファイルの保存
+                summary_path = os.path.join(output_dir, 'multi_range_comparison_summary.txt')
+                with open(summary_path, 'w', encoding='utf-8') as f:
+                    f.write('# Multi-Range Comparison Summary\n')
+                    f.write(f'# Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n')
+                    f.write(f'# Number of ranges: {num_ranges}\n')
+                    f.write('#\n')
+
+                    for i, summary in enumerate(all_ranges_summary, 1):
+                        f.write(f'# ===== Range {i}: {summary["range_label"]} =====\n')
+                        if summary['time_range']:
+                            f.write(f'# Time range: {summary["time_min"]}-{summary["time_max"]} ns\n')
+                        else:
+                            f.write('# Time range: Not specified\n')
+                        if summary['horizontal_range']:
+                            f.write(f'# Horizontal range: {summary["horizontal_min"]}-{summary["horizontal_max"]} m\n')
+                        else:
+                            f.write('# Horizontal range: Not specified\n')
+                        f.write(f'# Area: {summary["area"]} m²\n')
+                        if summary['exclude']:
+                            f.write('# Mode: Exclude specified range\n')
+                        else:
+                            f.write('# Mode: Use specified range only\n')
+                        f.write(f'# Total rocks (Label 1-3): {summary["total_rocks"]}\n')
+                        f.write(f'# Label 1: {summary["label_1_count"]}\n')
+                        f.write(f'# Label 2: {summary["label_2_count"]}\n')
+                        f.write(f'# Label 3: {summary["label_3_count"]}\n')
+                        f.write('#\n')
+                        f.write('# [Group1-3 Fitting (Area Normalized)]\n')
+                        f.write(f'# k: {summary["group1_3_fit"]["k"]:.4e}\n')
+                        f.write(f'# r: {summary["group1_3_fit"]["r"]:.4f}\n')
+                        f.write(f'# R²: {summary["group1_3_fit"]["R2"]:.4f}\n')
+                        f.write(f'# p: {summary["group1_3_fit"]["p"]:.4e}\n')
+                        f.write('#\n')
+                        f.write('# [Group2-3 Fitting (Area Normalized)]\n')
+                        f.write(f'# k: {summary["group2_3_fit"]["k"]:.4e}\n')
+                        f.write(f'# r: {summary["group2_3_fit"]["r"]:.4f}\n')
+                        f.write(f'# R²: {summary["group2_3_fit"]["R2"]:.4f}\n')
+                        f.write(f'# p: {summary["group2_3_fit"]["p"]:.4e}\n')
+                        f.write('#\n')
+
+                print(f'サマリーファイル保存: {summary_path}')
             else:
                 # モード1-3の処理
                 with open(data_path, 'r') as f:
@@ -1741,6 +1814,7 @@ else:  # mode == '4'
     all_ranges_data_grp2_3 = []  # Group2-3のみ
     all_ranges_data_area_normalized_est = []  # 面積規格化Group2推定
     all_ranges_data_area_normalized_2_3 = []  # 面積規格化Group2-3
+    all_ranges_summary = []  # サマリー情報格納用
 
     # JSONデータ読み込み（一度だけ）
     with open(data_path, 'r') as f:
@@ -2015,6 +2089,35 @@ else:  # mode == '4'
             'color': color
         })
 
+        # 6) サマリー情報を収集
+        all_ranges_summary.append({
+            'range_label': range_label,
+            'time_range': range_info['time_range'],
+            'horizontal_range': range_info['horizontal_range'],
+            'time_min': time_min,
+            'time_max': time_max,
+            'horizontal_min': horizontal_min,
+            'horizontal_max': horizontal_max,
+            'area': area_range,
+            'exclude': exclude_flag,
+            'total_rocks': len(lab),
+            'label_1_count': counts[1],
+            'label_2_count': counts[2],
+            'label_3_count': counts[3],
+            'group1_3_fit': {
+                'k': k_pow_area_est,
+                'r': r_pow_area_est,
+                'R2': R2_pow_area_est,
+                'p': p_pow_area_est
+            },
+            'group2_3_fit': {
+                'k': k_pow_area_2_3,
+                'r': r_pow_area_2_3,
+                'R2': R2_pow_area_2_3,
+                'p': p_pow_area_2_3
+            }
+        })
+
     # ------------------------------------------------------------------
     # プロット生成
     # ------------------------------------------------------------------
@@ -2037,6 +2140,51 @@ else:  # mode == '4'
     )
 
     print('複数範囲比較プロット完了')
+
+    # ------------------------------------------------------------------
+    # サマリーファイルの保存
+    # ------------------------------------------------------------------
+    summary_path = os.path.join(output_dir, 'multi_range_comparison_summary.txt')
+    with open(summary_path, 'w', encoding='utf-8') as f:
+        f.write('# Multi-Range Comparison Summary\n')
+        f.write(f'# Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n')
+        f.write(f'# Number of ranges: {num_ranges}\n')
+        f.write('#\n')
+
+        for i, summary in enumerate(all_ranges_summary, 1):
+            f.write(f'# ===== Range {i}: {summary["range_label"]} =====\n')
+            if summary['time_range']:
+                f.write(f'# Time range: {summary["time_min"]}-{summary["time_max"]} ns\n')
+            else:
+                f.write('# Time range: Not specified\n')
+            if summary['horizontal_range']:
+                f.write(f'# Horizontal range: {summary["horizontal_min"]}-{summary["horizontal_max"]} m\n')
+            else:
+                f.write('# Horizontal range: Not specified\n')
+            f.write(f'# Area: {summary["area"]} m²\n')
+            if summary['exclude']:
+                f.write('# Mode: Exclude specified range\n')
+            else:
+                f.write('# Mode: Use specified range only\n')
+            f.write(f'# Total rocks (Label 1-3): {summary["total_rocks"]}\n')
+            f.write(f'# Label 1: {summary["label_1_count"]}\n')
+            f.write(f'# Label 2: {summary["label_2_count"]}\n')
+            f.write(f'# Label 3: {summary["label_3_count"]}\n')
+            f.write('#\n')
+            f.write('# [Group1-3 Fitting (Area Normalized)]\n')
+            f.write(f'# k: {summary["group1_3_fit"]["k"]:.4e}\n')
+            f.write(f'# r: {summary["group1_3_fit"]["r"]:.4f}\n')
+            f.write(f'# R²: {summary["group1_3_fit"]["R2"]:.4f}\n')
+            f.write(f'# p: {summary["group1_3_fit"]["p"]:.4e}\n')
+            f.write('#\n')
+            f.write('# [Group2-3 Fitting (Area Normalized)]\n')
+            f.write(f'# k: {summary["group2_3_fit"]["k"]:.4e}\n')
+            f.write(f'# r: {summary["group2_3_fit"]["r"]:.4f}\n')
+            f.write(f'# R²: {summary["group2_3_fit"]["R2"]:.4f}\n')
+            f.write(f'# p: {summary["group2_3_fit"]["p"]:.4e}\n')
+            f.write('#\n')
+
+    print(f'サマリーファイル保存: {summary_path}')
 
 # ------------------------------------------------------------------
 # 13. 設定ファイルの保存（新規処理の場合のみ）
