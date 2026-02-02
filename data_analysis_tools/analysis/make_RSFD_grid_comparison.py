@@ -380,6 +380,7 @@ def create_grid_subplot(grid_data_dict, fit_params_dict, rock_counts_dict,
 
 def create_bscan_with_grid_lines(bscan_data, time_bins, dist_bins, output_path, epsilon_r,
                                   fit_params_dict=None, rock_counts_dict=None,
+                                  num_time_bins=1,
                                   sample_interval=0.312500e-9, trace_interval=3.6e-2,
                                    c=299792458, dpi_png=300, dpi_pdf=600):
     """
@@ -446,7 +447,8 @@ def create_bscan_with_grid_lines(bscan_data, time_bins, dist_bins, output_path, 
             label_x = (d_min + d_max) / 2
             label_y = (t_min + t_max) / 2
 
-            lines = []
+            parts = []  # 1行表示用
+            lines = []  # 複数行表示用
             box_edge_color = 'black'
             box_linewidth = 1.0
 
@@ -457,6 +459,7 @@ def create_bscan_with_grid_lines(bscan_data, time_bins, dist_bins, output_path, 
                 g2 = counts.get('group2', 0)
                 g3 = counts.get('group3', 0)
                 lines.append(f'Gr1:{g1} Gr2:{g2} Gr3:{g3}')
+                parts.append(f'G1:{g1} G2:{g2} G3:{g3}')
 
             # 2. RSFDパラメータ
             if fit_params_dict and (i, j) in fit_params_dict:
@@ -469,17 +472,23 @@ def create_bscan_with_grid_lines(bscan_data, time_bins, dist_bins, output_path, 
                 # kをe-3オーダーに変換して表示 (k * 1000)e-3
                 k_scaled = k_val * 1000
                 lines.append(f'r={r_val:.2f}, k={k_scaled:.1f}e-3')
-                
+                parts.append(f'r={r_val:.2f} k={k_scaled:.1f}e-3')
+
                 # p-value
                 lines.append(f'{p_str}')
-                
+                parts.append(f'{p_str}')
+
                 # p-value強調表示
                 if p_val <= 0.05:
                     box_edge_color = 'red'
                     box_linewidth = 2.0
 
             if lines:
-                label_text = '\n'.join(lines)
+                # 時間方向の分割数が8以上の場合は1行表示
+                if num_time_bins >= 8:
+                    label_text = ' '.join(parts)
+                else:
+                    label_text = '\n'.join(lines)
                 text_color = 'black'
             else:
                 label_text = 'No Data'
@@ -959,6 +968,7 @@ if __name__ == '__main__':
             output_path_bscan, epsilon_regolith,
             fit_params_dict=fit_params_dict_area_normalized,
             rock_counts_dict=rock_counts_dict,
+            num_time_bins=num_time_bins,
             sample_interval=sample_interval,
             trace_interval=trace_interval,
             c=c
