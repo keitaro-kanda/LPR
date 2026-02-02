@@ -378,10 +378,10 @@ def create_grid_subplot(grid_data_dict, fit_params_dict, rock_counts_dict,
 
     print(f'グリッドsubplotプロット保存: {output_path}.png')
 
-def create_bscan_with_grid_lines(bscan_data, time_bins, dist_bins, output_path,
+def create_bscan_with_grid_lines(bscan_data, time_bins, dist_bins, output_path, epsilon_r,
                                   fit_params_dict=None, rock_counts_dict=None,
                                   sample_interval=0.312500e-9, trace_interval=3.6e-2,
-                                  epsilon_r=4.5, c=299792458, dpi_png=300, dpi_pdf=600):
+                                   c=299792458, dpi_png=300, dpi_pdf=600):
     """
     B-scanプロット上にグリッド分割の境界線を表示する関数
     (右側の余白削除 + kをe-3オーダー固定表示版)
@@ -503,7 +503,7 @@ def create_bscan_with_grid_lines(bscan_data, time_bins, dist_bins, output_path,
     depth_min = (t_min_plot * 1e-9) * c / np.sqrt(epsilon_r) / 2
     depth_max = (t_max_plot * 1e-9) * c / np.sqrt(epsilon_r) / 2
     ax2.set_ylim(depth_min, depth_max)
-    ax2.set_ylabel(r'Depth [m] ($\varepsilon_r = 4.5$)', fontsize=font_medium)
+    ax2.set_ylabel(r'Depth [m] ($\varepsilon_r = ' + str(epsilon_r) + '$)', fontsize=font_medium)
     ax2.tick_params(axis='y', which='major', labelsize=font_small)
 
     # レイアウトの自動調整
@@ -703,7 +703,7 @@ if __name__ == '__main__':
     print('\n=== グリッド処理開始 ===')
 
     # 物理定数
-    epsilon_regolith = 4.5  # 月面レゴリスの比誘電率
+    epsilon_regolith = 3.0  # 月面レゴリスの比誘電率
     epsilon_rock = 9.0     # 岩石の比誘電率
     c = 299_792_458  # [m/s]
 
@@ -938,12 +938,11 @@ if __name__ == '__main__':
         output_path_bscan = os.path.join(base_dir, 'bscan_with_grid')
         create_bscan_with_grid_lines(
             bscan_data, time_bins_for_bscan, dist_bins_for_bscan,
-            output_path_bscan,
+            output_path_bscan, epsilon_regolith,
             fit_params_dict=fit_params_dict_area_normalized,
             rock_counts_dict=rock_counts_dict,
             sample_interval=sample_interval,
             trace_interval=trace_interval,
-            epsilon_r=epsilon_regolith,
             c=c
         )
     else:
