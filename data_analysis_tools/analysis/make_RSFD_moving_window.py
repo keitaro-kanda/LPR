@@ -233,9 +233,11 @@ def calculate_rsfd_in_window(rock_data, sizes, time_positions,
 
     Returns:
     --------
-    tuple: (k, r, R2, p_value, num_rocks, area, unique_sizes, cum_counts_normalized)
+    tuple: (k, r, R2, p_value, num_rocks, num_rocks_by_label, area, unique_sizes, cum_counts_normalized)
+           num_rocks_by_label: dict with keys 1, 2, 3 containing counts per label
     """
     x = rock_data['x']
+    lab = rock_data['label']
 
     # 範囲内の岩石をフィルタリング
     mask = (x >= dist_min) & (x <= dist_max) & \
@@ -243,7 +245,15 @@ def calculate_rsfd_in_window(rock_data, sizes, time_positions,
            (~np.isnan(sizes))
 
     filtered_sizes = sizes[mask]
+    filtered_labels = lab[mask]
     num_rocks = len(filtered_sizes)
+
+    # ラベル別岩石数をカウント
+    num_rocks_by_label = {
+        1: np.sum(filtered_labels == 1),
+        2: np.sum(filtered_labels == 2),
+        3: np.sum(filtered_labels == 3)
+    }
 
     # 面積計算（時間範囲を深度に変換）
     depth_min = time_min * 1e-9 * c / (2 * np.sqrt(epsilon_r))
@@ -251,7 +261,7 @@ def calculate_rsfd_in_window(rock_data, sizes, time_positions,
     area = (depth_max - depth_min) * (dist_max - dist_min)  # [m²]
 
     if num_rocks < 3:
-        return np.nan, np.nan, np.nan, np.nan, num_rocks, area, np.array([]), np.array([])
+        return np.nan, np.nan, np.nan, np.nan, num_rocks, num_rocks_by_label, area, np.array([]), np.array([])
 
     # 累積サイズ分布を計算
     unique_sizes = np.sort(np.unique(filtered_sizes))
@@ -263,7 +273,7 @@ def calculate_rsfd_in_window(rock_data, sizes, time_positions,
     # べき則フィッティング（規格化されたカウントを使用）
     k, r, R2, p_value = calc_fitting_power_law(unique_sizes, cum_counts_normalized)
 
-    return k, r, R2, p_value, num_rocks, area, unique_sizes, cum_counts_normalized
+    return k, r, R2, p_value, num_rocks, num_rocks_by_label, area, unique_sizes, cum_counts_normalized
 
 def plot_individual_rsfd(unique_sizes, cum_counts_normalized, k, r, R2, p_value,
                          num_rocks, area, window_range, output_path,
@@ -398,6 +408,9 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     R2_values = []
     p_values = []
     num_rocks_list = []
+    num_rocks_label1_list = []
+    num_rocks_label2_list = []
+    num_rocks_label3_list = []
     area_list = []
 
     print(f'\n水平方向移動ウィンドウ解析: {len(window_centers)}個のウィンドウ')
@@ -406,7 +419,7 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
         d_min = center - window_width / 2
         d_max = center + window_width / 2
 
-        k, r, R2, p, num_rocks, area, unique_sizes, cum_counts_normalized = calculate_rsfd_in_window(
+        k, r, R2, p, num_rocks, num_rocks_by_label, area, unique_sizes, cum_counts_normalized = calculate_rsfd_in_window(
             rock_data, sizes, time_positions,
             d_min, d_max, time_min_data, time_max_data,
             epsilon_r, c
@@ -417,6 +430,9 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
         R2_values.append(R2)
         p_values.append(p)
         num_rocks_list.append(num_rocks)
+        num_rocks_label1_list.append(num_rocks_by_label[1])
+        num_rocks_label2_list.append(num_rocks_by_label[2])
+        num_rocks_label3_list.append(num_rocks_by_label[3])
         area_list.append(area)
 
         # 個別RSFDプロット作成
@@ -445,26 +461,39 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     # p値の配列化
     p_values_array = np.array(p_values)
 
-    # 岩石数の配列化
+    # 岩石数の配列化（ラベル別）
     num_rocks_array = np.array(num_rocks_list)
+    num_label1_array = np.array(num_rocks_label1_list)
+    num_label2_array = np.array(num_rocks_label2_list)
+    num_label3_array = np.array(num_rocks_label3_list)
+
+    # 棒グラフの幅（ステップサイズの80%）
+    bar_width = step_size * 0.8
 
     # Figure作成（4つのサブプロット：上から岩石数、r、k、p値）
     fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(18, 20), sharex=True)
 
-    # === 1段目: 岩石数のプロット ===
+    # === 1段目: 岩石数のプロット（ラベル別積み上げ棒グラフ） ===
     # B-scan背景
     ax1.imshow(bscan_data, aspect='auto', cmap='seismic',
                extent=[0, bscan_data.shape[1] * trace_interval,
                       time_array[-1], time_array[0]],
                vmin=vmin, vmax=vmax, alpha=0.5)
 
-
-    # 岩石数を第2軸にプロット（リニアスケール）
+    # 岩石数を第2軸に積み上げ棒グラフでプロット（縦向き）
     ax1_twin = ax1.twinx()
-    ax1_twin.plot(window_centers, num_rocks_array,
-                  'k-', linewidth=2, marker='D', markersize=10, label='Number of rocks')
+    # ラベル1（赤）を一番下に
+    ax1_twin.bar(window_centers, num_label1_array, width=bar_width,
+                 color='red', alpha=0.7, label='Group 1')
+    # ラベル2（緑）をラベル1の上に積み上げ
+    ax1_twin.bar(window_centers, num_label2_array, width=bar_width,
+                 bottom=num_label1_array, color='green', alpha=0.7, label='Group 2')
+    # ラベル3（青）をラベル1+2の上に積み上げ
+    ax1_twin.bar(window_centers, num_label3_array, width=bar_width,
+                 bottom=num_label1_array + num_label2_array, color='blue', alpha=0.7, label='Group 3')
     ax1_twin.set_ylabel('Number of detected rocks', fontsize=font_medium, color='black')
     ax1_twin.tick_params(axis='y', labelcolor='black', labelsize=font_small)
+    ax1_twin.legend(loc='lower right', fontsize=font_small - 2)
 
     ax1.set_ylabel('Time [ns]', fontsize=font_medium)
     ax1.set_ylim(time_max_data, time_min_data)
@@ -573,17 +602,23 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     individual_plots_dir = os.path.join(os.path.dirname(output_path), 'individual_plots')
     os.makedirs(individual_plots_dir, exist_ok=True)
 
-    # --- 岩石数の個別プロット ---
+    # --- 岩石数の個別プロット（ラベル別積み上げ棒グラフ） ---
     fig_num, ax_num = plt.subplots(figsize=(18, 6))
     ax_num.imshow(bscan_data, aspect='auto', cmap='seismic',
                   extent=[0, bscan_data.shape[1] * trace_interval,
                          time_array[-1], time_array[0]],
                   vmin=vmin, vmax=vmax, alpha=0.5)
     ax_num_twin = ax_num.twinx()
-    ax_num_twin.plot(window_centers, num_rocks_array,
-                     'k-', linewidth=2, marker='D', markersize=10, label='Number of rocks')
+    # ラベル別積み上げ棒グラフ（縦向き）
+    ax_num_twin.bar(window_centers, num_label1_array, width=bar_width,
+                    color='red', alpha=0.7, label='Group 1')
+    ax_num_twin.bar(window_centers, num_label2_array, width=bar_width,
+                    bottom=num_label1_array, color='green', alpha=0.7, label='Group 2')
+    ax_num_twin.bar(window_centers, num_label3_array, width=bar_width,
+                    bottom=num_label1_array + num_label2_array, color='blue', alpha=0.7, label='Group 3')
     ax_num_twin.set_ylabel('Number of detected rocks', fontsize=font_medium, color='black')
     ax_num_twin.tick_params(axis='y', labelcolor='black', labelsize=font_small)
+    ax_num_twin.legend(loc='lower right', fontsize=font_small - 2)
     ax_num.set_xlabel('Moving distance [m]', fontsize=font_medium)
     ax_num.set_ylabel('Time [ns]', fontsize=font_medium)
     ax_num.set_ylim(time_max_data, time_min_data)
@@ -743,6 +778,9 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     R2_values = []
     p_values = []
     num_rocks_list = []
+    num_rocks_label1_list = []
+    num_rocks_label2_list = []
+    num_rocks_label3_list = []
     area_list = []
 
     print(f'\n深さ方向移動ウィンドウ解析: {len(window_centers)}個のウィンドウ')
@@ -751,7 +789,7 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
         t_min = center - window_width / 2
         t_max = center + window_width / 2
 
-        k, r, R2, p, num_rocks, area, unique_sizes, cum_counts_normalized = calculate_rsfd_in_window(
+        k, r, R2, p, num_rocks, num_rocks_by_label, area, unique_sizes, cum_counts_normalized = calculate_rsfd_in_window(
             rock_data, sizes, time_positions,
             dist_min_data, dist_max_data, t_min, t_max,
             epsilon_r, c
@@ -762,6 +800,9 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
         R2_values.append(R2)
         p_values.append(p)
         num_rocks_list.append(num_rocks)
+        num_rocks_label1_list.append(num_rocks_by_label[1])
+        num_rocks_label2_list.append(num_rocks_by_label[2])
+        num_rocks_label3_list.append(num_rocks_by_label[3])
         area_list.append(area)
 
         # 個別RSFDプロット作成
@@ -790,25 +831,39 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     # p値の配列化
     p_values_array = np.array(p_values)
 
-    # 岩石数の配列化
+    # 岩石数の配列化（ラベル別）
     num_rocks_array = np.array(num_rocks_list)
+    num_label1_array = np.array(num_rocks_label1_list)
+    num_label2_array = np.array(num_rocks_label2_list)
+    num_label3_array = np.array(num_rocks_label3_list)
+
+    # 棒グラフの高さ（ステップサイズの80%）
+    bar_height = step_size * 0.8
 
     # Figure作成（4つのサブプロット：上から岩石数、r、k、p値）
     fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(18, 20), sharey=True)
 
-    # === 1段目: 岩石数のプロット ===
+    # === 1段目: 岩石数のプロット（ラベル別積み上げ棒グラフ） ===
     # B-scan背景
     ax1.imshow(bscan_data, aspect='auto', cmap='seismic',
                extent=[0, bscan_data.shape[1] * trace_interval,
                       time_array[-1], time_array[0]],
                vmin=vmin, vmax=vmax, alpha=0.5)
 
-    # 岩石数を第2横軸にプロット（リニアスケール、縦方向に沿って）
+    # 岩石数を第2横軸に積み上げ棒グラフでプロット（横向き）
     ax1_twin = ax1.twiny()
-    ax1_twin.plot(num_rocks_array, window_centers,
-                  'k-', linewidth=2, marker='D', markersize=10, label='Number of rocks')
+    # ラベル1（赤）を一番左に
+    ax1_twin.barh(window_centers, num_label1_array, height=bar_height,
+                  color='red', alpha=0.7, label='Group 1')
+    # ラベル2（緑）をラベル1の右に積み上げ
+    ax1_twin.barh(window_centers, num_label2_array, height=bar_height,
+                  left=num_label1_array, color='green', alpha=0.7, label='Group 2')
+    # ラベル3（青）をラベル1+2の右に積み上げ
+    ax1_twin.barh(window_centers, num_label3_array, height=bar_height,
+                  left=num_label1_array + num_label2_array, color='blue', alpha=0.7, label='Group 3')
     ax1_twin.set_xlabel('Number of detected rocks', fontsize=font_medium, color='black')
     ax1_twin.tick_params(axis='x', labelcolor='black', labelsize=font_small)
+    ax1_twin.legend(loc='lower right', fontsize=font_small - 2)
 
     ax1.set_xlabel('Moving distance [m]', fontsize=font_medium)
     ax1.set_ylabel('Time [ns]', fontsize=font_medium)
@@ -920,17 +975,23 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     individual_plots_dir = os.path.join(os.path.dirname(output_path), 'individual_plots')
     os.makedirs(individual_plots_dir, exist_ok=True)
 
-    # --- 岩石数の個別プロット ---
+    # --- 岩石数の個別プロット（ラベル別積み上げ棒グラフ） ---
     fig_num, ax_num = plt.subplots(figsize=(18, 6))
     ax_num.imshow(bscan_data, aspect='auto', cmap='seismic',
                   extent=[0, bscan_data.shape[1] * trace_interval,
                          time_array[-1], time_array[0]],
                   vmin=vmin, vmax=vmax, alpha=0.5)
     ax_num_twin = ax_num.twiny()
-    ax_num_twin.plot(num_rocks_array, window_centers,
-                     'k-', linewidth=2, marker='D', markersize=10, label='Number of rocks')
+    # ラベル別積み上げ棒グラフ（横向き）
+    ax_num_twin.barh(window_centers, num_label1_array, height=bar_height,
+                     color='red', alpha=0.7, label='Group 1')
+    ax_num_twin.barh(window_centers, num_label2_array, height=bar_height,
+                     left=num_label1_array, color='green', alpha=0.7, label='Group 2')
+    ax_num_twin.barh(window_centers, num_label3_array, height=bar_height,
+                     left=num_label1_array + num_label2_array, color='blue', alpha=0.7, label='Group 3')
     ax_num_twin.set_xlabel('Number of detected rocks', fontsize=font_medium, color='black')
     ax_num_twin.tick_params(axis='x', labelcolor='black', labelsize=font_small)
+    ax_num_twin.legend(loc='lower right', fontsize=font_small - 2)
     ax_num.set_xlabel('Moving distance [m]', fontsize=font_medium)
     ax_num.set_ylabel('Time [ns]', fontsize=font_medium)
     ax_num.set_ylim(time_max_data, time_min_data)
