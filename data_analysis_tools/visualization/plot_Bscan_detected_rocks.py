@@ -179,7 +179,7 @@ x, t, lab = load_labels_from_files(selected_files)
 sample_interval = 0.312500e-9    # [s] - Time sampling interval
 trace_interval = 3.6e-2          # [m] - Spatial trace interval
 c = 299792458                    # [m/s] - Speed of light
-epsilon_r = 4.5                 # Relative permittivity of lunar regolith
+epsilon_r = 3.0                  # Almost an average value between Chen+2022 (2.3-3.7), Dong+2020 (2-4くらい), Feng+2022 (2.64-3.85).
 reciever_time_delay = 28.203e-9  # [s] - Hardware delay
 
 
