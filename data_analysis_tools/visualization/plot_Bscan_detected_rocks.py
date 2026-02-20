@@ -292,7 +292,7 @@ def single_plot(plot_data, time_zero_idx, label_keys=None, suffix=''):
     depth_max = (t_max * 1e-9) * c / np.sqrt(epsilon_r) / 2
     # 第2軸に深さの範囲とラベルを設定
     ax2.set_ylim(depth_min, depth_max)
-    ax2.set_ylabel(r'Depth [m] ($\varepsilon_r = 4.5$)', fontsize=font_medium)
+    ax2.set_ylabel(r'Depth [m] ($\varepsilon_r = $' + f'{epsilon_r})', fontsize=font_medium)
     ax2.tick_params(axis='y', which='major', labelsize=font_small)
 
     # Add legend if labels are present
