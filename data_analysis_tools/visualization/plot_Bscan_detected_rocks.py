@@ -352,8 +352,8 @@ def single_plot(plot_data, time_zero_idx, label_keys=None, suffix=''):
     output_path_png = os.path.join(out_dir, base + '.png')
     output_path_pdf = os.path.join(out_dir, base + '.pdf')
     
-    plt.savefig(output_path_png, dpi=120)   # Web quality
-    plt.savefig(output_path_pdf, dpi=600)   # Publication quality
+    plt.savefig(output_path_png, dpi=120, bbox_inches='tight')   # Web quality
+    plt.savefig(output_path_pdf, dpi=600, bbox_inches='tight')   # Publication quality
     print(f'プロットを保存しました: {output_path_png}')
     plt.show()
     
