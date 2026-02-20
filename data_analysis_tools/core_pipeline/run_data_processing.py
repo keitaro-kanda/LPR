@@ -597,12 +597,13 @@ for i in range(len(plot_data)):
     ### ここまで ###
 
     #* Saving
+    #* Saving
     if rover_name == 'CE-4':
-        plt.savefig(dir_list[i] + '/' + str(step) + '_' + title[i] + '.png', format='png', dpi=120)
-        plt.savefig(dir_list[i] + '/' + str(step) + '_' + title[i] + '.pdf', format='pdf', dpi=600)
+        plt.savefig(dir_list[i] + '/' + str(step) + '_' + title[i] + '.png', format='png', dpi=120, bbox_inches='tight')
+        plt.savefig(dir_list[i] + '/' + str(step) + '_' + title[i] + '.pdf', format='pdf', dpi=600, bbox_inches='tight')
     elif rover_name == 'CE-3':
-        plt.savefig(dir_list[i] + '/' + str(step) + '_' + title[i] + '_full.png', format='png', dpi=120)
-        plt.savefig(dir_list[i] + '/' + str(step) + '_' + title[i] + '_full.pdf', format='pdf', dpi=600)
+        plt.savefig(dir_list[i] + '/' + str(step) + '_' + title[i] + '_full.png', format='png', dpi=120, bbox_inches='tight')
+        plt.savefig(dir_list[i] + '/' + str(step) + '_' + title[i] + '_full.pdf', format='pdf', dpi=600, bbox_inches='tight')
     print('Finished plotting', title[i])
     plt.close()
 
@@ -667,8 +668,8 @@ if rover_name == 'CE-3':
 
         #* Saving
         # In case of CE-3 zoomed plot, data point if limited and dpi can be lower
-        plt.savefig(dir_list[i] + '/' + str(step) + '_' + title[i] + '_0-100.png', format='png', dpi=120)
-        plt.savefig(dir_list[i] + '/' + str(step) + '_' + title[i] + '_0-100.pdf', format='pdf', dpi=300)
+        plt.savefig(dir_list[i] + '/' + str(step) + '_' + title[i] + '_0-100.png', format='png', dpi=120, bbox_inches='tight')
+        plt.savefig(dir_list[i] + '/' + str(step) + '_' + title[i] + '_0-100.pdf', format='pdf', dpi=300, bbox_inches='tight')
         print('Finished plotting', title[i])
         plt.close()
 
