@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
-import datetime
 
 # --- 1. 設定クラス (変更なし) ---
 class RadarConfig:
@@ -26,7 +25,7 @@ class RadarConfig:
         
         # --- C. シミュレーション空間設定 ---
         self.MAX_DEPTH = 12.0
-        self.AREA_SIZE_M2 = 4500.0
+        self.AREA_SIZE_M2 = 4500.0 # 幅3 m x 奥行き1500 mのエリア
         self.ROCK_SIZE_MIN = 0.01
         self.ROCK_SIZE_MAX = 1.0
         self.TOTAL_ROCKS = 10000
@@ -56,34 +55,24 @@ class RadarConfig:
         n2 = np.sqrt(self.EPSILON_R_ROCK)
         return ((n1 - n2) / (n1 + n2))**2
 
-# --- 2. 物理モデルクラス (生成ロジックを厳密化) ---
+# --- 2. 物理モデルクラス (変更なし) ---
 class RockModel:
     """
     岩石の生成とレーダー方程式の適用を行うクラス
     """
     def generate_rocks(self, r_true, config):
-        """
-        【重要】有界パレート分布 (Bounded Pareto Distribution) に従う岩石を生成
-        単純な (1-u) 方式ではなく、Min/Max の範囲内で正規化された逆関数法を用いることで、
-        データの端（最大サイズ）までフィッティングに含めても傾きがズレないようにする。
-        """
         print(f"岩石を生成中... (True Slope = -{r_true}, N={config.TOTAL_ROCKS})")
         
-        # 一様乱数 [0, 1)
         u = np.random.rand(config.TOTAL_ROCKS)
         
         D_min = config.ROCK_SIZE_MIN
         D_max = config.ROCK_SIZE_MAX
-        
-        # --- Bounded Pareto Inverse Transform Sampling ---
-        # 公式: D = [ (D_max^-r - D_min^-r) * u + D_min^-r ] ^ (-1/r)
         
         term1 = D_max ** (-r_true)
         term2 = D_min ** (-r_true)
         
         diameters = ( (term1 - term2) * u + term2 ) ** (-1.0 / r_true)
         
-        # 深さをランダムに割り当て
         depths = np.random.uniform(0, config.MAX_DEPTH, size=len(diameters))
         
         df = pd.DataFrame({
@@ -127,30 +116,21 @@ class RockModel:
         
         return result_df
 
-# --- 3. 解析クラス (全データ使用へ修正) ---
+# --- 3. 解析クラス (プロットのカラー指定と引数の追加) ---
 class Analyzer:
     """
     検出された岩石データからRSFDを計算・プロットするクラス
     """
     def calculate_slope(self, diameters):
-        """
-        累積個数分布の傾きを算出する
-        【修正】フィルタリング条件を撤廃し、全てのデータ(N>=1)を使用する
-        """
-        # データ数が極端に少ない場合のみエラー回避
         if len(diameters) < 2:
             return np.nan, np.nan, [], []
             
-        # 累積分布の作成
         sorted_d = np.sort(diameters)
         y_cumulative = np.arange(len(sorted_d), 0, -1)
         
-        # 最小二乗法のためにログをとる
         x_log = np.log10(sorted_d)
         y_log = np.log10(y_cumulative)
         
-        # --- 全データを用いてフィッティング ---
-        # ご要望通り、岩石サイズが大きい（累積数が小さい）データも全て含めます
         slope, intercept = np.polyfit(x_log, y_log, 1)
         
         return slope, intercept, x_log, y_log
@@ -161,21 +141,33 @@ class Analyzer:
         depth_ranges = np.arange(1.0, max_depth + 0.1, step)
         
         for d in depth_ranges:
-            subset = detected_df[
+            subset_detected = detected_df[
                 (detected_df['is_detected'] == True) & 
                 (detected_df['depth'] <= d)
             ]
-            count = len(subset)
-            if count > 5: # 最低限の点数があれば計算
-                slope, _, _, _ = self.calculate_slope(subset['diameter'].values)
+            subset_all = detected_df[detected_df['depth'] <= d]
+            
+            count_detected = len(subset_detected)
+            count_all = len(subset_all)
+            
+            if count_detected > 5:
+                slope, _, _, _ = self.calculate_slope(subset_detected['diameter'].values)
                 r_apparent = -slope
             else:
                 r_apparent = np.nan
             
+            detection_rate = count_detected / count_all if count_all > 0 else 0.0
+            
+            area = d * 1500.0
+            rock_density = count_detected / area if area > 0 else 0.0
+            
             results.append({
                 'depth_range': d,
                 'r_apparent': r_apparent,
-                'count': count
+                'count_detected': count_detected,
+                'count_all': count_all,
+                'detection_rate': detection_rate,
+                'rock_density': rock_density
             })
             
         return pd.DataFrame(results)
@@ -183,26 +175,20 @@ class Analyzer:
     def plot_csfd(self, detected_df, all_rocks_df, output_path, r_true):
         plt.figure(figsize=(10, 8))
 
-        # --- 1. 真の分布 (Ground Truth) ---
         diameters_true = all_rocks_df['diameter'].values
         if len(diameters_true) > 0:
             slope_true, intercept_true, x_log_true, y_log_true = self.calculate_slope(diameters_true)
-            
             plt.scatter(10**x_log_true, 10**y_log_true, s=20, color='gray', label='Generated Rocks', marker='D', alpha=0.5)
-            
             if not np.isnan(slope_true):
                 x_fit_true = np.linspace(min(x_log_true), max(x_log_true), 100)
                 y_fit_true = slope_true * x_fit_true + intercept_true
                 plt.plot(10**x_fit_true, 10**y_fit_true, 'k--', linewidth=2.0, 
                          label=f'True Fit (r = {-slope_true:.2f})')
 
-        # --- 2. 見かけの分布 (Detected) ---
         diameters_det = detected_df[detected_df['is_detected'] == True]['diameter'].values
         if len(diameters_det) > 0:
             slope_det, intercept_det, x_log_det, y_log_det = self.calculate_slope(diameters_det)
-            
             plt.scatter(10**x_log_det, 10**y_log_det, s=20, color='blue', label='Detected Rocks', marker='o')
-            
             if not np.isnan(slope_det):
                 x_fit_det = np.linspace(min(x_log_det), max(x_log_det), 100)
                 y_fit_det = slope_det * x_fit_det + intercept_det
@@ -222,10 +208,11 @@ class Analyzer:
         plt.savefig(output_path)
         plt.show()
     
+    # --- ご指定いただいたプロットの色変更 ---
     def plot_depth_analysis(self, analysis_df, output_path, r_true):
         plt.figure(figsize=(10, 8))
         plt.plot(analysis_df['depth_range'], analysis_df['r_apparent'], marker='o', linestyle='-', color='blue', label='Apparent r')
-        plt.axhline(y=r_true, color='r', linestyle='--', label='True r')
+        plt.axhline(y=r_true, color='k', linestyle='--', label='True r')
         
         plt.xlabel('Depth Range [m]', fontsize=18)
         plt.ylabel('Apparent Slope r', fontsize=18)
@@ -239,7 +226,45 @@ class Analyzer:
         plt.savefig(output_path)
         plt.show()
 
-# --- 4. メイン処理 (変更なし) ---
+    def plot_detection_rate(self, analysis_df, output_path):
+        plt.figure(figsize=(10, 8))
+        plt.plot(analysis_df['depth_range'], analysis_df['detection_rate'], marker='o', linestyle='-', color='k', label='Detection Rate')
+        plt.axhline(y=1.0, color='k', linestyle='--', label='100% Detection Rate')
+        
+        plt.xlabel('Depth Range [m]', fontsize=18)
+        plt.ylabel('Detection Rate', fontsize=18)
+        plt.title('Detection Rate vs Depth Range', fontsize=18)
+        plt.tick_params(axis='both', which='major', labelsize=16)
+        
+        plt.ylim(0, 1.05) 
+        plt.legend(fontsize=16)
+        plt.grid(True, ls='--', alpha=0.5)
+        
+        plt.tight_layout()
+        plt.savefig(output_path)
+        plt.show()
+
+    # 引数に `true_rock_density` を追加
+    def plot_rock_density(self, analysis_df, output_path, true_rock_density):
+        plt.figure(figsize=(10, 8))
+        # Apparent を r (赤) で描画
+        plt.plot(analysis_df['depth_range'], analysis_df['rock_density'], marker='s', linestyle='-', color='r', label='Detected Rock Density')
+        # True を k (黒の破線) で追加
+        plt.axhline(y=true_rock_density, color='k', linestyle='--', label=f'True Rock Density: {true_rock_density:.2f}')
+        
+        plt.xlabel('Depth Range [m]', fontsize=18)
+        plt.ylabel('Detected Rock Density [1/m²]', fontsize=18)
+        plt.title('Detected Rock Density vs Depth Range', fontsize=18)
+        plt.tick_params(axis='both', which='major', labelsize=16)
+        
+        plt.legend(fontsize=16)
+        plt.grid(True, ls='--', alpha=0.5)
+        
+        plt.tight_layout()
+        plt.savefig(output_path)
+        plt.show()
+
+# --- 4. メイン処理 (密度計算と出力の追加) ---
 def main():
     print("--- 岩石見逃しモデル シミュレーション ---")
     try:
@@ -259,9 +284,14 @@ def main():
     model = RockModel()
     analyzer = Analyzer()
 
+    # 真の岩石密度を計算: 全岩石数 / (最大深さ * 奥行き)
+    true_rock_density = config.TOTAL_ROCKS / (config.MAX_DEPTH * 1500.0)
+
     with open(f"{output_dir}/parameters.txt", "w") as f:
         f.write(f"True Slope (r): {r_true}\n")
         f.write(f"Total Rocks: {config.TOTAL_ROCKS}\n")
+        # [追加] 真の岩石密度を parameters.txt へ出力
+        f.write(f"True Rock Density [1/m2]: {true_rock_density:.6f}\n")
 
     # 1. 岩石生成
     all_rocks_df = model.generate_rocks(r_true, config)
@@ -276,10 +306,15 @@ def main():
     # 3. プロット (全データ使用)
     analyzer.plot_csfd(detected_df, all_rocks_df, f"{output_dir}/csfd_comparison.png", r_true)
 
-    # 4. 深さ解析 (全データ使用)
+    # 4. 深さ解析と各種プロット
     analysis_results = analyzer.run_depth_analysis(detected_df, config.MAX_DEPTH, step=1.0)
     analysis_results.to_csv(f"{output_dir}/depth_analysis_results.csv", index=False)
+    
     analyzer.plot_depth_analysis(analysis_results, f"{output_dir}/depth_analysis.png", r_true)
+    analyzer.plot_detection_rate(analysis_results, f"{output_dir}/detection_rate.png")
+    
+    # 引数として true_rock_density を渡す
+    analyzer.plot_rock_density(analysis_results, f"{output_dir}/rock_density.png", true_rock_density)
 
     print("処理完了。")
 
