@@ -122,12 +122,16 @@ class Analyzer:
     """
     検出された岩石データからRSFDを計算・プロットするクラス
     """
-    def calculate_slope(self, diameters):
+    def calculate_slope(self, diameters, area=1.0):
+        """
+        累積密度分布の傾きを算出する
+        個数を面積(area)で規格化し、密度としてフィッティングを行う
+        """
         if len(diameters) < 2:
             return np.nan, np.nan, [], []
             
         sorted_d = np.sort(diameters)
-        y_cumulative = np.arange(len(sorted_d), 0, -1)
+        y_cumulative = np.arange(len(sorted_d), 0, -1) / area
         
         x_log = np.log10(sorted_d)
         y_log = np.log10(y_cumulative)
@@ -152,15 +156,16 @@ class Analyzer:
             count_detected = len(subset_detected)
             count_all = len(subset_all)
             
+            area = d * 1500.0
+            
             if count_detected > 5:
-                slope, _, _, _ = self.calculate_slope(subset_detected['diameter'].values)
+                # 面積規格化を適用
+                slope, _, _, _ = self.calculate_slope(subset_detected['diameter'].values, area)
                 r_apparent = -slope
             else:
                 r_apparent = np.nan
             
             detection_rate = count_detected / count_all if count_all > 0 else 0.0
-            
-            area = d * 1500.0
             rock_density = count_detected / area if area > 0 else 0.0
             
             results.append({
@@ -175,34 +180,40 @@ class Analyzer:
         return pd.DataFrame(results)
 
     # === 個別出力用プロットメソッド ===
-    def plot_csfd(self, detected_df, all_rocks_df, output_prefix, r_true):
+    def plot_csfd(self, detected_df, all_rocks_df, output_prefix, r_true, config):
         plt.figure(figsize=(10, 8))
+        
+        # 全岩石が分布する面積で規格化
+        overall_area = config.MAX_DEPTH * 1500.0
 
         diameters_true = all_rocks_df['diameter'].values
         if len(diameters_true) > 0:
-            slope_true, intercept_true, x_log_true, y_log_true = self.calculate_slope(diameters_true)
+            slope_true, intercept_true, x_log_true, y_log_true = self.calculate_slope(diameters_true, overall_area)
             plt.scatter(10**x_log_true, 10**y_log_true, s=20, color='gray', label='Generated Rocks', marker='D', alpha=0.7)
             if not np.isnan(slope_true):
                 x_fit_true = np.linspace(min(x_log_true), max(x_log_true), 100)
                 y_fit_true = slope_true * x_fit_true + intercept_true
+                d_min = config.ROCK_SIZE_MIN
+                k_true = (10**intercept_true) * (d_min**slope_true)
                 plt.plot(10**x_fit_true, 10**y_fit_true, 'k--', linewidth=2.0, 
-                         label=f'True Fit (r = {-slope_true:.2f})')
+                         label=f'True Fit (r={-slope_true:.2f}, k={k_true:.2e})')
 
         diameters_det = detected_df[detected_df['is_detected'] == True]['diameter'].values
         if len(diameters_det) > 0:
-            slope_det, intercept_det, x_log_det, y_log_det = self.calculate_slope(diameters_det)
+            slope_det, intercept_det, x_log_det, y_log_det = self.calculate_slope(diameters_det, overall_area)
             plt.scatter(10**x_log_det, 10**y_log_det, s=20, color='blue', label='Detected Rocks', marker='o')
             if not np.isnan(slope_det):
                 x_fit_det = np.linspace(min(x_log_det), max(x_log_det), 100)
                 y_fit_det = slope_det * x_fit_det + intercept_det
+                k_det = (10**intercept_det) * (d_min**slope_det)
                 plt.plot(10**x_fit_det, 10**y_fit_det, 'r-', linewidth=2.5, 
-                         label=f'Apparent Fit (r = {-slope_det:.2f})')
+                         label=f'Apparent Fit (r={-slope_det:.2f}, k={k_det:.2e})')
 
         plt.xscale('log')
         plt.yscale('log')
         plt.xlabel('Diameter [m]', fontsize=18)
-        plt.ylabel('Cumulative Number N(>D)', fontsize=18)
-        plt.title(f'Comparison of True vs Apparent RSFD\n(Input True r = {r_true})', fontsize=18)
+        plt.ylabel('Cumulative Rock Density N(>D) [1/m²]', fontsize=18)
+        # plt.title(f'Comparison of True vs Apparent RSFD\n(Input True r = {r_true})', fontsize=18)
         plt.tick_params(axis='both', which='major', labelsize=16)
         plt.legend(fontsize=14)
         plt.grid(True, which="both", ls="-", alpha=0.7)
@@ -219,7 +230,7 @@ class Analyzer:
         
         plt.xlabel('Depth Range [m]', fontsize=18)
         plt.ylabel('Apparent Slope r', fontsize=18)
-        plt.title('Depth-wise Apparent Slope Analysis', fontsize=18)
+        # plt.title('Depth-wise Apparent Slope Analysis', fontsize=18)
         plt.tick_params(axis='both', which='major', labelsize=16)
         plt.ylim(0, r_true + 1)
         plt.legend(fontsize=16)
@@ -237,7 +248,7 @@ class Analyzer:
         
         plt.xlabel('Depth Range [m]', fontsize=18)
         plt.ylabel('Detection Rate', fontsize=18)
-        plt.title('Detection Rate vs Depth Range', fontsize=18)
+        # plt.title('Detection Rate vs Depth Range', fontsize=18)
         plt.tick_params(axis='both', which='major', labelsize=16)
         
         plt.ylim(0, 1.05) 
@@ -252,11 +263,11 @@ class Analyzer:
     def plot_rock_density(self, analysis_df, output_prefix, true_rock_density):
         plt.figure(figsize=(10, 8))
         plt.plot(analysis_df['depth_range'], analysis_df['rock_density'], marker='s', linestyle='-', color='r', label='Detected Rock Density')
-        plt.axhline(y=true_rock_density, color='k', linestyle='--', label=f'True Rock Density: {true_rock_density:.2f}')
+        plt.axhline(y=true_rock_density, color='k', linestyle='--', label=f'True Rock Density: {true_rock_density:.2e}')
         
         plt.xlabel('Depth Range [m]', fontsize=18)
         plt.ylabel('Detected Rock Density [1/m²]', fontsize=18)
-        plt.title('Detected Rock Density vs Depth Range', fontsize=18)
+        # plt.title('Detected Rock Density vs Depth Range', fontsize=18)
         plt.tick_params(axis='both', which='major', labelsize=16)
         
         plt.legend(fontsize=16)
@@ -290,12 +301,16 @@ class Analyzer:
             y_true_all = np.array(y_true_all)
             y_true_mean = np.mean(y_true_all, axis=0)
             y_true_std = np.std(y_true_all, axis=0)
+            
             mean_slope_true = np.mean(csfd_stats_df['slope_true'])
+            mean_intercept_true = np.mean(csfd_stats_df['intercept_true'])
+            d_min = config.ROCK_SIZE_MIN
+            mean_k_true = (10**mean_intercept_true) * (d_min**mean_slope_true)
             
             plt.plot(x_common, 10**y_true_mean, 'k--', linewidth=2.0, 
-                     label=f'Mean True Fit (r = {-mean_slope_true:.2f})')
-            # 視認性を上げるため真の岩石のエラーバンドは省略するか薄く描画
-            plt.fill_between(x_common, 10**(y_true_mean - y_true_std), 10**(y_true_mean + y_true_std), color='gray', alpha=0.1)
+                     label=f'Mean True Fit (r={-mean_slope_true:.2f}, k={mean_k_true:.2e})')
+            # 視認性を上げるため真の岩石のエラーバンドは薄く描画
+            plt.fill_between(x_common, 10**(y_true_mean - y_true_std), 10**(y_true_mean + y_true_std), color='gray', alpha=0.3)
 
         # --- 検出された岩石の近似直線の平均と標準偏差 ---
         y_det_all = []
@@ -307,17 +322,20 @@ class Analyzer:
             y_det_all = np.array(y_det_all)
             y_det_mean = np.mean(y_det_all, axis=0)
             y_det_std = np.std(y_det_all, axis=0)
+            
             mean_slope_det = np.mean(csfd_stats_df['slope_det'])
+            mean_intercept_det = np.mean(csfd_stats_df['intercept_det'])
+            mean_k_det = (10**mean_intercept_det) * (d_min**mean_slope_det)
             
             plt.plot(x_common, 10**y_det_mean, 'r-', linewidth=2.5, 
-                     label=f'Mean Apparent Fit (r = {-mean_slope_det:.2f})')
-            plt.fill_between(x_common, 10**(y_det_mean - y_det_std), 10**(y_det_mean + y_det_std), color='red', alpha=0.2, label='Apparent Fit ±1 Std Dev')
+                     label=f'Mean Apparent Fit (r={-mean_slope_det:.2f}, k={mean_k_det:.2e})')
+            plt.fill_between(x_common, 10**(y_det_mean - y_det_std), 10**(y_det_mean + y_det_std), color='red', alpha=0.3, label='Apparent Fit ±1 Std Dev')
 
         plt.xscale('log')
         plt.yscale('log')
         plt.xlabel('Diameter [m]', fontsize=18)
-        plt.ylabel('Cumulative Number N(>D)', fontsize=18)
-        plt.title(f'Statistical True vs Apparent RSFD\n(Input True r = {r_true}, {len(csfd_stats_df)} Iterations)', fontsize=18)
+        plt.ylabel('Cumulative Rock Density N(>D) [1/m²]', fontsize=18)
+        # plt.title(f'Statistical True vs Apparent RSFD\n(Input True r = {r_true}, {len(csfd_stats_df)} Iterations)', fontsize=18)
         plt.tick_params(axis='both', which='major', labelsize=16)
         plt.legend(fontsize=14)
         plt.grid(True, which="both", ls="-", alpha=0.7)
@@ -335,12 +353,12 @@ class Analyzer:
         y_std = stats_df['r_apparent_std']
 
         plt.plot(x, y_mean, marker='o', linestyle='-', color='blue', label='Mean Apparent r')
-        plt.fill_between(x, y_mean - y_std, y_mean + y_std, color='blue', alpha=0.2, label='±1 Std Dev')
+        plt.fill_between(x, y_mean - y_std, y_mean + y_std, color='blue', alpha=0.3, label='±1 Std Dev')
         plt.axhline(y=r_true, color='k', linestyle='--', label='True r')
         
         plt.xlabel('Depth Range [m]', fontsize=18)
         plt.ylabel('Apparent Slope r', fontsize=18)
-        plt.title('Statistical Depth-wise Apparent Slope Analysis', fontsize=18)
+        # plt.title('Statistical Depth-wise Apparent Slope Analysis', fontsize=18)
         plt.tick_params(axis='both', which='major', labelsize=16)
         plt.ylim(0, r_true + 1.5)
         plt.legend(fontsize=16)
@@ -359,12 +377,12 @@ class Analyzer:
         y_std = stats_df['detection_rate_std']
 
         plt.plot(x, y_mean, marker='o', linestyle='-', color='k', label='Mean Detection Rate')
-        plt.fill_between(x, y_mean - y_std, y_mean + y_std, color='k', alpha=0.2, label='±1 Std Dev')
+        plt.fill_between(x, y_mean - y_std, y_mean + y_std, color='k', alpha=0.3, label='±1 Std Dev')
         plt.axhline(y=1.0, color='k', linestyle='--', label='100% Detection Rate')
         
         plt.xlabel('Depth Range [m]', fontsize=18)
         plt.ylabel('Detection Rate', fontsize=18)
-        plt.title('Statistical Detection Rate vs Depth Range', fontsize=18)
+        # plt.title('Statistical Detection Rate vs Depth Range', fontsize=18)
         plt.tick_params(axis='both', which='major', labelsize=16)
         
         plt.ylim(0, 1.05) 
@@ -384,12 +402,12 @@ class Analyzer:
         y_std = stats_df['rock_density_std']
 
         plt.plot(x, y_mean, marker='s', linestyle='-', color='r', label='Mean Detected Density')
-        plt.fill_between(x, y_mean - y_std, y_mean + y_std, color='r', alpha=0.2, label='±1 Std Dev')
-        plt.axhline(y=true_rock_density, color='k', linestyle='--', label=f'True Rock Density: {true_rock_density:.2f}')
+        plt.fill_between(x, y_mean - y_std, y_mean + y_std, color='r', alpha=0.3, label='±1 Std Dev')
+        plt.axhline(y=true_rock_density, color='k', linestyle='--', label=f'True Rock Density: {true_rock_density:.2e}')
         
         plt.xlabel('Depth Range [m]', fontsize=18)
         plt.ylabel('Detected Rock Density [1/m²]', fontsize=18)
-        plt.title('Statistical Detected Rock Density vs Depth Range', fontsize=18)
+        # plt.title('Statistical Detected Rock Density vs Depth Range', fontsize=18)
         plt.tick_params(axis='both', which='major', labelsize=16)
         
         plt.legend(fontsize=16)
@@ -427,7 +445,9 @@ def main():
         model = RockModel()
         analyzer = Analyzer()
 
-        true_rock_density = config.TOTAL_ROCKS / (config.MAX_DEPTH * 1500.0)
+        # 面積計算用の変数を定義
+        overall_area = config.MAX_DEPTH * 1500.0
+        true_rock_density = config.TOTAL_ROCKS / overall_area
 
         # 全体パラメータファイルの出力
         with open(f"{output_dir}/parameters.txt", "w") as f:
@@ -456,10 +476,10 @@ def main():
             detected_df = model.apply_radar_equation(all_rocks_df, config, quiet=True)
             detected_df.to_csv(f"{iter_dir}/simulated_detection.csv", index=False)
             
-            # RSFD統計プロット用に傾きと切片を計算・保存
-            slope_true, intercept_true, _, _ = analyzer.calculate_slope(all_rocks_df['diameter'].values)
+            # RSFD統計プロット用に傾きと切片を計算・保存 (面積規格化)
+            slope_true, intercept_true, _, _ = analyzer.calculate_slope(all_rocks_df['diameter'].values, overall_area)
             diameters_det = detected_df[detected_df['is_detected'] == True]['diameter'].values
-            slope_det, intercept_det, _, _ = analyzer.calculate_slope(diameters_det)
+            slope_det, intercept_det, _, _ = analyzer.calculate_slope(diameters_det, overall_area)
             
             overall_csfd_stats.append({
                 'iteration': i,
@@ -470,7 +490,7 @@ def main():
             })
 
             # 3. 個別プロット
-            analyzer.plot_csfd(detected_df, all_rocks_df, f"{iter_dir}/csfd_comparison", r_true)
+            analyzer.plot_csfd(detected_df, all_rocks_df, f"{iter_dir}/csfd_comparison", r_true, config)
 
             # 4. 深さ解析
             analysis_results = analyzer.run_depth_analysis(detected_df, config.MAX_DEPTH, step=1.0, quiet=True)
@@ -491,7 +511,7 @@ def main():
         # --- 全体RSFDの統計プロット ---
         csfd_stats_df = pd.DataFrame(overall_csfd_stats)
         csfd_stats_df.to_csv(f"{output_dir}/csfd_fits_stats.csv", index=False)
-        analyzer.plot_csfd_stats(csfd_stats_df, f"{output_dir}/csfd_comparison_stats", r_true, config)
+        analyzer.plot_csfd_stats(csfd_stats_df, f"{output_dir}/RSFD_comparison_stats", r_true, config)
 
         # --- 深さ解析の統計プロット ---
         # 全イテレーションのデータを結合
