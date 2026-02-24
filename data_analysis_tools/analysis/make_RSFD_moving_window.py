@@ -861,10 +861,18 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     # ラベル3（青）をラベル1+2の右に積み上げ
     ax1_twin.barh(window_centers, num_label3_array, height=bar_height,
                   left=num_label1_array + num_label2_array, color='blue', alpha=0.7, label='Group 3')
-    ax1_twin.set_xlabel('Number of detected rocks', fontsize=font_medium, color='black')
+
+    # フィッティングデータ数を第2横軸に折れ線グラフでプロット（横向き）
+    num_fitting_points = num_label2_array + num_label3_array + 1 # グループ１は１つのデータ点にまとめて取り扱う
+    ax1_twin.plot(num_fitting_points, window_centers,
+                'k-', linewidth=2, marker='D', markersize=10, label='Number of fitting points')
+
+    # 第２横軸の設定
+    ax1_twin.set_xlabel('Number of rocks', fontsize=font_medium, color='black')
     ax1_twin.tick_params(axis='x', labelcolor='black', labelsize=font_small)
     ax1_twin.legend(loc='lower right', fontsize=font_small - 2)
 
+    # グラフの軸ラベルと範囲設定
     ax1.set_xlabel('Moving distance [m]', fontsize=font_medium)
     ax1.set_ylabel('Time [ns]', fontsize=font_medium)
     ax1.set_ylim(time_max_data, time_min_data)
@@ -989,8 +997,13 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
                      left=num_label1_array, color='green', alpha=0.7, label='Group 2')
     ax_num_twin.barh(window_centers, num_label3_array, height=bar_height,
                      left=num_label1_array + num_label2_array, color='blue', alpha=0.7, label='Group 3')
-    ax_num_twin.set_xlabel('Number of detected rocks', fontsize=font_medium, color='black')
+    ax_num_twin.set_xlabel('Number of rocks', fontsize=font_medium, color='black')
     ax_num_twin.tick_params(axis='x', labelcolor='black', labelsize=font_small)
+    # フィッティングデータ数を第2横軸に折れ線グラフでプロット（横向き）
+    num_fitting_points = num_label2_array + num_label3_array + 1 # グループ１は１つのデータ点にまとめて取り扱う
+    ax_num_twin.plot(num_fitting_points, window_centers,
+                'k-', linewidth=2, marker='D', markersize=10, label='Number of fitting points')
+    ax_num_twin.set_xlabel('Number of fitting points', fontsize=font_medium, color='black')
     ax_num_twin.legend(loc='lower right', fontsize=font_small - 2)
     ax_num.set_xlabel('Moving distance [m]', fontsize=font_medium)
     ax_num.set_ylabel('Time [ns]', fontsize=font_medium)
@@ -1103,9 +1116,9 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
         f.write('# P-value Statistics\n')
         f.write(f'Windows with p ≤ 0.05: {significant_count} / {valid_p_count} ({significant_ratio:.2f}%)\n')
         f.write(f'Note: NaN p-values are treated as p > 0.05\n\n')
-        f.write('Window\tCenter [ns]\tk [/m²]\tr\tR2\tp-value\tNum rocks\tArea [m²]\n')
+        f.write('Window\tCenter [ns]\t Time range [ns]\tk [/m²]\tr\tR2\tp-value\tNum rocks\tArea [m²]\n')
         for i, center in enumerate(window_centers):
-            f.write(f'{i+1}\t{center:.2f}\t{k_values[i]:.4e}\t{r_values[i]:.4f}\t'
+            f.write(f'{i+1}\t{center:.2f}\t{center - window_width/2:.2f} - {center + window_width/2:.2f}\t{k_values[i]:.4e}\t{r_values[i]:.4f}\t'
                    f'{R2_values[i]:.4f}\t{p_values[i]:.4e}\t{num_rocks_list[i]}\t{area_list[i]:.4f}\n')
 
     print(f'統計情報保存: {stats_path}')
