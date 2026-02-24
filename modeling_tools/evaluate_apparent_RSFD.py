@@ -181,7 +181,7 @@ class Analyzer:
         diameters_true = all_rocks_df['diameter'].values
         if len(diameters_true) > 0:
             slope_true, intercept_true, x_log_true, y_log_true = self.calculate_slope(diameters_true)
-            plt.scatter(10**x_log_true, 10**y_log_true, s=20, color='gray', label='Generated Rocks', marker='D', alpha=0.5)
+            plt.scatter(10**x_log_true, 10**y_log_true, s=20, color='gray', label='Generated Rocks', marker='D', alpha=0.7)
             if not np.isnan(slope_true):
                 x_fit_true = np.linspace(min(x_log_true), max(x_log_true), 100)
                 y_fit_true = slope_true * x_fit_true + intercept_true
@@ -205,7 +205,7 @@ class Analyzer:
         plt.title(f'Comparison of True vs Apparent RSFD\n(Input True r = {r_true})', fontsize=18)
         plt.tick_params(axis='both', which='major', labelsize=16)
         plt.legend(fontsize=14)
-        plt.grid(True, which="both", ls="-", alpha=0.5)
+        plt.grid(True, which="both", ls="-", alpha=0.7)
         
         plt.tight_layout()
         plt.savefig(f"{output_prefix}.png")
@@ -223,7 +223,7 @@ class Analyzer:
         plt.tick_params(axis='both', which='major', labelsize=16)
         plt.ylim(0, r_true + 1)
         plt.legend(fontsize=16)
-        plt.grid(True, ls='--', alpha=0.5)
+        plt.grid(True, ls='--', alpha=0.7)
         
         plt.tight_layout()
         plt.savefig(f"{output_prefix}.png")
@@ -242,7 +242,7 @@ class Analyzer:
         
         plt.ylim(0, 1.05) 
         plt.legend(fontsize=16)
-        plt.grid(True, ls='--', alpha=0.5)
+        plt.grid(True, ls='--', alpha=0.7)
         
         plt.tight_layout()
         plt.savefig(f"{output_prefix}.png")
@@ -260,7 +260,7 @@ class Analyzer:
         plt.tick_params(axis='both', which='major', labelsize=16)
         
         plt.legend(fontsize=16)
-        plt.grid(True, ls='--', alpha=0.5)
+        plt.grid(True, ls='--', alpha=0.7)
         
         plt.tight_layout()
         plt.savefig(f"{output_prefix}.png")
@@ -320,7 +320,7 @@ class Analyzer:
         plt.title(f'Statistical True vs Apparent RSFD\n(Input True r = {r_true}, {len(csfd_stats_df)} Iterations)', fontsize=18)
         plt.tick_params(axis='both', which='major', labelsize=16)
         plt.legend(fontsize=14)
-        plt.grid(True, which="both", ls="-", alpha=0.5)
+        plt.grid(True, which="both", ls="-", alpha=0.7)
         
         plt.tight_layout()
         plt.savefig(f"{output_prefix}.png")
@@ -344,7 +344,7 @@ class Analyzer:
         plt.tick_params(axis='both', which='major', labelsize=16)
         plt.ylim(0, r_true + 1.5)
         plt.legend(fontsize=16)
-        plt.grid(True, ls='--', alpha=0.5)
+        plt.grid(True, ls='--', alpha=0.7)
         
         plt.tight_layout()
         plt.savefig(f"{output_prefix}.png")
@@ -369,7 +369,7 @@ class Analyzer:
         
         plt.ylim(0, 1.05) 
         plt.legend(fontsize=16)
-        plt.grid(True, ls='--', alpha=0.5)
+        plt.grid(True, ls='--', alpha=0.7)
         
         plt.tight_layout()
         plt.savefig(f"{output_prefix}.png")
@@ -393,7 +393,7 @@ class Analyzer:
         plt.tick_params(axis='both', which='major', labelsize=16)
         
         plt.legend(fontsize=16)
-        plt.grid(True, ls='--', alpha=0.5)
+        plt.grid(True, ls='--', alpha=0.7)
         
         plt.tight_layout()
         plt.savefig(f"{output_prefix}.png")
