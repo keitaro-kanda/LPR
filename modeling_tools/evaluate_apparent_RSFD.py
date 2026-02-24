@@ -288,6 +288,7 @@ class Analyzer:
         
         plt.xlabel(xlabel, fontsize=18)
         plt.ylabel('Apparent Slope r', fontsize=18)
+        plt.xticks(np.arange(2, 14, 2), ['0-2', '2-4', '4-6', '6-8', '8-10', '10-12'], fontsize=16)
         # plt.title('Depth-wise Apparent Slope Analysis', fontsize=18)
         plt.tick_params(axis='both', which='major', labelsize=16)
         plt.ylim(0, r_true + 1)
@@ -307,6 +308,7 @@ class Analyzer:
         
         plt.xlabel(xlabel, fontsize=18)
         plt.ylabel('Apparent Density Coefficient k [1/m²]', fontsize=18)
+        plt.xticks(np.arange(2, 14, 2), ['0-2', '2-4', '4-6', '6-8', '8-10', '10-12'], fontsize=16)
         # plt.title('Depth-wise Apparent Coefficient k', fontsize=18)
         plt.tick_params(axis='both', which='major', labelsize=16)
         plt.legend(fontsize=16)
@@ -324,6 +326,7 @@ class Analyzer:
         
         plt.xlabel(xlabel, fontsize=18)
         plt.ylabel('Detection Rate', fontsize=18)
+        plt.xticks(np.arange(2, 14, 2), ['0-2', '2-4', '4-6', '6-8', '8-10', '10-12'], fontsize=16)
         # plt.title('Detection Rate vs Depth Range', fontsize=18)
         plt.tick_params(axis='both', which='major', labelsize=16)
         
@@ -343,6 +346,7 @@ class Analyzer:
         
         plt.xlabel(xlabel, fontsize=18)
         plt.ylabel('Detected Rock Density [1/m²]', fontsize=18)
+        plt.xticks(np.arange(2, 14, 2), ['0-2', '2-4', '4-6', '6-8', '8-10', '10-12'], fontsize=16)
         # plt.title('Detected Rock Density vs Depth Range', fontsize=18)
         plt.tick_params(axis='both', which='major', labelsize=16)
         
