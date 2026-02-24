@@ -439,7 +439,15 @@ class Analyzer:
         plt.xlabel(xlabel, fontsize=18)
         plt.ylabel('Apparent Slope r', fontsize=18)
         # plt.title('Statistical Depth-wise Apparent Slope Analysis', fontsize=18)
-        plt.tick_params(axis='both', which='major', labelsize=16)
+        # x_col が 'depth_range' の場合（Range解析）のみラベルを 0-2, 0-4 に変更
+        if x_col == 'depth_range':
+            tick_vals = np.arange(2, 13, 2)
+            plt.xticks(tick_vals, [f"0-{int(v)}" for v in tick_vals], fontsize=16)
+        else:
+            # Moving解析の場合はそのまま
+            plt.tick_params(axis='x', which='major', labelsize=16)
+            
+        plt.tick_params(axis='y', which='major', labelsize=16)
         plt.ylim(0, r_true + 1.5)
         plt.legend(fontsize=16)
         plt.grid(True, ls='--', alpha=0.7)
@@ -464,7 +472,15 @@ class Analyzer:
         plt.xlabel(xlabel, fontsize=18)
         plt.ylabel('Apparent Density Coefficient k [1/m²]', fontsize=18)
         # plt.title('Statistical Depth-wise Apparent Coefficient k', fontsize=18)
-        plt.tick_params(axis='both', which='major', labelsize=16)
+        # x_col が 'depth_range' の場合（Range解析）のみラベルを 0-2, 0-4 に変更
+        if x_col == 'depth_range':
+            tick_vals = np.arange(2, 13, 2)
+            plt.xticks(tick_vals, [f"0-{int(v)}" for v in tick_vals], fontsize=16)
+        else:
+            # Moving解析の場合はそのまま
+            plt.tick_params(axis='x', which='major', labelsize=16)
+            
+        plt.tick_params(axis='y', which='major', labelsize=16)
         plt.legend(fontsize=16)
         plt.grid(True, ls='--', alpha=0.7)
         
@@ -487,7 +503,15 @@ class Analyzer:
         plt.xlabel(xlabel, fontsize=18)
         plt.ylabel('Detection Rate', fontsize=18)
         # plt.title('Statistical Detection Rate vs Depth Range', fontsize=18)
-        plt.tick_params(axis='both', which='major', labelsize=16)
+        # x_col が 'depth_range' の場合（Range解析）のみラベルを 0-2, 0-4 に変更
+        if x_col == 'depth_range':
+            tick_vals = np.arange(2, 13, 2)
+            plt.xticks(tick_vals, [f"0-{int(v)}" for v in tick_vals], fontsize=16)
+        else:
+            # Moving解析の場合はそのまま
+            plt.tick_params(axis='x', which='major', labelsize=16)
+            
+        plt.tick_params(axis='y', which='major', labelsize=16)
         
         plt.ylim(0, 1.05) 
         plt.legend(fontsize=16)
@@ -512,7 +536,15 @@ class Analyzer:
         plt.xlabel(xlabel, fontsize=18)
         plt.ylabel('Detected Rock Density [1/m²]', fontsize=18)
         # plt.title('Statistical Detected Rock Density vs Depth Range', fontsize=18)
-        plt.tick_params(axis='both', which='major', labelsize=16)
+        # x_col が 'depth_range' の場合（Range解析）のみラベルを 0-2, 0-4 に変更
+        if x_col == 'depth_range':
+            tick_vals = np.arange(2, 13, 2)
+            plt.xticks(tick_vals, [f"0-{int(v)}" for v in tick_vals], fontsize=16)
+        else:
+            # Moving解析の場合はそのまま
+            plt.tick_params(axis='x', which='major', labelsize=16)
+            
+        plt.tick_params(axis='y', which='major', labelsize=16)
         
         plt.legend(fontsize=16)
         plt.grid(True, ls='--', alpha=0.7)
@@ -536,8 +568,8 @@ def main():
     base_dir = '/Volumes/SSD_Kanda_SAMSUNG/modeling_tools_output/evaluate_apparent_RSFD' 
     
     # 計算パラメータ
-    rock_counts = [100, 500, 1000, 10000]
-    NUM_ITERATIONS = 20  # 反復回数
+    rock_counts = [100, 500, 1000, 5000]
+    NUM_ITERATIONS = 50  # 反復回数
     
     for total_rocks in rock_counts:
         print(f"\n=== 岩石数: {total_rocks} のシミュレーションを開始 ({NUM_ITERATIONS}回) ===")
