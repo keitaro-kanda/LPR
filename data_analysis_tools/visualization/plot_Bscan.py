@@ -68,7 +68,7 @@ if use_plot_range:
 sample_interval = 0.312500e-9  # [s] - Time sampling interval
 trace_interval = 3.6e-2       # [m] - Spatial trace interval
 c = 299792458                 # [m/s] - Speed of light
-epsilon_r = 4.5              # Relative permittivity of lunar regolith
+epsilon_r = 3.0 # Almost an average value between Chen+2022 (2.3-3.7), Dong+2020 (2-4くらい), Feng+2022 (2.64-3.85).
 reciever_time_delay = 28.203e-9  # [s] - Hardware delay
 
 
@@ -160,7 +160,7 @@ def single_plot(plot_data, time_zero_idx):
     depth_max = (t_max * 1e-9) * c / np.sqrt(epsilon_r) / 2
     # Set depth range and labels for new Y-axis
     ax2.set_ylim(depth_min, depth_max)
-    ax2.set_ylabel(r'Depth [m] ($\varepsilon_r = 4.5$)', fontsize=font_medium)
+    ax2.set_ylabel(r'Depth [m] ($\varepsilon_r = ' + f'{epsilon_r:.1f}' + r'$)', fontsize=font_medium)
     ax2.tick_params(axis='y', which='major', labelsize=font_small)
 
     # Adjust layout for colorbar
