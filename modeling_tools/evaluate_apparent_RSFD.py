@@ -3,12 +3,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 
-# --- 1. 設定クラス (変更なし) ---
+# --- 1. 設定クラス (TOTAL_ROCKSを動的に変更可能に修正) ---
 class RadarConfig:
     """
     シミュレーションの全パラメータを管理するクラス
     """
-    def __init__(self):
+    def __init__(self, total_rocks=10000):
         # --- A. レーダーシステム ---
         self.FREQ = 500e6  # 500 MHz
         self.C_0 = 3e8
@@ -28,7 +28,7 @@ class RadarConfig:
         self.AREA_SIZE_M2 = 4500.0 # 幅3 m x 奥行き1500 mのエリア
         self.ROCK_SIZE_MIN = 0.01
         self.ROCK_SIZE_MAX = 1.0
-        self.TOTAL_ROCKS = 10000
+        self.TOTAL_ROCKS = total_rocks
 
     @property
     def lambda_0(self):
@@ -116,7 +116,7 @@ class RockModel:
         
         return result_df
 
-# --- 3. 解析クラス (プロットのカラー指定と引数の追加) ---
+# --- 3. 解析クラス (PDF保存とplt.closeの適用) ---
 class Analyzer:
     """
     検出された岩石データからRSFDを計算・プロットするクラス
@@ -172,7 +172,7 @@ class Analyzer:
             
         return pd.DataFrame(results)
 
-    def plot_csfd(self, detected_df, all_rocks_df, output_path, r_true):
+    def plot_csfd(self, detected_df, all_rocks_df, output_prefix, r_true):
         plt.figure(figsize=(10, 8))
 
         diameters_true = all_rocks_df['diameter'].values
@@ -205,11 +205,12 @@ class Analyzer:
         plt.grid(True, which="both", ls="-", alpha=0.5)
         
         plt.tight_layout()
-        plt.savefig(output_path)
-        plt.show()
+        plt.savefig(f"{output_prefix}.png")
+        plt.savefig(f"{output_prefix}.pdf")
+        # RSFDのプロットだけは画面に表示させる（表示させると閉じるまで次の処理が止まる点にご注意ください）
+        plt.show() 
     
-    # --- ご指定いただいたプロットの色変更 ---
-    def plot_depth_analysis(self, analysis_df, output_path, r_true):
+    def plot_depth_analysis(self, analysis_df, output_prefix, r_true):
         plt.figure(figsize=(10, 8))
         plt.plot(analysis_df['depth_range'], analysis_df['r_apparent'], marker='o', linestyle='-', color='blue', label='Apparent r')
         plt.axhline(y=r_true, color='k', linestyle='--', label='True r')
@@ -223,10 +224,11 @@ class Analyzer:
         plt.grid(True, ls='--', alpha=0.5)
         
         plt.tight_layout()
-        plt.savefig(output_path)
-        plt.show()
+        plt.savefig(f"{output_prefix}.png")
+        plt.savefig(f"{output_prefix}.pdf")
+        plt.close() # 変更箇所
 
-    def plot_detection_rate(self, analysis_df, output_path):
+    def plot_detection_rate(self, analysis_df, output_prefix):
         plt.figure(figsize=(10, 8))
         plt.plot(analysis_df['depth_range'], analysis_df['detection_rate'], marker='o', linestyle='-', color='k', label='Detection Rate')
         plt.axhline(y=1.0, color='k', linestyle='--', label='100% Detection Rate')
@@ -241,15 +243,13 @@ class Analyzer:
         plt.grid(True, ls='--', alpha=0.5)
         
         plt.tight_layout()
-        plt.savefig(output_path)
-        plt.show()
+        plt.savefig(f"{output_prefix}.png")
+        plt.savefig(f"{output_prefix}.pdf")
+        plt.close() # 変更箇所
 
-    # 引数に `true_rock_density` を追加
-    def plot_rock_density(self, analysis_df, output_path, true_rock_density):
+    def plot_rock_density(self, analysis_df, output_prefix, true_rock_density):
         plt.figure(figsize=(10, 8))
-        # Apparent を r (赤) で描画
         plt.plot(analysis_df['depth_range'], analysis_df['rock_density'], marker='s', linestyle='-', color='r', label='Detected Rock Density')
-        # True を k (黒の破線) で追加
         plt.axhline(y=true_rock_density, color='k', linestyle='--', label=f'True Rock Density: {true_rock_density:.2f}')
         
         plt.xlabel('Depth Range [m]', fontsize=18)
@@ -261,10 +261,11 @@ class Analyzer:
         plt.grid(True, ls='--', alpha=0.5)
         
         plt.tight_layout()
-        plt.savefig(output_path)
-        plt.show()
+        plt.savefig(f"{output_prefix}.png")
+        plt.savefig(f"{output_prefix}.pdf")
+        plt.close() # 変更箇所
 
-# --- 4. メイン処理 (密度計算と出力の追加) ---
+# --- 4. メイン処理 (ループ処理の導入) ---
 def main():
     print("--- 岩石見逃しモデル シミュレーション ---")
     try:
@@ -276,47 +277,54 @@ def main():
 
     # パス設定
     base_dir = '/Volumes/SSD_Kanda_SAMSUNG/modeling_tools_output/evaluate_apparent_RSFD' 
-    output_dir = f"{base_dir}/r_{r_true}"
-    os.makedirs(output_dir, exist_ok=True)
-    print(f"出力ディレクトリ: {output_dir}")
-
-    config = RadarConfig()
-    model = RockModel()
-    analyzer = Analyzer()
-
-    # 真の岩石密度を計算: 全岩石数 / (最大深さ * 奥行き)
-    true_rock_density = config.TOTAL_ROCKS / (config.MAX_DEPTH * 1500.0)
-
-    with open(f"{output_dir}/parameters.txt", "w") as f:
-        f.write(f"True Slope (r): {r_true}\n")
-        f.write(f"Total Rocks: {config.TOTAL_ROCKS}\n")
-        # [追加] 真の岩石密度を parameters.txt へ出力
-        f.write(f"True Rock Density [1/m2]: {true_rock_density:.6f}\n")
-
-    # 1. 岩石生成
-    all_rocks_df = model.generate_rocks(r_true, config)
-    all_rocks_df.to_csv(f"{output_dir}/truth_rocks.csv", index=False)
-
-    # 2. レーダー検出
-    detected_df = model.apply_radar_equation(all_rocks_df, config)
-    detected_df.to_csv(f"{output_dir}/simulated_detection.csv", index=False)
     
-    print(f"検出数: {detected_df['is_detected'].sum()} / {len(detected_df)}")
-
-    # 3. プロット (全データ使用)
-    analyzer.plot_csfd(detected_df, all_rocks_df, f"{output_dir}/csfd_comparison.png", r_true)
-
-    # 4. 深さ解析と各種プロット
-    analysis_results = analyzer.run_depth_analysis(detected_df, config.MAX_DEPTH, step=1.0)
-    analysis_results.to_csv(f"{output_dir}/depth_analysis_results.csv", index=False)
+    # 岩石数のリスト
+    rock_counts = [100, 500, 1000, 10000]
     
-    analyzer.plot_depth_analysis(analysis_results, f"{output_dir}/depth_analysis.png", r_true)
-    analyzer.plot_detection_rate(analysis_results, f"{output_dir}/detection_rate.png")
-    
-    # 引数として true_rock_density を渡す
-    analyzer.plot_rock_density(analysis_results, f"{output_dir}/rock_density.png", true_rock_density)
+    for total_rocks in rock_counts:
+        print(f"\n=== 岩石数: {total_rocks} のシミュレーションを開始 ===")
+        output_dir = f"{base_dir}/r_{r_true}/{total_rocks}"
+        os.makedirs(output_dir, exist_ok=True)
+        print(f"出力ディレクトリ: {output_dir}")
 
-    print("処理完了。")
+        config = RadarConfig(total_rocks=total_rocks)
+        model = RockModel()
+        analyzer = Analyzer()
+
+        # 真の岩石密度を計算: 全岩石数 / (最大深さ * 奥行き)
+        true_rock_density = config.TOTAL_ROCKS / (config.MAX_DEPTH * 1500.0)
+
+        with open(f"{output_dir}/parameters.txt", "w") as f:
+            f.write(f"True Slope (r): {r_true}\n")
+            f.write(f"Total Rocks: {config.TOTAL_ROCKS}\n")
+            f.write(f"True Rock Density [1/m2]: {true_rock_density:.6f}\n")
+
+        # 1. 岩石生成
+        all_rocks_df = model.generate_rocks(r_true, config)
+        all_rocks_df.to_csv(f"{output_dir}/truth_rocks.csv", index=False)
+
+        # 2. レーダー検出
+        detected_df = model.apply_radar_equation(all_rocks_df, config)
+        detected_df.to_csv(f"{output_dir}/simulated_detection.csv", index=False)
+        
+        print(f"検出数: {detected_df['is_detected'].sum()} / {len(detected_df)}")
+
+        # 3. プロット (全データ使用)
+        # 拡張子なしのプレフィックスを渡します
+        analyzer.plot_csfd(detected_df, all_rocks_df, f"{output_dir}/csfd_comparison", r_true)
+
+        # 4. 深さ解析と各種プロット
+        analysis_results = analyzer.run_depth_analysis(detected_df, config.MAX_DEPTH, step=1.0)
+        analysis_results.to_csv(f"{output_dir}/depth_analysis_results.csv", index=False)
+        
+        # こちらも拡張子なしのプレフィックスを渡します
+        analyzer.plot_depth_analysis(analysis_results, f"{output_dir}/depth_analysis", r_true)
+        analyzer.plot_detection_rate(analysis_results, f"{output_dir}/detection_rate")
+        analyzer.plot_rock_density(analysis_results, f"{output_dir}/rock_density", true_rock_density)
+
+        print(f"=== 岩石数: {total_rocks} の処理完了 ===\n")
+
+    print("全ての処理が完了しました。")
 
 if __name__ == "__main__":
     main()
