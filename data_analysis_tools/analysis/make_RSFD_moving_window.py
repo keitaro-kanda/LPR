@@ -277,7 +277,7 @@ def calculate_rsfd_in_window(rock_data, sizes, time_positions,
 
 def plot_individual_rsfd(unique_sizes, cum_counts_normalized, k, r, R2, p_value,
                          num_rocks, area, window_range, output_path,
-                         dpi_png=300, dpi_pdf=600):
+                         dpi_png=300, dpi_pdf=600, xlim=None, ylim=None):
     """
     個別ウィンドウのRSFDプロットを作成
 
@@ -312,8 +312,12 @@ def plot_individual_rsfd(unique_sizes, cum_counts_normalized, k, r, R2, p_value,
 
         # べき則フィッティング曲線
         if not np.isnan(k) and not np.isnan(r):
-            size_fit = np.logspace(np.log10(unique_sizes.min()),
-                                   np.log10(unique_sizes.max()), 100)
+            if xlim is not None:
+                size_fit = np.logspace(np.log10(xlim[0]),
+                                       np.log10(xlim[1]), 100)
+            else:
+                size_fit = np.logspace(np.log10(unique_sizes.min()),
+                                       np.log10(unique_sizes.max()), 100)
             count_fit = k * size_fit ** (-r)
             ax.plot(size_fit, count_fit, 'r-', linewidth=2,
                    label=f'Power-law fit: N = {k:.4e} × D^(-{r:.3f})')
@@ -323,6 +327,10 @@ def plot_individual_rsfd(unique_sizes, cum_counts_normalized, k, r, R2, p_value,
     ax.set_ylabel('Cumulative count N(≥D) [/m²]', fontsize=font_medium)
     ax.set_xscale('log')
     ax.set_yscale('log')
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    if ylim is not None:
+        ax.set_ylim(ylim)
     ax.tick_params(axis='both', which='major', labelsize=font_small)
     ax.grid(True, alpha=0.3)
     ax.legend(fontsize=font_small)
@@ -415,6 +423,9 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
 
     print(f'\n水平方向移動ウィンドウ解析: {len(window_centers)}個のウィンドウ')
 
+    # 個別RSFDプロット用データ格納リスト
+    rsfd_plot_data = []
+
     for center in tqdm(window_centers, desc='RSFD計算中'):
         d_min = center - window_width / 2
         d_max = center + window_width / 2
@@ -435,12 +446,42 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
         num_rocks_label3_list.append(num_rocks_by_label[3])
         area_list.append(area)
 
-        # 個別RSFDプロット作成
+        # 個別RSFDプロット用データを格納
         window_range = f'{d_min:.2f} - {d_max:.2f} m'
         rsfd_output_path = os.path.join(rsfd_plots_dir, f'rsfd_x{d_min:.2f}-{d_max:.2f}m')
-        plot_individual_rsfd(unique_sizes, cum_counts_normalized,
-                           k, r, R2, p, num_rocks, area,
-                           window_range, rsfd_output_path)
+        rsfd_plot_data.append({
+            'unique_sizes': unique_sizes,
+            'cum_counts_normalized': cum_counts_normalized,
+            'k': k, 'r': r, 'R2': R2, 'p': p,
+            'num_rocks': num_rocks, 'area': area,
+            'window_range': window_range,
+            'output_path': rsfd_output_path
+        })
+
+    # 全ウィンドウのデータから共通軸範囲を算出
+    all_sizes_list = [d['unique_sizes'] for d in rsfd_plot_data if len(d['unique_sizes']) > 0]
+    all_counts_list = [d['cum_counts_normalized'] for d in rsfd_plot_data if len(d['cum_counts_normalized']) > 0]
+    if all_sizes_list and all_counts_list:
+        all_sizes_concat = np.concatenate(all_sizes_list)
+        all_counts_concat = np.concatenate(all_counts_list)
+        positive_counts = all_counts_concat[all_counts_concat > 0]
+        if len(all_sizes_concat) > 0 and len(positive_counts) > 0:
+            global_xlim = (all_sizes_concat.min() * 0.5, all_sizes_concat.max() * 2.0)
+            global_ylim = (positive_counts.min() * 0.5, all_counts_concat.max() * 2.0)
+        else:
+            global_xlim = None
+            global_ylim = None
+    else:
+        global_xlim = None
+        global_ylim = None
+
+    # 個別RSFDプロット作成（共通軸範囲で統一）
+    for d in rsfd_plot_data:
+        plot_individual_rsfd(d['unique_sizes'], d['cum_counts_normalized'],
+                           d['k'], d['r'], d['R2'], d['p'],
+                           d['num_rocks'], d['area'],
+                           d['window_range'], d['output_path'],
+                           xlim=global_xlim, ylim=global_ylim)
 
     window_centers = np.array(window_centers)
     k_values = np.array(k_values)
@@ -785,6 +826,9 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
 
     print(f'\n深さ方向移動ウィンドウ解析: {len(window_centers)}個のウィンドウ')
 
+    # 個別RSFDプロット用データ格納リスト
+    rsfd_plot_data = []
+
     for center in tqdm(window_centers, desc='RSFD計算中'):
         t_min = center - window_width / 2
         t_max = center + window_width / 2
@@ -805,12 +849,42 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
         num_rocks_label3_list.append(num_rocks_by_label[3])
         area_list.append(area)
 
-        # 個別RSFDプロット作成
+        # 個別RSFDプロット用データを格納
         window_range = f'{t_min:.2f} - {t_max:.2f} ns'
         rsfd_output_path = os.path.join(rsfd_plots_dir, f'rsfd_t{t_min:.2f}-{t_max:.2f}ns')
-        plot_individual_rsfd(unique_sizes, cum_counts_normalized,
-                           k, r, R2, p, num_rocks, area,
-                           window_range, rsfd_output_path)
+        rsfd_plot_data.append({
+            'unique_sizes': unique_sizes,
+            'cum_counts_normalized': cum_counts_normalized,
+            'k': k, 'r': r, 'R2': R2, 'p': p,
+            'num_rocks': num_rocks, 'area': area,
+            'window_range': window_range,
+            'output_path': rsfd_output_path
+        })
+
+    # 全ウィンドウのデータから共通軸範囲を算出
+    all_sizes_list = [d['unique_sizes'] for d in rsfd_plot_data if len(d['unique_sizes']) > 0]
+    all_counts_list = [d['cum_counts_normalized'] for d in rsfd_plot_data if len(d['cum_counts_normalized']) > 0]
+    if all_sizes_list and all_counts_list:
+        all_sizes_concat = np.concatenate(all_sizes_list)
+        all_counts_concat = np.concatenate(all_counts_list)
+        positive_counts = all_counts_concat[all_counts_concat > 0]
+        if len(all_sizes_concat) > 0 and len(positive_counts) > 0:
+            global_xlim = (all_sizes_concat.min() * 0.5, all_sizes_concat.max() * 2.0)
+            global_ylim = (positive_counts.min() * 0.5, all_counts_concat.max() * 2.0)
+        else:
+            global_xlim = None
+            global_ylim = None
+    else:
+        global_xlim = None
+        global_ylim = None
+
+    # 個別RSFDプロット作成（共通軸範囲で統一）
+    for d in rsfd_plot_data:
+        plot_individual_rsfd(d['unique_sizes'], d['cum_counts_normalized'],
+                           d['k'], d['r'], d['R2'], d['p'],
+                           d['num_rocks'], d['area'],
+                           d['window_range'], d['output_path'],
+                           xlim=global_xlim, ylim=global_ylim)
 
     window_centers = np.array(window_centers)
     k_values = np.array(k_values)
