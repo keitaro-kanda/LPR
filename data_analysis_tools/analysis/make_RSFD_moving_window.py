@@ -779,6 +779,82 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     print(f'統計情報保存: {stats_path}')
     print(f'p値統計: {significant_count}/{valid_p_count}個のウィンドウでp ≤ 0.05 ({significant_ratio:.2f}%)')
 
+def plot_depth_rsfd_summary(window_centers, num_rocks_array, num_fitting_points_array,
+                             r_values, k_values, epsilon_r, c, output_path,
+                             dpi_png=300, dpi_pdf=600):
+    """
+    深さ vs Num/r/k サマリープロットを作成（各変数を最大値で規格化）
+
+    Parameters:
+    -----------
+    window_centers : ndarray
+        ウィンドウ中心時間 [ns]
+    num_rocks_array : ndarray
+        総岩石数
+    num_fitting_points_array : ndarray
+        フィッティングデータ点数（Group2 + Group3 + 1）
+    r_values : ndarray
+        r値（NaN含む可能性あり）
+    k_values : ndarray
+        k値（NaN含む可能性あり）
+    epsilon_r : float
+        比誘電率
+    c : float
+        光速 [m/s]
+    output_path : str
+        出力パス（拡張子なし）
+    """
+    font_medium = 18
+    font_small = 16
+    nan_placeholder = 1.2
+
+    # 深さ変換 [ns] → [m]
+    depths = window_centers * 1e-9 * c / (2 * np.sqrt(epsilon_r))
+
+    # 総岩石数を最大値で規格化
+    num_max = np.max(num_rocks_array) if np.max(num_rocks_array) > 0 else 1
+    num_norm = num_rocks_array / num_max
+
+    # フィッティングデータ点数を最大値で規格化
+    fit_max = np.max(num_fitting_points_array) if np.max(num_fitting_points_array) > 0 else 1
+    fit_norm = num_fitting_points_array / fit_max
+
+    # r値を最大値で規格化（NaN → nan_placeholder）
+    r_max = np.nanmax(r_values) if not np.all(np.isnan(r_values)) else 1.0
+    r_norm = r_values / r_max
+    r_norm_plot = np.where(np.isnan(r_norm), nan_placeholder, r_norm)
+
+    # k値を最大値で規格化（NaN → nan_placeholder）
+    k_max = np.nanmax(k_values) if not np.all(np.isnan(k_values)) else 1.0
+    k_norm = k_values / k_max
+    k_norm_plot = np.where(np.isnan(k_norm), nan_placeholder, k_norm)
+
+    fig, ax = plt.subplots(figsize=(10, 8))
+
+    ax.plot(depths, num_norm, 'k-', linewidth=2, label='Num (total)')
+    ax.plot(depths, fit_norm, 'k--', linewidth=2, label='Num (fitting)')
+    ax.plot(depths, r_norm_plot, 'b-', linewidth=2, marker='o', markersize=8, label='r')
+    ax.plot(depths, k_norm_plot, 'r-', linewidth=2, marker='s', markersize=8, label='k')
+
+    ax.set_xlabel('Depth [m]', fontsize=font_medium)
+    ax.set_ylabel('RSFD parameter', fontsize=font_medium)
+    ax.set_ylim(0, 1.3)
+    yticks = [0, 0.2, 0.4, 0.6, 0.8, 1.0, nan_placeholder]
+    ytick_labels = ['0', '0.2', '0.4', '0.6', '0.8', '1.0', 'Nan']
+    ax.set_yticks(yticks)
+    ax.set_yticklabels(ytick_labels)
+
+    ax.tick_params(axis='both', which='major', labelsize=font_small)
+    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=font_small, loc='uuper left')
+
+    plt.tight_layout()
+
+    plt.savefig(f'{output_path}.png', dpi=dpi_png)
+    plt.savefig(f'{output_path}.pdf', dpi=dpi_pdf)
+    plt.close()
+
+
 def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positions,
                                         window_width, step_size,
                                         time_min_data, time_max_data,
@@ -1161,6 +1237,15 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     plt.savefig(os.path.join(individual_plots_dir, 'p_value_plot.png'), dpi=dpi_png)
     plt.savefig(os.path.join(individual_plots_dir, 'p_value_plot.pdf'), dpi=dpi_pdf)
     plt.close()
+
+    # --- 深さ vs Num/r/k サマリープロット ---
+    num_fitting_points_arr = num_label2_array + num_label3_array + 1
+    plot_depth_rsfd_summary(
+        window_centers, num_rocks_array, num_fitting_points_arr,
+        r_values, k_values, epsilon_r, c,
+        os.path.join(individual_plots_dir, 'depth_rsfd_summary'),
+        dpi_png=dpi_png, dpi_pdf=dpi_pdf
+    )
 
     print(f'個別プロット保存: {individual_plots_dir}')
 
