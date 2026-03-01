@@ -846,7 +846,7 @@ def plot_depth_rsfd_summary(window_centers, num_rocks_array, num_fitting_points_
 
     ax.tick_params(axis='both', which='major', labelsize=font_small)
     ax.grid(True, alpha=0.3)
-    ax.legend(fontsize=font_small, loc='uuper left')
+    ax.legend(fontsize=font_small, loc='upper right')
 
     plt.tight_layout()
 
