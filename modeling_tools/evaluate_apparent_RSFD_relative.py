@@ -167,7 +167,8 @@ class Analyzer:
         個数を面積(area)で規格化し、密度としてフィッティングを行う
         """
         if len(diameters) < 2:
-            return np.nan, np.nan, np.array([]), np.array([])  # ← NumPy配列に変更
+            # 検出岩石が1個以下の場合はエラーを回避するため空配列を返す
+            return np.nan, np.nan, np.array([]), np.array([])
             
         sorted_d = np.sort(diameters)
         y_cumulative = np.arange(len(sorted_d), 0, -1) / area
@@ -225,7 +226,7 @@ class Analyzer:
 
     def run_moving_window_analysis(self, detected_df, config, window_size=2.0, step_ratio=0.2, quiet=False):
         """
-        [新規] 指定した窓幅(window_size)と移動幅(step_ratio)での移動窓解析
+        指定した窓幅(window_size)と移動幅(step_ratio)での移動窓解析
         """
         if not quiet:
             print("深さ方向の移動窓解析(Moving Window)を実行中...")
@@ -275,6 +276,38 @@ class Analyzer:
             
         return pd.DataFrame(results)
 
+    # === [新規追加] 信号強度のScatterプロット ===
+    def plot_power_scatter(self, df, output_prefix, config):
+        """
+        横軸：深さ、縦軸：岩石サイズ の空間に、
+        色で信号強度（received_power）をマッピングする散布図
+        """
+        plt.figure(figsize=(10, 8))
+        
+        # 岩石をプロット (色を received_power に設定)
+        sc = plt.scatter(df['depth'], df['diameter'], 
+                         c=df['received_power'], cmap='jet', 
+                         alpha=0.8, s=20, edgecolors='none')
+        
+        # カラーバーの追加と設定
+        cbar = plt.colorbar(sc)
+        cbar.set_label('Received Power $S_{norm}$ [dB]', fontsize=16)
+        cbar.ax.tick_params(labelsize=14)
+        
+        # カラーバー上に現在の検出閾値（ノイズフロア）のラインを引く
+        cbar.ax.axhline(config.NOISE_FLOOR_DBM, color='red', linestyle='--', linewidth=2)
+        #cbar.ax.text(1.5, config.NOISE_FLOOR_DBM, 'Detection\nThreshold', 
+        #             color='red', va='center', ha='left', fontsize=12)
+
+        plt.xlabel('Depth [m]', fontsize=18)
+        plt.ylabel('Diameter [m]', fontsize=18)
+        plt.tick_params(axis='both', which='major', labelsize=16)
+        plt.grid(True, which="both", ls="--", alpha=0.5)
+        
+        plt.tight_layout()
+        plt.savefig(f"{output_prefix}.png")
+        plt.savefig(f"{output_prefix}.pdf")
+        plt.close()
 
     # === 個別出力用プロットメソッド ===
     def plot_csfd(self, detected_df, all_rocks_df, output_prefix, r_true, config):
@@ -286,7 +319,8 @@ class Analyzer:
         diameters_true = all_rocks_df['diameter'].values
         if len(diameters_true) > 0:
             slope_true, intercept_true, x_log_true, y_log_true = self.calculate_slope(diameters_true, overall_area)
-            plt.scatter(10**x_log_true, 10**y_log_true, s=20, color='gray', label='Generated Rocks', marker='D', alpha=0.7)
+            if len(x_log_true) > 0:
+                plt.scatter(10**x_log_true, 10**y_log_true, s=20, color='gray', label='Generated Rocks', marker='D', alpha=0.7)
             if not np.isnan(slope_true):
                 x_fit_true = np.linspace(min(x_log_true), max(x_log_true), 100)
                 y_fit_true = slope_true * x_fit_true + intercept_true
@@ -298,7 +332,8 @@ class Analyzer:
         diameters_det = detected_df[detected_df['is_detected'] == True]['diameter'].values
         if len(diameters_det) > 0:
             slope_det, intercept_det, x_log_det, y_log_det = self.calculate_slope(diameters_det, overall_area)
-            plt.scatter(10**x_log_det, 10**y_log_det, s=20, color='blue', label='Detected Rocks', marker='o')
+            if len(x_log_det) > 0:
+                plt.scatter(10**x_log_det, 10**y_log_det, s=20, color='blue', label='Detected Rocks', marker='o')
             if not np.isnan(slope_det):
                 x_fit_det = np.linspace(min(x_log_det), max(x_log_det), 100)
                 y_fit_det = slope_det * x_fit_det + intercept_det
@@ -577,8 +612,8 @@ def main():
         print("数値ではない入力です。デフォルト値 1.0 を使用します。")
         r_true = 1.0
 
-    # パス設定
-    base_dir = '/Volumes/SSD_Kanda_SAMSUNG/modeling_tools_output/evaluate_apparent_RSFD_relative'
+    # パス設定（新規ディレクトリに変更）
+    base_dir = '/Volumes/SSD_Kanda_SAMSUNG/modeling_tools_output/evaluate_apparent_RSFD_relative' 
     
     # 計算パラメータ
     rock_counts = [100, 500, 1000, 5000]
@@ -621,6 +656,9 @@ def main():
             detected_df = model.apply_radar_equation(all_rocks_df, config, quiet=True)
             detected_df.to_csv(f"{iter_dir}/simulated_detection.csv", index=False)
             
+            # --- [新規追加] 信号強度のScatterプロット出力 ---
+            analyzer.plot_power_scatter(detected_df, f"{iter_dir}/power_scatter", config)
+            
             # RSFD統計プロット情報
             slope_true, intercept_true, _, _ = analyzer.calculate_slope(all_rocks_df['diameter'].values, overall_area)
             diameters_det = detected_df[detected_df['is_detected'] == True]['diameter'].values
@@ -655,7 +693,6 @@ def main():
             
             analyzer.plot_depth_analysis(analysis_moving, f"{iter_dir}/powerlaw_exp_moving", r_true, x_col='depth_center', xlabel='Depth Center [m]')
             analyzer.plot_k_analysis(analysis_moving, f"{iter_dir}/powerlaw_k_moving", true_rock_density, x_col='depth_center', xlabel='Depth Center [m]')
-            # 移動窓解析の検出率プロットは省略
             analyzer.plot_rock_density(analysis_moving, f"{iter_dir}/rock_density_moving", true_rock_density, x_col='depth_center', xlabel='Depth Center [m]')
 
             all_moving_results.append(analysis_moving)
@@ -705,7 +742,6 @@ def main():
 
         analyzer.plot_depth_analysis_stats(stats_moving, f"{output_dir}/powerlaw_exp_moving_stats", r_true, x_col='depth_center', xlabel='Depth Center [m]')
         analyzer.plot_k_analysis_stats(stats_moving, f"{output_dir}/powerlaw_k_moving_stats", true_rock_density, x_col='depth_center', xlabel='Depth Center [m]')
-        # 移動窓解析の検出率プロットは省略
         analyzer.plot_rock_density_stats(stats_moving, f"{output_dir}/rock_density_moving_stats", true_rock_density, x_col='depth_center', xlabel='Depth Center [m]')
 
 
