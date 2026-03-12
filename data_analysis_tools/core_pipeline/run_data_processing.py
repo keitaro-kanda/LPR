@@ -258,13 +258,13 @@ def background_removal(data, output_dir=None):
         # background_removed_dB_ave = np.mean(background_removed_data_dB, axis=1)
         # print('Background removed average:', background_removed_dB_ave)
         # print('Background removed average shape: ', background_removed_dB_ave.shape)
-        background_removed_dB_std = np.std(background_removed_data, axis=1)
+        background_removed_std = np.std(background_removed_data, axis=1)
         # print('Background removed average standard deviation:', background_removed_dB_std)
         # print('Background removed average standard deviation shape: ', background_removed_dB_std.shape)`
 
         ax.plot(10 * np.log10(np.abs(background_removed_data)), time)
-        ax.fill_betweenx(time, 10 * np.log10(np.abs(background_removed_data)) - background_removed_dB_std,
-                            10 * np.log10(np.abs(background_removed_data)) + background_removed_dB_std, alpha=0.6)
+        ax.fill_betweenx(time, 10 * np.log10(np.abs(background_removed_data - background_removed_std)),
+                            10 * np.log10(np.abs(background_removed_data + background_removed_std)), alpha=0.6)
 
         ax.set_xlabel('Amplitude [dB]', fontsize=20)
         ax.set_ylabel('Time [ns]', fontsize=20)
