@@ -219,6 +219,7 @@ def time_correction(data):
 #* Holizontal high pass filter
 def background_removal(data, output_dir=None):
     background_data = np.mean(data, axis=1)
+    background_data_std = np.std(data, axis=1)
     # save background data
     np.savetxt(output_dir + '/background_data.txt', background_data)
 
@@ -231,18 +232,12 @@ def background_removal(data, output_dir=None):
     if output_dir is not None:
         fig, ax = plt.subplots(figsize=(6, 10), tight_layout=True)
         time = np.arange(0, data.shape[0]*sample_interval/1e-9, sample_interval/1e-9)
-        # ax[0].plot(background_data, time)
 
-        # ax[0].set_xlabel('Amplitude', fontsize=20)
-        # ax[0].set_ylabel('Time [ns]', fontsize=20)
-        # ax[0].tick_params(labelsize=18)
-        # ax[0].grid(which='major', axis='both', linestyle='-.')
-        # ax[0].invert_yaxis()
-        # ax[0].set_ylim(np.max(time), 0)
+        ax.plot(10 *np.log(np.abs(background_data)), time)
+        ax.fill_betweenx(time, 10 * np.log(np.abs(background_data - background_data_std)),
+                            10 * np.log(np.abs(background_data + background_data_std)), alpha=0.6)
 
-        ax.plot(np.log(np.abs(background_data)), time)
-
-        ax.set_xlabel('Log amplitude', fontsize=20)
+        ax.set_xlabel('Amplitude [dB]', fontsize=20)
         ax.set_ylabel('Time [ns]', fontsize=20)
         ax.tick_params(labelsize=18)
         ax.grid(which='major', axis='both', linestyle='-.')
@@ -259,29 +254,19 @@ def background_removal(data, output_dir=None):
     if output_dir is not None:
         fig, ax = plt.subplots(figsize=(6, 10), tight_layout=True)
         time = np.arange(0, data.shape[0]*sample_interval/1e-9, sample_interval/1e-9)
-        background_removed_data_log = np.log(np.abs(background_removed_data))
-        background_removed_log_ave = np.mean(background_removed_data_log, axis=1)
-        print('Background removed average:', background_removed_log_ave)
-        print('Background removed average shape: ', background_removed_log_ave.shape)
-        background_removed_log_std = np.std(background_removed_data_log, axis=1)
-        print('Background removed average standard deviation:', background_removed_log_std)
-        print('Background removed average standard deviation shape: ', background_removed_log_std.shape)
-        # ax[0].plot(background_removed_ave, time)
-        # ax[0].fill_betweenx(time, background_removed_ave - background_removed_std,
-        #                     background_removed_ave + background_removed_std, alpha=0.6)
+        # background_removed_data_dB = 10 * np.log10(np.abs(background_removed_data))
+        # background_removed_dB_ave = np.mean(background_removed_data_dB, axis=1)
+        # print('Background removed average:', background_removed_dB_ave)
+        # print('Background removed average shape: ', background_removed_dB_ave.shape)
+        background_removed_dB_std = np.std(background_removed_data, axis=1)
+        # print('Background removed average standard deviation:', background_removed_dB_std)
+        # print('Background removed average standard deviation shape: ', background_removed_dB_std.shape)`
 
-        # ax[0].set_xlabel('Amplitude', fontsize=20)
-        # ax[0].set_ylabel('Time [ns]', fontsize=20)
-        # ax[0].tick_params(labelsize=18)
-        # ax[0].grid(which='major', axis='both', linestyle='-.')
-        # ax[0].invert_yaxis()
-        # ax[0].set_ylim(np.max(time), 0)
+        ax.plot(10 * np.log10(np.abs(background_removed_data)), time)
+        ax.fill_betweenx(time, 10 * np.log10(np.abs(background_removed_data)) - background_removed_dB_std,
+                            10 * np.log10(np.abs(background_removed_data)) + background_removed_dB_std, alpha=0.6)
 
-        ax.plot(background_removed_log_ave, time)
-        ax.fill_betweenx(time, background_removed_log_ave - background_removed_log_std,
-                            background_removed_log_ave + background_removed_log_std, alpha=0.6)
-
-        ax.set_xlabel('Log amplitude', fontsize=20)
+        ax.set_xlabel('Amplitude [dB]', fontsize=20)
         ax.set_ylabel('Time [ns]', fontsize=20)
         ax.tick_params(labelsize=18)
         ax.grid(which='major', axis='both', linestyle='-.')
