@@ -228,16 +228,16 @@ def background_removal(data, output_dir=None):
     for i in tqdm(range(data.shape[1]), desc='Subtracting background'):
         background_removed_data[:, i] =  data[:, i] - background_data
     background_removed_std = np.std(background_removed_data, axis=1)
-    background_removed_ave = np.mean(background_removed_data, axis=1)
+    background_removed_ave = np.mean(np.abs(background_removed_data), axis=1) # 平均を除去したものを平均するとゼロになってしまう。強度の平均を見るために、絶対値を取ってから平均する。
 
     # Plot background data
     if output_dir is not None:
         fig, ax = plt.subplots(figsize=(6, 10), tight_layout=True)
         time = np.arange(0, data.shape[0]*sample_interval/1e-9, sample_interval/1e-9)
 
-        ax.plot(10 *np.log(np.abs(background_data)), time)
-        ax.fill_betweenx(time, 10 * np.log(np.abs(background_data - background_data_std)),
-                            10 * np.log(np.abs(background_data + background_data_std)), alpha=0.6)
+        ax.plot(10 *np.log10(np.abs(background_data)), time)
+        ax.fill_betweenx(time, 10 * np.log10(np.abs(background_data - background_data_std)),
+                            10 * np.log10(np.abs(background_data + background_data_std)), alpha=0.6)
 
         ax.set_xlabel('Amplitude [dB]', fontsize=20)
         ax.set_ylabel('Time [ns]', fontsize=20)
