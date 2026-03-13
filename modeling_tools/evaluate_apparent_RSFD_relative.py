@@ -19,7 +19,7 @@ class RadarConfig:
         self.SYSTEM_LOSS_DB = 0
         
         # 閾値（相対値モデルに合わせ後日変更予定。一旦 -90.0 を使用）
-        self.NOISE_FLOOR_DBM = -90.0 
+        self.NOISE_FLOOR_DBM = -40.0 
         self.H_ANTENNA = 0.3 # アンテナ地上高 [m]
         
         # --- B. 環境・媒質パラメータ ---
@@ -287,7 +287,7 @@ class Analyzer:
         # 岩石をプロット (色を received_power に設定)
         sc = plt.scatter(df['depth'], df['diameter'], 
                          c=df['received_power'], cmap='jet', 
-                         alpha=0.8, s=20, edgecolors='none')
+                         alpha=0.8, s=20, edgecolors='none', vmax=0, vmin=-100)
         
         # カラーバーの追加と設定
         cbar = plt.colorbar(sc)
