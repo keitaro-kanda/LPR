@@ -219,7 +219,11 @@ def time_correction(data):
 #* Holizontal high pass filter
 def background_removal(data, output_dir=None):
     background_data = np.mean(data, axis=1)
-    background_data_std = np.std(data, axis=1)
+
+    # For plot
+    data_dB = 10 * np.log10(np.abs(data))
+    background_dB = np.mean(data_dB, axis=1)
+    background_dB_std = np.std(data_dB, axis=1)
     # save background data
     np.savetxt(output_dir + '/background_data.txt', background_data)
 
@@ -235,9 +239,12 @@ def background_removal(data, output_dir=None):
         fig, ax = plt.subplots(figsize=(6, 10), tight_layout=True)
         time = np.arange(0, data.shape[0]*sample_interval/1e-9, sample_interval/1e-9)
 
-        ax.plot(10 *np.log10(np.abs(background_data)), time)
-        ax.fill_betweenx(time, 10 * np.log10(np.abs(background_data - background_data_std)),
-                            10 * np.log10(np.abs(background_data + background_data_std)), alpha=0.6)
+        # ax.plot(10 *np.log10(np.abs(background_data)), time)
+        # ax.fill_betweenx(time, 10 * np.log10(np.abs(np.abs(np.abs(background_data) - background_data_std)),
+        #                     10 * np.log10(np.abs(np.abs(background_data) + background_data_std)), alpha=0.6))
+        #ax.plot(background_dB, time)
+        #ax.fill_betweenx(time, background_dB - background_dB_std, background_dB + background_dB_std, alpha=0.6)
+        ax.plot(10 * np.log10(np.abs(background_data)), time)
 
         ax.set_xlabel('Amplitude [dB]', fontsize=20)
         ax.set_ylabel('Time [ns]', fontsize=20)
