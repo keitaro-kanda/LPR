@@ -608,6 +608,16 @@ if __name__ == '__main__':
         time_bin_width = None
         dist_bin_width = None
 
+    # Group 1のサイズ選択
+    print('\n=== Group 1 サイズ設定 ===')
+    print('1: 1 cm')
+    print('2: 2 cm')
+    group1_size_choice = input('Group 1のサイズを選択してください (1/2): ').strip()
+    if group1_size_choice not in ['1', '2']:
+        raise ValueError('Group 1のサイズは1または2を選択してください。')
+    group1_size = 1.0 if group1_size_choice == '1' else 2.0
+    group1_size_str = 'group1_1cm' if group1_size_choice == '1' else 'group1_2cm'
+
     # ------------------------------------------------------------------
     # 4. JSONデータ読み込み
     # ------------------------------------------------------------------
@@ -709,10 +719,10 @@ if __name__ == '__main__':
     # サブディレクトリ名の決定（入力モードに応じて命名を変更）
     if grid_input_mode == '1':
         # モード1（分割幅入力）: timeXXns_distOOm
-        sub_dir_name = f'time{time_bin_width:.0f}ns_dist{dist_bin_width:.0f}m'
+        sub_dir_name = f'time{time_bin_width:.0f}ns_dist{dist_bin_width:.0f}m_{group1_size_str}'
     else:
         # モード2（分割数入力）: timeX_distY
-        sub_dir_name = f'time{num_time_bins}_dist{num_dist_bins}'
+        sub_dir_name = f'time{num_time_bins}_dist{num_dist_bins}_{group1_size_str}'
 
     base_dir = os.path.join(parent_dir, sub_dir_name)
     os.makedirs(base_dir, exist_ok=True)
@@ -828,9 +838,9 @@ if __name__ == '__main__':
             print(f'  面積: {area:.2f} m²')
 
             # サイズ配列を作成（Group1, Group2, Group3全て含める）
-            # Group1: 1cm固定
+            # Group1: Group 1サイズ
             num_group1 = int(np.sum(lab == 1))
-            size_label1 = np.full(num_group1, 1.0)
+            size_label1 = np.full(num_group1, group1_size)
 
             # Group2: 6cm固定
             mask2_valid = (lab == 2) & (~np.isnan(time_top)) & (~np.isnan(time_bottom))

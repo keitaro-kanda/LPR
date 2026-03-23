@@ -144,7 +144,7 @@ def load_rock_data(label_path):
         'time_bottom': time_bottom_all
     }
 
-def calculate_rock_sizes(rock_data, epsilon_rock=9.0, c=299792458):
+def calculate_rock_sizes(rock_data, epsilon_rock=9.0, c=299792458, group1_size=1.0):
     """
     各岩石のサイズを計算
 
@@ -156,6 +156,8 @@ def calculate_rock_sizes(rock_data, epsilon_rock=9.0, c=299792458):
         岩石の比誘電率
     c : float
         光速 [m/s]
+    group1_size : float
+        Group 1の固定サイズ [cm]
 
     Returns:
     --------
@@ -167,8 +169,8 @@ def calculate_rock_sizes(rock_data, epsilon_rock=9.0, c=299792458):
 
     sizes = np.full(len(lab), np.nan)
 
-    # Group1: 1cm固定
-    sizes[lab == 1] = 1.0
+    # Group1: Group 1サイズ固定
+    sizes[lab == 1] = group1_size
 
     # Group2, Group3: time_top/time_bottomから計算
     for group in [2, 3]:
@@ -1333,6 +1335,16 @@ else:
 step_size = window_width * 0.2
 print(f'ステップサイズ: {step_size:.2f} {"m" if analysis_direction == "horizontal" else "ns"} (ウィンドウ幅の20%)')
 
+# Group 1のサイズ選択
+print('\n=== Group 1 サイズ設定 ===')
+print('1: 1 cm')
+print('2: 2 cm')
+group1_size_choice = input('Group 1のサイズを選択してください (1/2): ').strip()
+if group1_size_choice not in ['1', '2']:
+    raise ValueError('Group 1のサイズは1または2を選択してください。')
+group1_size = 1.0 if group1_size_choice == '1' else 2.0
+group1_size_str = 'group1_1cm' if group1_size_choice == '1' else 'group1_2cm'
+
 # ------------------------------------------------------------------
 # 4. データ読み込み
 # ------------------------------------------------------------------
@@ -1349,7 +1361,7 @@ rock_data = load_rock_data(label_path)
 print(f'岩石数: {len(rock_data["label"])}')
 
 # 岩石サイズと時間位置の計算
-sizes = calculate_rock_sizes(rock_data)
+sizes = calculate_rock_sizes(rock_data, group1_size=group1_size)
 time_positions = get_time_position(rock_data)
 
 # ------------------------------------------------------------------
@@ -1408,9 +1420,9 @@ os.makedirs(output_dir, exist_ok=True)
 
 # サブディレクトリ名
 if analysis_direction == 'horizontal':
-    sub_dir_name = f'horizontal_window{window_width:.0f}m'
+    sub_dir_name = f'horizontal_window{window_width:.0f}m_{group1_size_str}'
 else:
-    sub_dir_name = f'vertical_window{window_width:.1f}ns'
+    sub_dir_name = f'vertical_window{window_width:.1f}ns_{group1_size_str}'
 
 sub_dir = os.path.join(output_dir, sub_dir_name)
 os.makedirs(sub_dir, exist_ok=True)
