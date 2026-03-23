@@ -197,7 +197,7 @@ def calc_fitting_area_normalized(sizes, counts, area):
 
 def save_processing_config(config_path, data_path, mode, time_range, horizontal_range,
                            time_min, time_max, horizontal_min, horizontal_max, output_dir,
-                           num_ranges=None, ranges_list=None, area=None):
+                           num_ranges=None, ranges_list=None, area=None, group1_size=1.0):
     """処理設定をJSONファイルに保存"""
     # 既存の設定ファイルを読み込み
     if os.path.exists(config_path):
@@ -221,7 +221,8 @@ def save_processing_config(config_path, data_path, mode, time_range, horizontal_
         "horizontal_min": horizontal_min,
         "horizontal_max": horizontal_max,
         "output_dir": output_dir,
-        "area": area
+        "area": area,
+        "group1_size": group1_size
     }
 
     # モード4の場合は範囲リストも保存
@@ -488,6 +489,16 @@ if startup_mode == '1':
         except ValueError:
             raise ValueError('範囲の入力形式が正しくありません。例: 0-100')
 
+    # Group 1のサイズ選択
+    print('\n=== Group 1 サイズ設定 ===')
+    print('1: 1 cm')
+    print('2: 2 cm')
+    group1_size_choice = input('Group 1のサイズを選択してください (1/2): ').strip()
+    if group1_size_choice not in ['1', '2']:
+        raise ValueError('Group 1のサイズは1または2を選択してください。')
+    group1_size = 1.0 if group1_size_choice == '1' else 2.0
+    group1_size_str = 'group1_1cm' if group1_size_choice == '1' else 'group1_2cm'
+
     # 出力フォルダ
     base_dir = os.path.join(os.path.dirname(os.path.dirname(data_path)), 'RSFD')
     file_name = os.path.splitext(os.path.basename(data_path))[0]
@@ -495,33 +506,33 @@ if startup_mode == '1':
     # 範囲指定に応じた出力ディレクトリ名
     if mode == '1':
         # モード1: 全範囲
-        output_dir = os.path.join(base_dir, f'{file_name}_full_range')
+        output_dir = os.path.join(base_dir, f'{file_name}_full_range_{group1_size_str}')
     elif mode == '2':
         # モード2: 特定範囲のみ使用（既存の命名）
         if time_range and not horizontal_range:
-            output_dir = os.path.join(base_dir, f'{file_name}_t{time_min}-{time_max}')
+            output_dir = os.path.join(base_dir, f'{file_name}_t{time_min}-{time_max}_{group1_size_str}')
         elif horizontal_range and not time_range:
-            output_dir = os.path.join(base_dir, f'{file_name}_x{horizontal_min}-{horizontal_max}')
+            output_dir = os.path.join(base_dir, f'{file_name}_x{horizontal_min}-{horizontal_max}_{group1_size_str}')
         elif time_range and horizontal_range:
-            output_dir = os.path.join(base_dir, f'{file_name}_t{time_min}-{time_max}_x{horizontal_min}-{horizontal_max}')
+            output_dir = os.path.join(base_dir, f'{file_name}_t{time_min}-{time_max}_x{horizontal_min}-{horizontal_max}_{group1_size_str}')
         else:
-            output_dir = os.path.join(base_dir, f'{file_name}_full_range')
+            output_dir = os.path.join(base_dir, f'{file_name}_full_range_{group1_size_str}')
     elif mode == '3':
         # モード3: 特定範囲を除外
         if time_range and not horizontal_range:
-            output_dir = os.path.join(base_dir, f'{file_name}_remove_t{time_min}-{time_max}')
+            output_dir = os.path.join(base_dir, f'{file_name}_remove_t{time_min}-{time_max}_{group1_size_str}')
         elif horizontal_range and not time_range:
-            output_dir = os.path.join(base_dir, f'{file_name}_remove_x{horizontal_min}-{horizontal_max}')
+            output_dir = os.path.join(base_dir, f'{file_name}_remove_x{horizontal_min}-{horizontal_max}_{group1_size_str}')
         elif time_range and horizontal_range:
-            output_dir = os.path.join(base_dir, f'{file_name}_remove_t{time_min}-{time_max}_x{horizontal_min}-{horizontal_max}')
+            output_dir = os.path.join(base_dir, f'{file_name}_remove_t{time_min}-{time_max}_x{horizontal_min}-{horizontal_max}_{group1_size_str}')
         else:
-            output_dir = os.path.join(base_dir, f'{file_name}_full_range')
+            output_dir = os.path.join(base_dir, f'{file_name}_full_range_{group1_size_str}')
     elif mode == '4':
         # モード4: 複数範囲比較（ユーザー指定のディレクトリ名）
         custom_dir_name = input('出力ディレクトリ名を入力してください: ').strip()
         if not custom_dir_name:
             raise ValueError('出力ディレクトリ名を指定してください。')
-        output_dir = os.path.join(base_dir, custom_dir_name)
+        output_dir = os.path.join(base_dir, f'{custom_dir_name}_{group1_size_str}')
 
     os.makedirs(output_dir, exist_ok=True)
 
@@ -564,6 +575,7 @@ else:  # startup_mode == '2'
             horizontal_max = selected_record['horizontal_max']
             output_dir = selected_record['output_dir']
             area = selected_record.get('area') or 16136  # デフォルト値を設定（Noneの場合も対応）
+            group1_size = selected_record.get('group1_size', 1.0)
 
             # base_dirとfile_nameを復元
             base_dir = os.path.dirname(output_dir)
@@ -690,7 +702,7 @@ else:  # startup_mode == '2'
 
                     # サイズ配列を作成
                     counts = {k: int(np.sum(lab == k)) for k in range(1, 7)}
-                    size_label1 = np.full(counts[1], 1.0)
+                    size_label1 = np.full(counts[1], group1_size)
                     size_label2 = np.full(counts[2], 6.0)
                     mask2_valid = (lab == 2) & (~np.isnan(time_top)) & (~np.isnan(time_bottom))
                     mask3_valid = (lab == 3) & (~np.isnan(time_top)) & (~np.isnan(time_bottom))
@@ -1069,7 +1081,7 @@ else:  # startup_mode == '2'
                 # ------------------------------------------------------------------
                 # 4. ラベル1・2・3 → サイズ配列を作成
                 # ------------------------------------------------------------------
-                size_label1 = np.full(counts[1], 1.0)      # ラベル1：1 cm
+                size_label1 = np.full(counts[1], group1_size)      # ラベル1：Group 1サイズ
                 size_label2 = np.full(counts[2], 6.0)      # ラベル2：6 cm
                 mask2_valid = (lab == 2) & (~np.isnan(time_top)) & (~np.isnan(time_bottom))
                 mask3_valid = (lab == 3) & (~np.isnan(time_top)) & (~np.isnan(time_bottom))
@@ -1494,7 +1506,7 @@ if mode != '4':
     # ------------------------------------------------------------------
     # 4. ラベル1・2・3 → サイズ配列を作成
     # ------------------------------------------------------------------
-    size_label1 = np.full(counts[1], 1.0)      # ラベル1：1 cm
+    size_label1 = np.full(counts[1], group1_size)      # ラベル1：Group 1サイズ
     size_label2 = np.full(counts[2], 6.0)      # ラベル2：6 cm
     mask2_valid = (lab == 2) & (~np.isnan(time_top)) & (~np.isnan(time_bottom))
     mask3_valid = (lab == 3) & (~np.isnan(time_top)) & (~np.isnan(time_bottom))
@@ -1888,7 +1900,7 @@ else:  # mode == '4'
 
         # サイズ配列を作成
         counts = {k: int(np.sum(lab == k)) for k in range(1, 7)}
-        size_label1 = np.full(counts[1], 1.0)
+        size_label1 = np.full(counts[1], group1_size)
         size_label2 = np.full(counts[2], 6.0)
         mask2_valid = (lab == 2) & (~np.isnan(time_top)) & (~np.isnan(time_bottom))
         mask3_valid = (lab == 3) & (~np.isnan(time_top)) & (~np.isnan(time_bottom))
@@ -2195,13 +2207,14 @@ if startup_mode == '1':
         save_processing_config(
             config_path, data_path, mode, time_range, horizontal_range,
             time_min, time_max, horizontal_min, horizontal_max, output_dir,
-            num_ranges=num_ranges, ranges_list=ranges_list, area=None
+            num_ranges=num_ranges, ranges_list=ranges_list, area=None,
+            group1_size=group1_size
         )
     else:
         save_processing_config(
             config_path, data_path, mode, time_range, horizontal_range,
             time_min, time_max, horizontal_min, horizontal_max, output_dir,
-            area=area
+            area=area, group1_size=group1_size
         )
 
 print('\nすべて完了しました！')
