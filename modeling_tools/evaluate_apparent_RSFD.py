@@ -358,6 +358,34 @@ class Analyzer:
         plt.savefig(f"{output_prefix}.pdf")
         plt.close()
 
+    # === [追加] 信号強度のScatterプロット ===
+    def plot_power_scatter(self, df, output_prefix, config):
+        """
+        横軸：深さ、縦軸：岩石サイズ の空間に、
+        色で信号強度（received_power）をマッピングする散布図
+        """
+        plt.figure(figsize=(10, 8))
+
+        sc = plt.scatter(df['depth'], df['diameter'],
+                         c=df['received_power'], cmap='jet',
+                         alpha=0.8, s=20, edgecolors='none', vmax=0, vmin=-120)
+
+        cbar = plt.colorbar(sc)
+        cbar.set_label('Received Power [dBm]', fontsize=16)
+        cbar.ax.tick_params(labelsize=14)
+
+        cbar.ax.axhline(config.NOISE_FLOOR_DBM, color='red', linestyle='--', linewidth=2)
+
+        plt.xlabel('Depth [m]', fontsize=18)
+        plt.ylabel('Diameter [m]', fontsize=18)
+        plt.tick_params(axis='both', which='major', labelsize=16)
+        plt.grid(True, which="both", ls="--", alpha=0.5)
+
+        plt.tight_layout()
+        plt.savefig(f"{output_prefix}.png")
+        plt.savefig(f"{output_prefix}.pdf")
+        plt.close()
+
     # === 統計出力用プロットメソッド (平均とエラー範囲) ===
     def plot_csfd_stats(self, csfd_stats_df, output_prefix, r_true, config):
         """
@@ -607,7 +635,10 @@ def main():
 
             detected_df = model.apply_radar_equation(all_rocks_df, config, quiet=True)
             detected_df.to_csv(f"{iter_dir}/simulated_detection.csv", index=False)
-            
+
+            # --- [追加] 信号強度のScatterプロット出力 ---
+            analyzer.plot_power_scatter(detected_df, f"{iter_dir}/power_scatter", config)
+
             # RSFD統計プロット情報
             slope_true, intercept_true, _, _ = analyzer.calculate_slope(all_rocks_df['diameter'].values, overall_area)
             diameters_det = detected_df[detected_df['is_detected'] == True]['diameter'].values
