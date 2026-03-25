@@ -287,7 +287,7 @@ class Analyzer:
         # 岩石をプロット (色を received_power に設定)
         sc = plt.scatter(df['depth'], df['diameter'], 
                          c=df['received_power'], cmap='jet', 
-                         alpha=0.8, s=20, edgecolors='none', vmax=0, vmin=-100)
+                         alpha=0.8, s=20, edgecolors='none', vmax=0, vmin=-120)
         
         # カラーバーの追加と設定
         cbar = plt.colorbar(sc)
