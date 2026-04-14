@@ -221,7 +221,7 @@ def background_removal(data, output_dir=None):
     background_data = np.mean(data, axis=1)
 
     # For plot
-    data_dB = 10 * np.log10(np.abs(data))
+    data_dB = 20 * np.log10(np.abs(data))
     background_dB = np.mean(data_dB, axis=1)
     background_dB_std = np.std(data_dB, axis=1)
     # save background data
@@ -231,8 +231,9 @@ def background_removal(data, output_dir=None):
     background_removed_data = np.zeros_like(data)
     for i in tqdm(range(data.shape[1]), desc='Subtracting background'):
         background_removed_data[:, i] =  data[:, i] - background_data
-    background_removed_std = np.std(background_removed_data, axis=1)
-    background_removed_ave = np.mean(np.abs(background_removed_data), axis=1) # 平均を除去したものを平均するとゼロになってしまう。強度の平均を見るために、絶対値を取ってから平均する。
+    background_removed_norm = background_removed_data / np.max(np.abs(background_removed_data))
+    background_removed_std = np.std(background_removed_norm, axis=1)
+    background_removed_ave = np.mean(np.abs(background_removed_norm), axis=1) # 平均を除去したものを平均するとゼロになってしまう。強度の平均を見るために、絶対値を取ってから平均する。
 
     # Plot background data
     if output_dir is not None:
@@ -244,10 +245,11 @@ def background_removal(data, output_dir=None):
         #                     10 * np.log10(np.abs(np.abs(background_data) + background_data_std)), alpha=0.6))
         #ax.plot(background_dB, time)
         #ax.fill_betweenx(time, background_dB - background_dB_std, background_dB + background_dB_std, alpha=0.6)
-        ax.plot(10 * np.log10(np.abs(background_data)), time)
+        ax.plot(20 * np.log10(np.abs(background_data / np.max(background_data))), time)
 
         ax.set_xlabel('Amplitude [dB]', fontsize=20)
         ax.set_ylabel('Time [ns]', fontsize=20)
+        ax.set_xticks(np.arange(-130, 0, 20))
         ax.tick_params(labelsize=18)
         ax.grid(which='major', axis='both', linestyle='-.')
         ax.invert_yaxis()
@@ -267,17 +269,18 @@ def background_removal(data, output_dir=None):
         # background_removed_dB_ave = np.mean(background_removed_data_dB, axis=1)
         # print('Background removed average:', background_removed_dB_ave)
         # print('Background removed average shape: ', background_removed_dB_ave.shape)
-        background_removed_std = np.std(background_removed_data, axis=1)
+        #background_removed_std = np.std(background_removed_data, axis=1)
         # print('Background removed average standard deviation:', background_removed_dB_std)
         # print('Background removed average standard deviation shape: ', background_removed_dB_std.shape)`
 
-        ax.plot(10 * np.log10(np.abs(background_removed_ave)), time)
-        ax.fill_betweenx(time, 10 * np.log10(np.abs(background_removed_ave - background_removed_std)),
-                            10 * np.log10(np.abs(background_removed_ave + background_removed_std)), alpha=0.6)
+        ax.plot(20 * np.log10(np.abs(background_removed_ave)), time)
+        ax.fill_betweenx(time, 20 * np.log10(np.abs(background_removed_ave - background_removed_std)),
+                            20 * np.log10(np.abs(background_removed_ave + background_removed_std)), alpha=0.6)
 
         ax.set_xlabel('Amplitude [dB]', fontsize=20)
         ax.set_ylabel('Time [ns]', fontsize=20)
         ax.tick_params(labelsize=18)
+        ax.set_xticks(np.arange(-130, 0, 20))
         ax.grid(which='major', axis='both', linestyle='-.')
         ax.invert_yaxis()
         ax.set_ylim(np.max(time), 0)
