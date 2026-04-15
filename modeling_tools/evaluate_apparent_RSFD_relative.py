@@ -18,8 +18,8 @@ class RadarConfig:
         self.ANTENNA_GAIN_DBI = -7.5
         self.SYSTEM_LOSS_DB = 0
         
-        # 閾値（相対値モデルに合わせ後日変更予定。一旦 -90.0 を使用）
-        self.NOISE_FLOOR_DBM = -40.0 
+        # 閾値（背景除去後の平均強度プロファイルで、表面反射に対する最低強度を参考に決定）
+        self.NOISE_FLOOR_DBM = -90.0 
         self.H_ANTENNA = 0.3 # アンテナ地上高 [m]
         
         # --- B. 環境・媒質パラメータ ---
