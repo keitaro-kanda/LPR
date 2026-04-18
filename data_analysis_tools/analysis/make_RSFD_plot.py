@@ -16,6 +16,11 @@ import statsmodels.api as sm
 from datetime import datetime
 from matplotlib.ticker import MultipleLocator
 
+# NaNデータ点をプロットする際のy位置（ylim下限より小さい値、軸の下に描画）
+NAN_Y_MARKER = 1e-5
+# フィッティングに必要な最小データ点数
+MIN_FIT_POINTS = 3
+
 # ------------------------------------------------------------------
 # 補助関数定義
 # ------------------------------------------------------------------
@@ -75,17 +80,28 @@ def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
     """
     plt.figure(figsize=(8, 6))
 
-    # データプロット
-    plt.plot(x_data, y_data, marker='o', linestyle='', color=data_color, label='Observed data')
+    # データプロット（NaN値は軸下にマーカーで表示）
+    x_arr = np.asarray(x_data, dtype=float)
+    y_arr = np.asarray(y_data, dtype=float)
+    nan_mask = np.isnan(y_arr)
+    if nan_mask.any():
+        x_nan = np.where(np.isnan(x_arr[nan_mask]), 1.0, x_arr[nan_mask])
+        plt.plot(x_nan, np.full(nan_mask.sum(), NAN_Y_MARKER),
+                 marker='v', linestyle='', color=data_color, markersize=8,
+                 clip_on=False, zorder=5, label='No data (NaN)')
+    if (~nan_mask).any():
+        plt.plot(x_arr[~nan_mask], y_arr[~nan_mask],
+                 marker='o', linestyle='', color=data_color, label='Observed data')
 
-    # フィット曲線の追加
+    # フィット曲線の追加（フィットパラメータがNaNでない場合のみ）
     if fit_x is not None and fit_y is not None and fit_params is not None:
-        k_str = format_k_value(fit_params['k'])
-        r_val = fit_params['r']
-        R2_val = fit_params['R2']
-        p_str = fit_params['p_str']
-        fit_label = f'Fit: N = {k_str} D^({-r_val:.2f}), R²={R2_val:.3f}, {p_str}'
-        plt.plot(fit_x, fit_y, linestyle='--', linewidth=1.5, color=fit_color, label=fit_label)
+        if not np.isnan(fit_params['k']):
+            k_str = format_k_value(fit_params['k'])
+            r_val = fit_params['r']
+            R2_val = fit_params['R2']
+            p_str = fit_params['p_str']
+            fit_label = f'Fit: N = {k_str} D^({-r_val:.2f}), R²={R2_val:.3f}, {p_str}'
+            plt.plot(fit_x, fit_y, linestyle='--', linewidth=1.5, color=fit_color, label=fit_label)
 
     # 軸スケール設定（両対数のみ）
     plt.xscale('log')
@@ -120,8 +136,16 @@ def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
 
 def calc_fitting(sizes, counts):
     """べき則と指数関数のフィッティングを実行"""
-    # 対数変換
     mask = sizes > 0
+    if len(sizes) == 0 or mask.sum() < MIN_FIT_POINTS:
+        nan_arr = np.full(200, np.nan)
+        nan_val = np.nan
+        d_fit = np.linspace(sizes.min(), sizes.max(), 200) if len(sizes) >= 2 else np.linspace(1.0, 10.0, 200)
+        return (nan_val, nan_val, nan_val, nan_arr, nan_val, nan_val, nan_val, int(mask.sum()), 0), \
+               (nan_val, nan_val, nan_val, nan_arr, nan_val, nan_val, nan_val, int(mask.sum()), 0), \
+               d_fit
+
+    # 対数変換
     log_D = np.log(sizes[mask])
     log_N = np.log(counts[mask])
 
@@ -165,11 +189,16 @@ def calc_fitting(sizes, counts):
 
 def calc_fitting_area_normalized(sizes, counts, area):
     """面積規格化されたべき則フィッティングを実行"""
-    # 岩石数を面積で規格化
-    counts_normalized = counts / area
+    counts_normalized = counts / area if len(counts) > 0 else np.array([np.nan])
+    mask = sizes > 0
+    if len(sizes) == 0 or mask.sum() < MIN_FIT_POINTS:
+        nan_arr = np.full(200, np.nan)
+        nan_val = np.nan
+        d_fit = np.linspace(sizes.min(), sizes.max(), 200) if len(sizes) >= 2 else np.linspace(1.0, 10.0, 200)
+        return (nan_val, nan_val, nan_val, nan_arr, nan_val, nan_val, nan_val, int(mask.sum()), 0), \
+               d_fit, counts_normalized
 
     # 対数変換
-    mask = sizes > 0
     log_D = np.log(sizes[mask])
     log_N = np.log(counts_normalized[mask])
 
@@ -310,29 +339,42 @@ def create_multi_range_comparison_plot(ranges_data_list, xlabel, ylabel, output_
 
     # 各範囲のデータとフィット曲線をプロット
     for range_data in ranges_data_list:
-        # データプロット
-        plt.plot(range_data['x_data'], range_data['y_data'],
-                marker='o', linestyle='',
-                color=range_data['color'],
-                label=f"{range_data['label']} (Observed)")
+        x_arr = np.asarray(range_data['x_data'], dtype=float)
+        y_arr = np.asarray(range_data['y_data'], dtype=float)
+        nan_mask = np.isnan(y_arr)
 
-        # フィット曲線プロット
-        k_str = format_k_value(range_data['fit_params']['k'])
-        r_val = range_data['fit_params']['r']
-        R2_val = range_data['fit_params']['R2']
-        p_str = range_data['fit_params']['p_str']
-        plt.plot(range_data['fit_x'], range_data['fit_y'],
-                linestyle='--', linewidth=1.5,
-                color=range_data['color'],
-                label=f"{range_data['label']} (Fit: N = {k_str} D⁻{r_val:.2f}, R²={R2_val:.3f}, {p_str})")
+        # NaN値は軸下にマーカーで表示
+        if nan_mask.any():
+            x_nan = np.where(np.isnan(x_arr[nan_mask]), 1.0, x_arr[nan_mask])
+            plt.plot(x_nan, np.full(nan_mask.sum(), NAN_Y_MARKER),
+                     marker='v', linestyle='', color=range_data['color'],
+                     markersize=8, clip_on=False, zorder=5,
+                     label=f"{range_data['label']} (No data)")
+        if (~nan_mask).any():
+            plt.plot(x_arr[~nan_mask], y_arr[~nan_mask],
+                     marker='o', linestyle='',
+                     color=range_data['color'],
+                     label=f"{range_data['label']} (Observed)")
+
+        # フィット曲線プロット（フィットパラメータがNaNでない場合のみ）
+        if not np.isnan(range_data['fit_params']['k']):
+            k_str = format_k_value(range_data['fit_params']['k'])
+            r_val = range_data['fit_params']['r']
+            R2_val = range_data['fit_params']['R2']
+            p_str = range_data['fit_params']['p_str']
+            plt.plot(range_data['fit_x'], range_data['fit_y'],
+                    linestyle='--', linewidth=1.5,
+                    color=range_data['color'],
+                    label=f"{range_data['label']} (Fit: N = {k_str} D⁻{r_val:.2f}, R²={R2_val:.3f}, {p_str})")
 
     # 軸スケール設定（両対数のみ）
     plt.xscale('log')
     plt.yscale('log')
 
-    # x軸範囲の設定
+    # x軸・y軸範囲の設定
     if xlim:
         plt.xlim(max(xlim[0], 0.5), xlim[1])
+    plt.ylim(3e-5, 5e-2)
 
     # 軸ラベルとグリッド
     plt.xlabel(xlabel, fontsize=20)
@@ -819,8 +861,12 @@ else:  # startup_mode == '2'
 
                     # 3) Group2-3のみ
                     all_sizes_group2_3 = np.concatenate([sizes_group2, sizes_group3])
-                    unique_sizes_group2_3 = np.sort(np.unique(all_sizes_group2_3))
-                    cum_counts_group2_3 = np.array([np.sum(all_sizes_group2_3 >= s) for s in unique_sizes_group2_3])
+                    if len(all_sizes_group2_3) == 0:
+                        unique_sizes_group2_3 = np.array([1.0])
+                        cum_counts_group2_3 = np.array([np.nan])
+                    else:
+                        unique_sizes_group2_3 = np.sort(np.unique(all_sizes_group2_3))
+                        cum_counts_group2_3 = np.array([np.sum(all_sizes_group2_3 >= s) for s in unique_sizes_group2_3])
 
                     (k_pow_grp2_3, r_pow_grp2_3, R2_pow_grp2_3, N_pow_fit_grp2_3, t_pow_grp2_3, p_pow_grp2_3, se_pow_grp2_3, n_pow_grp2_3, dof_pow_grp2_3), \
                     (k_exp_grp2_3, r_exp_grp2_3, R2_exp_grp2_3, N_exp_fit_grp2_3, t_exp_grp2_3, p_exp_grp2_3, se_exp_grp2_3, n_exp_grp2_3, dof_exp_grp2_3), \
@@ -1102,18 +1148,22 @@ else:  # startup_mode == '2'
                 #all_sizes_cm = sizes_group3 # Group3のみだとどうなる？の検証
                 if all_sizes_cm_traditional.size == 0:
                     raise RuntimeError('有効なラベル1–3が見つかりませんでした。')
-                
+
                 # ------------------------------------------------------------------
                 # 5. 累積サイズ‑頻度分布 (≥ size) を計算
                 # ------------------------------------------------------------------
                 unique_sizes_traditional = np.sort(np.unique(all_sizes_cm_traditional))
                 cum_counts_traditional   = np.array([(all_sizes_cm_traditional >= s).sum() for s in unique_sizes_traditional], dtype=int)
-                
+
                 unique_sizes_estimate_group2 = np.sort(np.unique(all_sizes_cm_estimamte_group2))
                 cum_counts_estimate_group2   = np.array([(all_sizes_cm_estimamte_group2 >= s).sum() for s in unique_sizes_estimate_group2], dtype=int)
-                
-                unique_sizes_group2_3 = np.sort(np.unique(all_sizes_cm_group2_3))
-                cum_counts_group2_3   = np.array([(all_sizes_cm_group2_3 >= s).sum() for s in unique_sizes_group2_3], dtype=int)
+
+                if len(all_sizes_cm_group2_3) == 0:
+                    unique_sizes_group2_3 = np.array([1.0])
+                    cum_counts_group2_3 = np.array([np.nan])
+                else:
+                    unique_sizes_group2_3 = np.sort(np.unique(all_sizes_cm_group2_3))
+                    cum_counts_group2_3   = np.array([(all_sizes_cm_group2_3 >= s).sum() for s in unique_sizes_group2_3], dtype=int)
                 
                 # ------------------------------------------------------------------
                 # 6. 汎用プロット関数の定義
@@ -1175,11 +1225,19 @@ else:  # startup_mode == '2'
             # 8. フィッティング: べき則と指数関数
             # ------------------------------------------------------------------
             def calc_fitting(sizes, counts):
-                # 対数変換
                 mask = sizes > 0
+                if len(sizes) == 0 or mask.sum() < MIN_FIT_POINTS:
+                    nan_arr = np.full(200, np.nan)
+                    nan_val = np.nan
+                    d_fit = np.linspace(sizes.min(), sizes.max(), 200) if len(sizes) >= 2 else np.linspace(1.0, 10.0, 200)
+                    return (nan_val, nan_val, nan_val, nan_arr, nan_val, nan_val, nan_val, int(mask.sum()), 0), \
+                           (nan_val, nan_val, nan_val, nan_arr, nan_val, nan_val, nan_val, int(mask.sum()), 0), \
+                           d_fit
+
+                # 対数変換
                 log_D = np.log(sizes[mask])
                 log_N = np.log(counts[mask])
-            
+
                 # 7.1 べき則フィッティング (Power-law: log N = r log D + log k)
                 # 定数項 (切片) のために X に '1' の列を追加
                 X_pow = sm.add_constant(log_D)
@@ -1527,18 +1585,22 @@ if mode != '4':
     #all_sizes_cm = sizes_group3 # Group3のみだとどうなる？の検証
     if all_sizes_cm_traditional.size == 0:
         raise RuntimeError('有効なラベル1–3が見つかりませんでした。')
-    
+
     # ------------------------------------------------------------------
     # 5. 累積サイズ‑頻度分布 (≥ size) を計算
     # ------------------------------------------------------------------
     unique_sizes_traditional = np.sort(np.unique(all_sizes_cm_traditional))
     cum_counts_traditional   = np.array([(all_sizes_cm_traditional >= s).sum() for s in unique_sizes_traditional], dtype=int)
-    
+
     unique_sizes_estimate_group2 = np.sort(np.unique(all_sizes_cm_estimamte_group2))
     cum_counts_estimate_group2   = np.array([(all_sizes_cm_estimamte_group2 >= s).sum() for s in unique_sizes_estimate_group2], dtype=int)
-    
-    unique_sizes_group2_3 = np.sort(np.unique(all_sizes_cm_group2_3))
-    cum_counts_group2_3   = np.array([(all_sizes_cm_group2_3 >= s).sum() for s in unique_sizes_group2_3], dtype=int)
+
+    if len(all_sizes_cm_group2_3) == 0:
+        unique_sizes_group2_3 = np.array([1.0])
+        cum_counts_group2_3 = np.array([np.nan])
+    else:
+        unique_sizes_group2_3 = np.sort(np.unique(all_sizes_cm_group2_3))
+        cum_counts_group2_3   = np.array([(all_sizes_cm_group2_3 >= s).sum() for s in unique_sizes_group2_3], dtype=int)
     
     # ------------------------------------------------------------------
     # 6. 汎用プロット関数の定義
@@ -1600,18 +1662,26 @@ if mode != '4':
     # 8. フィッティング: べき則と指数関数
     # ------------------------------------------------------------------
     def calc_fitting(sizes, counts):
-        # 対数変換
         mask = sizes > 0
+        if len(sizes) == 0 or mask.sum() < MIN_FIT_POINTS:
+            nan_arr = np.full(200, np.nan)
+            nan_val = np.nan
+            d_fit = np.linspace(sizes.min(), sizes.max(), 200) if len(sizes) >= 2 else np.linspace(1.0, 10.0, 200)
+            return (nan_val, nan_val, nan_val, nan_arr, nan_val, nan_val, nan_val, int(mask.sum()), 0), \
+                   (nan_val, nan_val, nan_val, nan_arr, nan_val, nan_val, nan_val, int(mask.sum()), 0), \
+                   d_fit
+
+        # 対数変換
         log_D = np.log(sizes[mask])
         log_N = np.log(counts[mask])
-    
+
         # 7.1 べき則フィッティング (Power-law: log N = r log D + log k)
         # 定数項 (切片) のために X に '1' の列を追加
         X_pow = sm.add_constant(log_D)
         # OLSモデルの実行
         model_pow = sm.OLS(log_N, X_pow)
         results_pow = model_pow.fit()
-    
+
         # パラメータを results_pow から抽出
         log_k_pow, r_pow = results_pow.params
         k_pow = np.exp(log_k_pow)
@@ -1622,7 +1692,7 @@ if mode != '4':
         r_pow_p = results_pow.pvalues[1]
         dof_pow = results_pow.df_resid
         n_pow = int(results_pow.nobs)
-    
+
         # 7.2 指数関数フィッティング (Exponential: log N = rD + log k)
         # 定数項 (切片) のために X に '1' の列を追加
         X_exp = sm.add_constant(sizes[mask])
@@ -2018,8 +2088,12 @@ else:  # mode == '4'
 
         # 3) Group2-3のみ
         all_sizes_group2_3 = np.concatenate([sizes_group2, sizes_group3])
-        unique_sizes_group2_3 = np.sort(np.unique(all_sizes_group2_3))
-        cum_counts_group2_3 = np.array([np.sum(all_sizes_group2_3 >= s) for s in unique_sizes_group2_3])
+        if len(all_sizes_group2_3) == 0:
+            unique_sizes_group2_3 = np.array([1.0])
+            cum_counts_group2_3 = np.array([np.nan])
+        else:
+            unique_sizes_group2_3 = np.sort(np.unique(all_sizes_group2_3))
+            cum_counts_group2_3 = np.array([np.sum(all_sizes_group2_3 >= s) for s in unique_sizes_group2_3])
 
         (k_pow_grp2_3, r_pow_grp2_3, R2_pow_grp2_3, N_pow_fit_grp2_3, t_pow_grp2_3, p_pow_grp2_3, se_pow_grp2_3, n_pow_grp2_3, dof_pow_grp2_3), \
         (k_exp_grp2_3, r_exp_grp2_3, R2_exp_grp2_3, N_exp_fit_grp2_3, t_exp_grp2_3, p_exp_grp2_3, se_exp_grp2_3, n_exp_grp2_3, dof_exp_grp2_3), \
