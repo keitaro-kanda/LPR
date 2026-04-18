@@ -550,20 +550,20 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
                       time_array[-1], time_array[0]],
                vmin=vmin, vmax=vmax, alpha=0.5)
 
-    # rの値を第2軸にプロット（NaN値は1.6としてプロット）
+    # rの値を第2軸にプロット（NaN値は-0.2としてプロット）
     ax2_twin = ax2.twinx()
-    r_nan_value = 1.6  # NaN値の代替値
+    r_nan_value = -0.2  # NaN値の代替値
     r_values_plot = np.where(np.isnan(r_values), r_nan_value, r_values)
     ax2_twin.plot(window_centers, r_values_plot,
                   'b-', linewidth=2, marker='o', markersize=10, label='r (power-law exponent)')
     ax2_twin.set_ylabel('r (power-law exponent)', fontsize=font_medium, color='blue')
     ax2_twin.tick_params(axis='y', labelcolor='blue', labelsize=font_small)
 
-    # y軸範囲設定（r値）: 0.3〜1.6に拡張（1.6はNaN用）
-    ax2_twin.set_ylim(0.3, 1.6)
-    # カスタム目盛り設定（1.6を「nan」と表示）
-    r_ticks = [0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6]
-    r_tick_labels = ['0.4', '0.6', '0.8', '1.0', '1.2', '1.4', 'nan']
+    # y軸範囲設定（r値）: -0.2〜1.4に拡張（-0.2はNaN用）
+    ax2_twin.set_ylim(-0.2, 1.4)
+    # カスタム目盛り設定（-0.2を「nan」と表示）
+    r_ticks = [-0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4]
+    r_tick_labels = ['nan', '0.4', '0.6', '0.8', '1.0', '1.2', '1.4']
     ax2_twin.set_yticks(r_ticks)
     ax2_twin.set_yticklabels(r_tick_labels)
 
@@ -579,18 +579,18 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
                       time_array[-1], time_array[0]],
                vmin=vmin, vmax=vmax, alpha=0.5)
 
-    # kの値を第2軸にプロット（リニアスケール、NaN値は8e-3としてプロット）
+    # kの値を第2軸にプロット（リニアスケール、NaN値は-1e-3としてプロット）
     ax3_twin = ax3.twinx()
-    k_nan_value = 8e-3  # NaN値の代替値
+    k_nan_value = -1e-3  # NaN値の代替値
     k_values_plot = np.where(np.isnan(k_values), k_nan_value, k_values)
     ax3_twin.plot(window_centers, k_values_plot,
                   'r-', linewidth=2, marker='s', markersize=10, label='k (scaling factor)')
     ax3_twin.tick_params(axis='y', labelcolor='red', labelsize=font_small)
-    # y軸範囲設定（k値）: 1e-3〜8e-3に拡張（8e-3はNaN用）
-    ax3_twin.set_ylim(1e-3, 8e-3)
-    # カスタム目盛り設定（8e-3を「nan」と表示）
-    k_ticks = [1e-3, 2e-3, 3e-3, 4e-3, 5e-3, 6e-3, 7e-3, 8e-3]
-    k_tick_labels = ['1', '2', '3', '4', '5', '6', '7', 'nan']
+    # y軸範囲設定（k値）: -1e-3〜7e-3に拡張（-1e-3はNaN用）
+    ax3_twin.set_ylim(-1e-3, 7e-3)
+    # カスタム目盛り設定（-1e-3を「nan」と表示）
+    k_ticks = [-1e-3, 1e-3, 2e-3, 3e-3, 4e-3, 5e-3, 6e-3, 7e-3]
+    k_tick_labels = ['nan', '1', '2', '3', '4', '5', '6', '7']
     ax3_twin.set_yticks(k_ticks)
     ax3_twin.set_yticklabels(k_tick_labels)
     ax3_twin.set_ylabel('k [×10⁻³ /m²]', fontsize=font_medium, color='red')
@@ -607,9 +607,9 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
                       time_array[-1], time_array[0]],
                vmin=vmin, vmax=vmax, alpha=0.5)
 
-    # p値を第2軸にプロット（対数スケール、NaN値は1.5としてプロット）
+    # p値を第2軸にプロット（対数スケール、NaN値は3e-6としてプロット）
     ax4_twin = ax4.twinx()
-    p_nan_value = 1.5  # NaN値の代替値
+    p_nan_value = 3e-6  # NaN値の代替値
     p_values_plot = np.where(np.isnan(p_values_array) | (p_values_array <= 0), p_nan_value, p_values_array)
     ax4_twin.semilogy(window_centers, p_values_plot,
                       'g-', linewidth=2, marker='^', markersize=10, label='p-value')
@@ -617,11 +617,11 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     ax4_twin.axhline(y=0.05, color='black', linestyle='--', linewidth=1.5, label='p = 0.05')
     ax4_twin.set_ylabel('p-value', fontsize=font_medium, color='green')
     ax4_twin.tick_params(axis='y', labelcolor='green', labelsize=font_small)
-    # y軸範囲設定（p値）: 1e-4〜1.5に拡張（1.5はNaN用）
-    ax4_twin.set_ylim(1e-4, 1.5)
-    # カスタム目盛り設定（1.5を「nan」と表示）
-    p_ticks = [1e-4, 1e-3, 1e-2, 0.05, 1e-1, 1.0, 1.5]
-    p_tick_labels = ['10⁻⁴', '10⁻³', '10⁻²', '0.05', '10⁻¹', '1', 'nan']
+    # y軸範囲設定（p値）: 3e-6〜1.0に拡張（3e-6はNaN用）
+    ax4_twin.set_ylim(3e-6, 1.0)
+    # カスタム目盛り設定（3e-6を「nan」と表示）
+    p_ticks = [3e-6, 1e-4, 1e-3, 1e-2, 0.05, 1e-1, 1.0]
+    p_tick_labels = ['nan', '10⁻⁴', '10⁻³', '10⁻²', '0.05', '10⁻¹', '1']
     ax4_twin.set_yticks(p_ticks)
     ax4_twin.set_yticklabels(p_tick_labels)
 
@@ -683,7 +683,7 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
                    'b-', linewidth=2, marker='o', markersize=10, label='r (power-law exponent)')
     ax_r_twin.set_ylabel('r (power-law exponent)', fontsize=font_medium, color='blue')
     ax_r_twin.tick_params(axis='y', labelcolor='blue', labelsize=font_small)
-    ax_r_twin.set_ylim(0.3, 1.6)
+    ax_r_twin.set_ylim(-0.2, 1.4)
     ax_r_twin.set_yticks(r_ticks)
     ax_r_twin.set_yticklabels(r_tick_labels)
     ax_r.set_xlabel('Moving distance [m]', fontsize=font_medium)
@@ -706,7 +706,7 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     ax_k_twin.plot(window_centers, k_values_plot,
                    'r-', linewidth=2, marker='s', markersize=10, label='k (scaling factor)')
     ax_k_twin.tick_params(axis='y', labelcolor='red', labelsize=font_small)
-    ax_k_twin.set_ylim(1e-3, 8e-3)
+    ax_k_twin.set_ylim(-1e-3, 7e-3)
     ax_k_twin.set_yticks(k_ticks)
     ax_k_twin.set_yticklabels(k_tick_labels)
     ax_k_twin.set_ylabel('k [×10⁻³ /m²]', fontsize=font_medium, color='red')
@@ -732,7 +732,7 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     ax_p_twin.axhline(y=0.05, color='black', linestyle='--', linewidth=1.5, label='p = 0.05')
     ax_p_twin.set_ylabel('p-value', fontsize=font_medium, color='green')
     ax_p_twin.tick_params(axis='y', labelcolor='green', labelsize=font_small)
-    ax_p_twin.set_ylim(1e-4, 1.5)
+    ax_p_twin.set_ylim(3e-6, 1.0)
     ax_p_twin.set_yticks(p_ticks)
     ax_p_twin.set_yticklabels(p_tick_labels)
     ax_p.set_xlabel('Moving distance [m]', fontsize=font_medium)
@@ -808,7 +808,7 @@ def plot_depth_rsfd_summary(window_centers, num_rocks_array, num_fitting_points_
     """
     font_medium = 18
     font_small = 16
-    nan_placeholder = 1.2
+    nan_placeholder = -0.2
 
     # 深さ変換 [ns] → [m]
     depths = window_centers * 1e-9 * c / (2 * np.sqrt(epsilon_r))
@@ -840,9 +840,9 @@ def plot_depth_rsfd_summary(window_centers, num_rocks_array, num_fitting_points_
 
     ax.set_xlabel('Depth [m]', fontsize=font_medium)
     ax.set_ylabel('RSFD parameter', fontsize=font_medium)
-    ax.set_ylim(0, 1.3)
-    yticks = [0, 0.2, 0.4, 0.6, 0.8, 1.0, nan_placeholder]
-    ytick_labels = ['0', '0.2', '0.4', '0.6', '0.8', '1.0', 'Nan']
+    ax.set_ylim(-0.2, 1.2)
+    yticks = [nan_placeholder, 0, 0.2, 0.4, 0.6, 0.8, 1.0]
+    ytick_labels = ['Nan', '0', '0.2', '0.4', '0.6', '0.8', '1.0']
     ax.set_yticks(yticks)
     ax.set_yticklabels(ytick_labels)
 
@@ -1038,20 +1038,20 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
                       time_array[-1], time_array[0]],
                vmin=vmin, vmax=vmax, alpha=0.5)
 
-    # rの値を第2横軸にプロット（縦方向に沿って、NaN値は1.6としてプロット）
+    # rの値を第2横軸にプロット（縦方向に沿って、NaN値は-0.2としてプロット）
     ax2_twin = ax2.twiny()
-    r_nan_value = 1.6  # NaN値の代替値
+    r_nan_value = -0.2  # NaN値の代替値
     r_values_plot = np.where(np.isnan(r_values), r_nan_value, r_values)
     ax2_twin.plot(r_values_plot, window_centers,
                   'b-', linewidth=2, marker='o', markersize=10, label='r (power-law exponent)')
     ax2_twin.set_xlabel('r (power-law exponent)', fontsize=font_medium, color='blue')
     ax2_twin.tick_params(axis='x', labelcolor='blue', labelsize=font_small)
 
-    # x軸範囲設定（r値）: 0.3〜1.6に拡張（1.6はNaN用）
-    ax2_twin.set_xlim(0.3, 1.6)
-    # カスタム目盛り設定（1.6を「nan」と表示）
-    r_ticks = [0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6]
-    r_tick_labels = ['0.4', '0.6', '0.8', '1.0', '1.2', '1.4', 'nan']
+    # x軸範囲設定（r値）: -0.2〜1.4に拡張（-0.2はNaN用）
+    ax2_twin.set_xlim(-0.2, 1.4)
+    # カスタム目盛り設定（-0.2を「nan」と表示）
+    r_ticks = [-0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4]
+    r_tick_labels = ['nan', '0.4', '0.6', '0.8', '1.0', '1.2', '1.4']
     ax2_twin.set_xticks(r_ticks)
     ax2_twin.set_xticklabels(r_tick_labels)
 
@@ -1068,18 +1068,18 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
                       time_array[-1], time_array[0]],
                vmin=vmin, vmax=vmax, alpha=0.5)
 
-    # kの値を第2横軸にプロット（リニアスケール、縦方向に沿って、NaN値は22e-3としてプロット）
+    # kの値を第2横軸にプロット（リニアスケール、縦方向に沿って、NaN値は-2e-3としてプロット）
     ax3_twin = ax3.twiny()
-    k_nan_value = 22e-3  # NaN値の代替値
+    k_nan_value = -2e-3  # NaN値の代替値
     k_values_plot = np.where(np.isnan(k_values), k_nan_value, k_values)
     ax3_twin.plot(k_values_plot, window_centers,
                   'r-', linewidth=2, marker='s', markersize=10, label='k (scaling factor)')
     ax3_twin.tick_params(axis='x', labelcolor='red', labelsize=font_small)
-    # x軸範囲設定（k値）: 0〜22e-3に拡張（22e-3はNaN用）
-    ax3_twin.set_xlim(0, 22e-3)
-    # カスタム目盛り設定（22e-3を「nan」と表示）
-    k_ticks = [0, 5e-3, 10e-3, 15e-3, 20e-3, 22e-3]
-    k_tick_labels = ['0', '5', '10', '15', '20', 'nan']
+    # x軸範囲設定（k値）: -2e-3〜20e-3に拡張（-2e-3はNaN用）
+    ax3_twin.set_xlim(-2e-3, 20e-3)
+    # カスタム目盛り設定（-2e-3を「nan」と表示）
+    k_ticks = [-2e-3, 0, 5e-3, 10e-3, 15e-3, 20e-3]
+    k_tick_labels = ['nan', '0', '5', '10', '15', '20']
     ax3_twin.set_xticks(k_ticks)
     ax3_twin.set_xticklabels(k_tick_labels)
     ax3_twin.set_xlabel('k [×10⁻³ /m²]', fontsize=font_medium, color='red')
@@ -1097,9 +1097,9 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
                       time_array[-1], time_array[0]],
                vmin=vmin, vmax=vmax, alpha=0.5)
 
-    # p値を第2横軸にプロット（対数スケール、縦方向に沿って、NaN値は1.5としてプロット）
+    # p値を第2横軸にプロット（対数スケール、縦方向に沿って、NaN値は3e-6としてプロット）
     ax4_twin = ax4.twiny()
-    p_nan_value = 1.5  # NaN値の代替値
+    p_nan_value = 3e-6  # NaN値の代替値
     p_values_plot = np.where(np.isnan(p_values_array) | (p_values_array <= 0), p_nan_value, p_values_array)
     ax4_twin.semilogx(p_values_plot, window_centers,
                       'g-', linewidth=2, marker='^', markersize=10, label='p-value')
@@ -1107,11 +1107,11 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     ax4_twin.axvline(x=0.05, color='black', linestyle='--', linewidth=1.5, label='p = 0.05')
     ax4_twin.set_xlabel('p-value', fontsize=font_medium, color='green')
     ax4_twin.tick_params(axis='x', labelcolor='green', labelsize=font_small)
-    # x軸範囲設定（p値）: 1e-4〜1.5に拡張（1.5はNaN用）
-    ax4_twin.set_xlim(1e-4, 1.5)
-    # カスタム目盛り設定（1.5を「nan」と表示）
-    p_ticks = [1e-4, 1e-3, 1e-2, 0.05, 1e-1, 1.0, 1.5]
-    p_tick_labels = ['10⁻⁴', '10⁻³', '10⁻²', '0.05', '10⁻¹', '1', 'nan']
+    # x軸範囲設定（p値）: 3e-6〜1.0に拡張（3e-6はNaN用）
+    ax4_twin.set_xlim(3e-6, 1.0)
+    # カスタム目盛り設定（3e-6を「nan」と表示）
+    p_ticks = [3e-6, 1e-4, 1e-3, 1e-2, 0.05, 1e-1, 1.0]
+    p_tick_labels = ['nan', '10⁻⁴', '10⁻³', '10⁻²', '0.05', '10⁻¹', '1']
     ax4_twin.set_xticks(p_ticks)
     ax4_twin.set_xticklabels(p_tick_labels)
 
@@ -1178,7 +1178,7 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
                    'b-', linewidth=2, marker='o', markersize=10, label='r (power-law exponent)')
     ax_r_twin.set_xlabel('r (power-law exponent)', fontsize=font_medium, color='blue')
     ax_r_twin.tick_params(axis='x', labelcolor='blue', labelsize=font_small)
-    ax_r_twin.set_xlim(0.3, 1.6)
+    ax_r_twin.set_xlim(-0.2, 1.4)
     ax_r_twin.set_xticks(r_ticks)
     ax_r_twin.set_xticklabels(r_tick_labels)
     ax_r.set_xlabel('Moving distance [m]', fontsize=font_medium)
@@ -1201,7 +1201,7 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     ax_k_twin.plot(k_values_plot, window_centers,
                    'r-', linewidth=2, marker='s', markersize=10, label='k (scaling factor)')
     ax_k_twin.tick_params(axis='x', labelcolor='red', labelsize=font_small)
-    ax_k_twin.set_xlim(0, 22e-3)
+    ax_k_twin.set_xlim(-2e-3, 20e-3)
     ax_k_twin.set_xticks(k_ticks)
     ax_k_twin.set_xticklabels(k_tick_labels)
     ax_k_twin.set_xlabel('k [×10⁻³ /m²]', fontsize=font_medium, color='red')
@@ -1227,7 +1227,7 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     ax_p_twin.axvline(x=0.05, color='black', linestyle='--', linewidth=1.5, label='p = 0.05')
     ax_p_twin.set_xlabel('p-value', fontsize=font_medium, color='green')
     ax_p_twin.tick_params(axis='x', labelcolor='green', labelsize=font_small)
-    ax_p_twin.set_xlim(1e-4, 1.5)
+    ax_p_twin.set_xlim(3e-6, 1.0)
     ax_p_twin.set_xticks(p_ticks)
     ax_p_twin.set_xticklabels(p_tick_labels)
     ax_p.set_xlabel('Moving distance [m]', fontsize=font_medium)
