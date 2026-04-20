@@ -35,6 +35,7 @@ import shutil
 import numpy as np
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
+from matplotlib.ticker import AutoLocator, FixedLocator, FixedFormatter
 from datetime import datetime
 
 # NaNデータ点をプロットする際のy位置（ylim下限より小さい値、軸の下に描画）
@@ -236,6 +237,150 @@ def create_multi_range_comparison_plot(ranges_data_list, xlabel, ylabel, output_
         plt.close()
 
     print(f'プロット保存: {output_path}.png')
+
+
+def plot_range_parameter_summary(range_labels, num_rocks_array, num_fitting_points_array,
+                                  r_values, k_values, output_dir,
+                                  dpi_png=300, dpi_pdf=600):
+    """
+    範囲別RSFDパラメータのサマリープロットを作成
+
+    個別プロット3枚:
+      1. 岩石数（総数・フィッティング点数）
+      2. r値
+      3. k値
+    まとめプロット1枚:
+      4. 全変数を最大値で規格化した比較プロット
+
+    NaN値の処理はmake_RSFD_moving_window.pyと同仕様:
+      - r: NaN → -0.2 としてプロット
+      - k: NaN → 有効最小値より下の値としてプロット
+      - 規格化プロット: NaN → nan_placeholder (-0.2)
+    """
+    font_medium = 18
+    font_small = 16
+    nan_placeholder = -0.2
+
+    x = np.arange(1, len(range_labels) + 1)
+    fig_width = max(10, len(x) * 0.9)
+
+    # --- r値のNaN処理 ---
+    r_nan_value = -0.2
+    r_values_plot = np.where(np.isnan(r_values), r_nan_value, r_values)
+
+    # --- k値のNaN処理（NaN点は必ず0未満にプロット）---
+    valid_k = k_values[~np.isnan(k_values)]
+    k_max_val = float(np.max(valid_k)) if len(valid_k) > 0 else 1e-3
+    k_nan_value = -abs(k_max_val) * 0.15
+    k_values_plot = np.where(np.isnan(k_values), k_nan_value, k_values)
+
+    # ===================================================
+    # 1. 岩石数プロット（個別）
+    # ===================================================
+    fig, ax = plt.subplots(figsize=(fig_width, 6))
+    ax.plot(x, num_rocks_array, 'k-', linewidth=2, marker='o', markersize=10,
+            label='Total rocks')
+    ax.plot(x, num_fitting_points_array, 'k--', linewidth=2, marker='D', markersize=10,
+            label='Fitting points')
+    ax.set_xticks(x)
+    ax.set_xticklabels(range_labels, rotation=45, ha='right', fontsize=font_small - 2)
+    ax.set_xlabel('Range', fontsize=font_medium)
+    ax.set_ylabel('Number of rocks', fontsize=font_medium)
+    ax.tick_params(axis='y', labelsize=font_small)
+    ax.legend(fontsize=font_small)
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'num_rocks_plot.png'), dpi=dpi_png)
+    plt.savefig(os.path.join(output_dir, 'num_rocks_plot.pdf'), dpi=dpi_pdf)
+    plt.close()
+
+    # ===================================================
+    # 2. r値プロット（個別）
+    # ===================================================
+    fig, ax = plt.subplots(figsize=(fig_width, 6))
+    ax.plot(x, r_values_plot, 'b-', linewidth=2, marker='o', markersize=10,
+            label='r (power-law exponent)')
+    ax.set_xticks(x)
+    ax.set_xticklabels(range_labels, rotation=45, ha='right', fontsize=font_small - 2)
+    ax.set_xlabel('Range', fontsize=font_medium)
+    ax.set_ylabel('r (power-law exponent)', fontsize=font_medium)
+    valid_r_plot = r_values_plot[r_values_plot > r_nan_value + 0.05]
+    r_top = float(np.max(valid_r_plot)) * 1.1 if len(valid_r_plot) > 0 else 1.4
+    ax.set_ylim(-0.3, r_top)
+    _r_auto = [t for t in AutoLocator().tick_values(0, r_top) if 0 <= t <= r_top]
+    ax.yaxis.set_major_locator(FixedLocator([r_nan_value] + _r_auto))
+    ax.yaxis.set_major_formatter(FixedFormatter(['Nan'] + [f'{t:g}' for t in _r_auto]))
+    ax.tick_params(axis='y', labelsize=font_small)
+    ax.legend(fontsize=font_small)
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'r_plot.png'), dpi=dpi_png)
+    plt.savefig(os.path.join(output_dir, 'r_plot.pdf'), dpi=dpi_pdf)
+    plt.close()
+
+    # ===================================================
+    # 3. k値プロット（個別）
+    # ===================================================
+    fig, ax = plt.subplots(figsize=(fig_width, 6))
+    ax.plot(x, k_values_plot, 'r-', linewidth=2, marker='s', markersize=10,
+            label='k (scaling factor)')
+    ax.set_xticks(x)
+    ax.set_xticklabels(range_labels, rotation=45, ha='right', fontsize=font_small - 2)
+    ax.set_xlabel('Range', fontsize=font_medium)
+    ax.set_ylabel('k [×10⁻³ /m²]', fontsize=font_medium)
+    k_top = k_max_val * 1.15
+    ax.set_ylim(k_nan_value * 1.2, k_top)
+    _k_auto = [t for t in AutoLocator().tick_values(0, k_top) if 0 <= t <= k_top]
+    ax.yaxis.set_major_locator(FixedLocator([k_nan_value] + _k_auto))
+    ax.yaxis.set_major_formatter(FixedFormatter(['Nan'] + [f'{t * 1e3:.1f}' for t in _k_auto]))
+    ax.tick_params(axis='y', labelsize=font_small)
+    ax.legend(fontsize=font_small)
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'k_plot.png'), dpi=dpi_png)
+    plt.savefig(os.path.join(output_dir, 'k_plot.pdf'), dpi=dpi_pdf)
+    plt.close()
+
+    # ===================================================
+    # 4. 規格化まとめプロット
+    # ===================================================
+    num_max = np.max(num_rocks_array) if np.max(num_rocks_array) > 0 else 1
+    num_norm = num_rocks_array / num_max
+
+    fit_max = np.max(num_fitting_points_array) if np.max(num_fitting_points_array) > 0 else 1
+    fit_norm = num_fitting_points_array / fit_max
+
+    r_max_norm = np.nanmax(r_values) if not np.all(np.isnan(r_values)) else 1.0
+    r_norm = r_values / r_max_norm
+    r_norm_plot = np.where(np.isnan(r_norm), nan_placeholder, r_norm)
+
+    k_max_norm = np.nanmax(k_values) if not np.all(np.isnan(k_values)) else 1.0
+    k_norm = k_values / k_max_norm
+    k_norm_plot = np.where(np.isnan(k_norm), nan_placeholder, k_norm)
+
+    fig, ax = plt.subplots(figsize=(fig_width, 6))
+    ax.plot(x, num_norm, 'k-', linewidth=2, label='Num (total)')
+    ax.plot(x, fit_norm, 'k--', linewidth=2, label='Num (fitting)')
+    ax.plot(x, r_norm_plot, 'b-', linewidth=2, marker='o', markersize=8, label='r')
+    ax.plot(x, k_norm_plot, 'r-', linewidth=2, marker='s', markersize=8, label='k')
+    ax.set_xticks(x)
+    ax.set_xticklabels(range_labels, rotation=45, ha='right', fontsize=font_small - 2)
+    ax.set_xlabel('Range', fontsize=font_medium)
+    ax.set_ylabel('Normalized RSFD parameter', fontsize=font_medium)
+    ax.set_ylim(-0.2, 1.2)
+    yticks = [nan_placeholder, 0, 0.2, 0.4, 0.6, 0.8, 1.0]
+    ytick_labels = ['Nan', '0', '0.2', '0.4', '0.6', '0.8', '1.0']
+    ax.set_yticks(yticks)
+    ax.set_yticklabels(ytick_labels)
+    ax.tick_params(axis='y', labelsize=font_small)
+    ax.legend(fontsize=font_small)
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'range_rsfd_summary.png'), dpi=dpi_png)
+    plt.savefig(os.path.join(output_dir, 'range_rsfd_summary.pdf'), dpi=dpi_pdf)
+    plt.close()
+
+    print(f'範囲別パラメータサマリープロット保存: {output_dir}')
 
 
 # ------------------------------------------------------------------
@@ -559,4 +704,23 @@ with open(summary_path, 'w', encoding='utf-8') as f:
         f.write('#\n')
 
 print(f'サマリーファイル保存: {summary_path}')
+
+# ------------------------------------------------------------------
+# 7. 範囲別パラメータサマリープロット
+# ------------------------------------------------------------------
+print('\n=== 範囲別パラメータサマリープロット生成中 ===')
+
+range_labels_arr = [s['range_label'] for s in all_ranges_summary]
+num_rocks_arr = np.array([s['total_rocks'] for s in all_ranges_summary])
+num_fitting_pts_arr = np.array([s['label_2_count'] + s['label_3_count'] + 1
+                                for s in all_ranges_summary])
+r_arr = np.array([s['group1_3_fit']['r'] for s in all_ranges_summary], dtype=float)
+k_arr = np.array([s['group1_3_fit']['k'] for s in all_ranges_summary], dtype=float)
+
+summary_plot_dir = os.path.join(output_dir, 'range_parameter_summary')
+os.makedirs(summary_plot_dir, exist_ok=True)
+
+plot_range_parameter_summary(range_labels_arr, num_rocks_arr, num_fitting_pts_arr,
+                              r_arr, k_arr, summary_plot_dir)
+
 print('\nすべて完了しました！')
