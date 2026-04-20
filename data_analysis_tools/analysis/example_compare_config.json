@@ -1,0 +1,52 @@
+{
+  "label_file": "/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Processed_Data/5_Terrain_correction/echo_labels/rock_labels.json",
+  "group1_size": 1.0,
+  "output_dir": "/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Processed_Data/5_Terrain_correction/RSFD_compare_multiple_region",
+  "ranges": [
+    {
+      "label": "Full range",
+      "time_min": null,
+      "time_max": null,
+      "horizontal_min": null,
+      "horizontal_max": null,
+      "exclude": false,
+      "area": 16136.0
+    },
+    {
+      "label": "Shallow region (0-50 ns)",
+      "time_min": 0.0,
+      "time_max": 50.0,
+      "horizontal_min": null,
+      "horizontal_max": null,
+      "exclude": false,
+      "area": 8068.0
+    },
+    {
+      "label": "Deep region (50-100 ns)",
+      "time_min": 50.0,
+      "time_max": 100.0,
+      "horizontal_min": null,
+      "horizontal_max": null,
+      "exclude": false,
+      "area": 8068.0
+    },
+    {
+      "label": "Near crater (horizontal 0-100 m)",
+      "time_min": null,
+      "time_max": null,
+      "horizontal_min": 0.0,
+      "horizontal_max": 100.0,
+      "exclude": false,
+      "area": 4000.0
+    },
+    {
+      "label": "Exclude near crater",
+      "time_min": null,
+      "time_max": null,
+      "horizontal_min": 0.0,
+      "horizontal_max": 100.0,
+      "exclude": true,
+      "area": 12136.0
+    }
+  ]
+}
