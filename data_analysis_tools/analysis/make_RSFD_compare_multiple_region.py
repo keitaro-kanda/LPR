@@ -347,8 +347,7 @@ def plot_range_parameter_summary(range_labels, num_rocks_array, num_fitting_poin
     num_max = np.max(num_rocks_array) if np.max(num_rocks_array) > 0 else 1
     num_norm = num_rocks_array / num_max
 
-    fit_max = np.max(num_fitting_points_array) if np.max(num_fitting_points_array) > 0 else 1
-    fit_norm = num_fitting_points_array / fit_max
+    fit_norm = num_fitting_points_array / num_max
 
     r_max_norm = np.nanmax(r_values) if not np.all(np.isnan(r_values)) else 1.0
     r_norm = r_values / r_max_norm
@@ -367,13 +366,13 @@ def plot_range_parameter_summary(range_labels, num_rocks_array, num_fitting_poin
     ax.set_xticklabels(range_labels, rotation=45, ha='right', fontsize=font_small - 2)
     ax.set_xlabel('Range', fontsize=font_medium)
     ax.set_ylabel('Normalized RSFD parameter', fontsize=font_medium)
-    ax.set_ylim(-0.2, 1.2)
+    ax.set_ylim(-0.4, 1.2)
     yticks = [nan_placeholder, 0, 0.2, 0.4, 0.6, 0.8, 1.0]
     ytick_labels = ['Nan', '0', '0.2', '0.4', '0.6', '0.8', '1.0']
     ax.set_yticks(yticks)
     ax.set_yticklabels(ytick_labels)
     ax.tick_params(axis='y', labelsize=font_small)
-    ax.legend(fontsize=font_small)
+    ax.legend(fontsize=font_small, loc="lower right")
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, 'range_rsfd_summary.png'), dpi=dpi_png)
