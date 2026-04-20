@@ -1,52 +1,115 @@
 {
-  "label_file": "/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Processed_Data/5_Terrain_correction/echo_labels/rock_labels.json",
+  "label_file": "/Volumes/SSD_Kanda_SAMSUNG/CE4_LPR/LPR_2B/Processed_Data/order_0_1_3_4_5/4_Gain_function/echo_labels/labels_1.json",
   "group1_size": 1.0,
-  "output_dir": "/Volumes/SSD_Kanda_SAMSUNG/LPR/LPR_2B/Processed_Data/5_Terrain_correction/RSFD_compare_multiple_region",
+  "output_dir": "/Volumes/SSD_Kanda_SAMSUNG/CE4_LPR/LPR_2B/Processed_Data/order_0_1_3_4_5/4_Gain_function/RSFD_compare_multiple_region",
   "ranges": [
     {
-      "label": "Full range",
-      "time_min": null,
-      "time_max": null,
+      "label": "0-1 m",
+      "time_min": 0,
+      "time_max": 11.5,
       "horizontal_min": null,
       "horizontal_max": null,
       "exclude": false,
-      "area": 16136.0
+      "area": 1525.0
     },
     {
-      "label": "Shallow region (0-50 ns)",
+      "label": "0-2 m",
       "time_min": 0.0,
-      "time_max": 50.0,
+      "time_max": 23.0,
       "horizontal_min": null,
       "horizontal_max": null,
       "exclude": false,
-      "area": 8068.0
+      "area": 3050.0
     },
     {
-      "label": "Deep region (50-100 ns)",
-      "time_min": 50.0,
-      "time_max": 100.0,
+      "label": "0-3 m",
+      "time_min": 0.0,
+      "time_max": 34.5,
       "horizontal_min": null,
       "horizontal_max": null,
       "exclude": false,
-      "area": 8068.0
+      "area": 4575.0
     },
     {
-      "label": "Near crater (horizontal 0-100 m)",
-      "time_min": null,
-      "time_max": null,
-      "horizontal_min": 0.0,
-      "horizontal_max": 100.0,
+      "label": "0-4 m",
+      "time_min": 0.0,
+      "time_max": 46.0,
+      "horizontal_min": null,
+      "horizontal_max": null,
       "exclude": false,
-      "area": 4000.0
+      "area": 6100.0
     },
     {
-      "label": "Exclude near crater",
-      "time_min": null,
-      "time_max": null,
-      "horizontal_min": 0.0,
-      "horizontal_max": 100.0,
-      "exclude": true,
-      "area": 12136.0
+      "label": "0-5 m",
+      "time_min": 0.0,
+      "time_max": 57.5,
+      "horizontal_min": null,
+      "horizontal_max": null,
+      "exclude": false,
+      "area": 7625.0
+    },
+    {
+      "label": "0-6 m",
+      "time_min": 0,
+      "time_max": 69.0,
+      "horizontal_min": null,
+      "horizontal_max": null,
+      "exclude": false,
+      "area": 9150.0
+    },
+    {
+      "label": "0-7 m",
+      "time_min": 0.0,
+      "time_max": 80.5,
+      "horizontal_min": null,
+      "horizontal_max": null,
+      "exclude": false,
+      "area": 10675.0
+    },
+    {
+      "label": "0-8 m",
+      "time_min": 0.0,
+      "time_max": 92.0,
+      "horizontal_min": null,
+      "horizontal_max": null,
+      "exclude": false,
+      "area": 12200.0
+    },
+    {
+      "label": "0-9 m",
+      "time_min": 0.0,
+      "time_max": 103.5,
+      "horizontal_min": null,
+      "horizontal_max": null,
+      "exclude": false,
+      "area": 13725.0
+    },
+    {
+      "label": "0-10 m",
+      "time_min": 0.0,
+      "time_max": 115.0,
+      "horizontal_min": null,
+      "horizontal_max": null,
+      "exclude": false,
+      "area": 15250.0
+    },
+    {
+      "label": "0-11 m",
+      "time_min": 0.0,
+      "time_max": 126.5,
+      "horizontal_min": null,
+      "horizontal_max": null,
+      "exclude": false,
+      "area": 16775.0
+    },
+    {
+      "label": "0-12 m",
+      "time_min": 0.0,
+      "time_max": 138.0,
+      "horizontal_min": null,
+      "horizontal_max": null,
+      "exclude": false,
+      "area": 18300.0
     }
   ]
 }
