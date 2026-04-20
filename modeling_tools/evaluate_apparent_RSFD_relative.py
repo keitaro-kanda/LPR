@@ -363,7 +363,7 @@ class Analyzer:
         plt.ylabel('Apparent Slope r', fontsize=18)
         plt.xticks(np.arange(2, 14, 2), ['0-2', '2-4', '4-6', '6-8', '8-10', '10-12'], fontsize=16)
         plt.tick_params(axis='both', which='major', labelsize=16)
-        plt.ylim(0, r_true + 1)
+        #plt.ylim(0, r_true + 1)
         plt.legend(fontsize=16)
         plt.grid(True, ls='--', alpha=0.7)
         
