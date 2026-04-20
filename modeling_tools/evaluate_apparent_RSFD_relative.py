@@ -611,13 +611,20 @@ def main():
     except ValueError:
         print("数値ではない入力です。デフォルト値 1.0 を使用します。")
         r_true = 1.0
+    
+    # 全岩石数の計算をするか、特定の岩石数のみ計算するか
+    try:
+        rock_counts = input("計算する岩石数をカンマ区切りで入力してください (例: 100,500,1000,5000) を入力: ")
+        rock_counts = [int(x.strip()) for x in rock_counts.split(',')]
+    except ValueError:
+        print("数値の入力ではありません。デフォルト値を使用します。")
+        rock_counts = [100, 500, 1000, 5000]
 
     # パス設定（新規ディレクトリに変更）
     base_dir = '/Volumes/SSD_Kanda_SAMSUNG/modeling_tools_output/evaluate_apparent_RSFD_relative' 
     
     # 計算パラメータ
-    rock_counts = [100, 500, 1000, 5000]
-    NUM_ITERATIONS = 50  # 反復回数
+    NUM_ITERATIONS = 100  # 反復回数
     
     for total_rocks in rock_counts:
         print(f"\n=== 岩石数: {total_rocks} のシミュレーションを開始 ({NUM_ITERATIONS}回) ===")
