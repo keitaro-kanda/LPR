@@ -651,7 +651,7 @@ def main():
 
         # --- 反復計算の実行 ---
         for i in range(1, NUM_ITERATIONS + 1):
-            if i % 5 == 0 or i == 1:
+            if i % 10 == 0 or i == 1:
                 print(f"  -> イテレーション {i}/{NUM_ITERATIONS} 実行中...")
             
             iter_dir = f"{output_dir}/iter_{i:02d}"
