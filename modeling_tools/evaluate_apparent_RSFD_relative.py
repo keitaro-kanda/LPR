@@ -1,8 +1,13 @@
 import numpy as np
 import pandas as pd
+import matplotlib
+# 並列処理時のクラッシュ防止と描画高速化のため、非対話型バックエンドを指定
+matplotlib.use('Agg') 
 import matplotlib.pyplot as plt
 import os
 import json
+import concurrent.futures # 並列化のために追加
+from tqdm import tqdm # 進捗バーのために追加
 
 # --- 1. 設定クラス ---
 class RadarConfig:
@@ -600,6 +605,72 @@ class Analyzer:
         plt.savefig(f"{output_prefix}.pdf")
         plt.close()
 
+# --- 新規: 並列処理用のワーカー関数 ---
+# マルチプロセスで実行できるようにトップレベルに配置します
+def process_iteration(args):
+    i, r_true, total_rocks, output_dir, overall_area, true_rock_density = args
+    
+    # プロセス間でインスタンスを共有しないよう、各プロセス内で独立して生成
+    config = RadarConfig(total_rocks=total_rocks)
+    model = RockModel()
+    analyzer = Analyzer()
+    
+    iter_dir = f"{output_dir}/iter_{i:02d}"
+    os.makedirs(iter_dir, exist_ok=True)
+
+    # 既存の計算ロジックをそのまま実行
+    all_rocks_df = model.generate_rocks(r_true, config, quiet=True)
+    all_rocks_df.to_csv(f"{iter_dir}/truth_rocks.csv", index=False)
+
+    detected_df = model.apply_radar_equation(all_rocks_df, config, quiet=True)
+    detected_df.to_csv(f"{iter_dir}/simulated_detection.csv", index=False)
+    
+    analyzer.plot_power_scatter(detected_df, f"{iter_dir}/power_scatter", config)
+    
+    d_min = config.ROCK_SIZE_MIN
+    
+    slope_true, intercept_true, _, _ = analyzer.calculate_slope(all_rocks_df['diameter'].values, overall_area)
+    r_true_iter = -slope_true if not np.isnan(slope_true) else np.nan
+    k_true_iter = (10**intercept_true) * (d_min**slope_true) if not np.isnan(slope_true) else np.nan
+    
+    diameters_det = detected_df[detected_df['is_detected'] == True]['diameter'].values
+    slope_det, intercept_det, _, _ = analyzer.calculate_slope(diameters_det, overall_area)
+    r_det_iter = -slope_det if not np.isnan(slope_det) else np.nan
+    k_det_iter = (10**intercept_det) * (d_min**slope_det) if not np.isnan(slope_det) else np.nan
+    
+    csfd_stats = {
+        'iteration': i,
+        'slope_true': slope_true,
+        'intercept_true': intercept_true,
+        'r_true': r_true_iter,
+        'k_true': k_true_iter,
+        'slope_det': slope_det,
+        'intercept_det': intercept_det,
+        'r_det': r_det_iter,
+        'k_det': k_det_iter
+    }
+
+    analyzer.plot_csfd(detected_df, all_rocks_df, f"{iter_dir}/csfd_comparison", r_true, config)
+
+    analysis_range = analyzer.run_depth_analysis(detected_df, config, step=1.0, quiet=True)
+    analysis_range['iteration'] = i 
+    analysis_range.to_csv(f"{iter_dir}/depth_analysis_range.csv", index=False)
+    
+    analyzer.plot_depth_analysis(analysis_range, f"{iter_dir}/powerlaw_exp_range", r_true, x_col='depth_range', xlabel='Depth Range [m]')
+    analyzer.plot_k_analysis(analysis_range, f"{iter_dir}/powerlaw_k_range", true_rock_density, x_col='depth_range', xlabel='Depth Range [m]')
+    analyzer.plot_detection_rate(analysis_range, f"{iter_dir}/detection_rate_range", x_col='depth_range', xlabel='Depth Range [m]')
+    analyzer.plot_rock_density(analysis_range, f"{iter_dir}/rock_density_range", true_rock_density, x_col='depth_range', xlabel='Depth Range [m]')
+    
+    analysis_moving = analyzer.run_moving_window_analysis(detected_df, config, window_size=2.0, step_ratio=0.2, quiet=True)
+    analysis_moving['iteration'] = i 
+    analysis_moving.to_csv(f"{iter_dir}/depth_analysis_moving.csv", index=False)
+    
+    analyzer.plot_depth_analysis(analysis_moving, f"{iter_dir}/powerlaw_exp_moving", r_true, x_col='depth_center', xlabel='Depth Center [m]')
+    analyzer.plot_k_analysis(analysis_moving, f"{iter_dir}/powerlaw_k_moving", true_rock_density, x_col='depth_center', xlabel='Depth Center [m]')
+    analyzer.plot_rock_density(analysis_moving, f"{iter_dir}/rock_density_moving", true_rock_density, x_col='depth_center', xlabel='Depth Center [m]')
+
+    return csfd_stats, analysis_range, analysis_moving
+
 # --- 4. メイン処理 ---
 def main():
     print("--- 岩石見逃しモデル 統計シミュレーション (相対値モデル) ---")
@@ -636,9 +707,6 @@ def main():
         print(f"出力ディレクトリ: {output_dir}")
 
         config = RadarConfig(total_rocks=total_rocks)
-        model = RockModel()
-        analyzer = Analyzer()
-
         overall_area = config.MAX_DEPTH * 1500.0
         true_rock_density = config.TOTAL_ROCKS / overall_area
 
@@ -652,77 +720,49 @@ def main():
         all_moving_results = []
         overall_csfd_stats = [] 
 
-        # --- 反復計算の実行 ---
-        for i in range(1, NUM_ITERATIONS + 1):
-            if i % 10 == 0 or i == 1:
-                print(f"  -> イテレーション {i}/{NUM_ITERATIONS} 実行中...")
-            
-            iter_dir = f"{output_dir}/iter_{i:02d}"
-            os.makedirs(iter_dir, exist_ok=True)
+        # --- 反復計算の実行 (並列化・進捗表示対応) ---
+        print("  -> 並列処理でイテレーションを実行中...")
+        
+        # ワーカーに渡す引数リストを作成
+        tasks = [(i, r_true, total_rocks, output_dir, overall_area, true_rock_density) for i in range(1, NUM_ITERATIONS + 1)]
+        
+        # 結果を格納するためのリスト（順序を維持するために初期化）
+        results = [None] * NUM_ITERATIONS
 
-            all_rocks_df = model.generate_rocks(r_true, config, quiet=True)
-            all_rocks_df.to_csv(f"{iter_dir}/truth_rocks.csv", index=False)
+        # ProcessPoolExecutorを使用してマルチプロセス処理
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            # 1. 全てのタスクを先にキューに登録 (submit)
+            # futureオブジェクトをキー、元のインデックスを値とした辞書を作成
+            future_to_index = {executor.submit(process_iteration, task): i for i, task in enumerate(tasks)}
+            
+            # 2. as_completedで完了したタスクから順次取り出し、tqdmでプログレスバーを更新
+            for future in tqdm(concurrent.futures.as_completed(future_to_index), total=NUM_ITERATIONS, desc="進捗", unit="iter"):
+                # 終わったタスクの元のインデックスを取得
+                original_idx = future_to_index[future]
+                try:
+                    # 処理結果を取得し、元の正しい順序の場所に格納
+                    results[original_idx] = future.result()
+                except Exception as exc:
+                    print(f"\nイテレーションでエラーが発生しました: {exc}")
 
-            detected_df = model.apply_radar_equation(all_rocks_df, config, quiet=True)
-            detected_df.to_csv(f"{iter_dir}/simulated_detection.csv", index=False)
-            
-            # --- 信号強度のScatterプロット出力 ---
-            analyzer.plot_power_scatter(detected_df, f"{iter_dir}/power_scatter", config)
-            
-            # --- 各イテレーションの r と k を個別に計算して保存 ---
-            d_min = config.ROCK_SIZE_MIN
-            
-            slope_true, intercept_true, _, _ = analyzer.calculate_slope(all_rocks_df['diameter'].values, overall_area)
-            r_true_iter = -slope_true if not np.isnan(slope_true) else np.nan
-            k_true_iter = (10**intercept_true) * (d_min**slope_true) if not np.isnan(slope_true) else np.nan
-            
-            diameters_det = detected_df[detected_df['is_detected'] == True]['diameter'].values
-            slope_det, intercept_det, _, _ = analyzer.calculate_slope(diameters_det, overall_area)
-            r_det_iter = -slope_det if not np.isnan(slope_det) else np.nan
-            k_det_iter = (10**intercept_det) * (d_min**slope_det) if not np.isnan(slope_det) else np.nan
-            
-            overall_csfd_stats.append({
-                'iteration': i,
-                'slope_true': slope_true,
-                'intercept_true': intercept_true,
-                'r_true': r_true_iter,
-                'k_true': k_true_iter,
-                'slope_det': slope_det,
-                'intercept_det': intercept_det,
-                'r_det': r_det_iter,
-                'k_det': k_det_iter
-            })
-
-            analyzer.plot_csfd(detected_df, all_rocks_df, f"{iter_dir}/csfd_comparison", r_true, config)
-
-            # --- A. 既存の深さ範囲解析 (Range) ---
-            analysis_range = analyzer.run_depth_analysis(detected_df, config, step=1.0, quiet=True)
-            analysis_range['iteration'] = i 
-            analysis_range.to_csv(f"{iter_dir}/depth_analysis_range.csv", index=False)
-            
-            analyzer.plot_depth_analysis(analysis_range, f"{iter_dir}/powerlaw_exp_range", r_true, x_col='depth_range', xlabel='Depth Range [m]')
-            analyzer.plot_k_analysis(analysis_range, f"{iter_dir}/powerlaw_k_range", true_rock_density, x_col='depth_range', xlabel='Depth Range [m]')
-            analyzer.plot_detection_rate(analysis_range, f"{iter_dir}/detection_rate_range", x_col='depth_range', xlabel='Depth Range [m]')
-            analyzer.plot_rock_density(analysis_range, f"{iter_dir}/rock_density_range", true_rock_density, x_col='depth_range', xlabel='Depth Range [m]')
-            
-            all_range_results.append(analysis_range)
-
-            # --- B. 新規の移動窓解析 (Moving Window) ---
-            analysis_moving = analyzer.run_moving_window_analysis(detected_df, config, window_size=2.0, step_ratio=0.2, quiet=True)
-            analysis_moving['iteration'] = i 
-            analysis_moving.to_csv(f"{iter_dir}/depth_analysis_moving.csv", index=False)
-            
-            analyzer.plot_depth_analysis(analysis_moving, f"{iter_dir}/powerlaw_exp_moving", r_true, x_col='depth_center', xlabel='Depth Center [m]')
-            analyzer.plot_k_analysis(analysis_moving, f"{iter_dir}/powerlaw_k_moving", true_rock_density, x_col='depth_center', xlabel='Depth Center [m]')
-            analyzer.plot_rock_density(analysis_moving, f"{iter_dir}/rock_density_moving", true_rock_density, x_col='depth_center', xlabel='Depth Center [m]')
-
-            all_moving_results.append(analysis_moving)
+        # ワーカーから戻ってきた結果を元のリストに集約
+        for res in results:
+            if res is not None:
+                csfd_stats, analysis_range, analysis_moving = res
+                overall_csfd_stats.append(csfd_stats)
+                all_range_results.append(analysis_range)
+                all_moving_results.append(analysis_moving)
 
         # --- 統計処理とプロットの実行 ---
         print("  -> 統計データの集計とプロットを生成中...")
         
+        # 分析用のダミーインスタンス（描画メソッド呼び出し用）
+        analyzer = Analyzer()
+        
         # 1. 全体RSFDの統計プロット
         csfd_stats_df = pd.DataFrame(overall_csfd_stats)
+        # イテレーション順にソート（並列処理で順序が前後する可能性があるため）
+        csfd_stats_df = csfd_stats_df.sort_values('iteration')
         csfd_stats_df.to_csv(f"{output_dir}/csfd_fits_stats.csv", index=False)
         analyzer.plot_csfd_stats(csfd_stats_df, f"{output_dir}/RSFD_comparison_stats", r_true, config)
 
