@@ -240,8 +240,8 @@ for count in rock_counts:
         color=line_colors[rock_counts.index(count) % len(line_colors)]
     )
 
-plt.axhline(k_obs, color='k', linestyle='--', label='Observed')  # 観測値の水平線を追加
-plt.axvline(r_obs, color='k', linestyle='--')  # 観測値の垂直線を追加
+plt.axhline(k_obs, color='k', linestyle='--', linewidth=2.5, label='Observed')  # 観測値の水平線を追加
+plt.axvline(r_obs, color='k', linestyle='--', linewidth=2.5)  # 観測値の垂直線を追加
 
 # グラフの装飾
 plt.xlabel('Apparent r', fontsize=16)
@@ -256,6 +256,6 @@ plt.grid(True, linestyle='--', alpha=0.7)
 
 # グラフの表示と保存
 plt.tight_layout()
-plt.savefig(os.path.join(output_dir, 'k_apparent_plot.png'))
-plt.savefig(os.path.join(output_dir, 'k_apparent_plot.pdf'))
+plt.savefig(os.path.join(output_dir, 'apparent_r_vs_k.png'))
+plt.savefig(os.path.join(output_dir, 'apparent_r_vs_k.pdf'))
 plt.show()
