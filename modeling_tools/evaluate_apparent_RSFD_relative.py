@@ -277,7 +277,7 @@ class Analyzer:
             
         return pd.DataFrame(results)
 
-    # === [新規追加] 信号強度のScatterプロット ===
+    # === 信号強度のScatterプロット ===
     def plot_power_scatter(self, df, output_prefix, config):
         """
         横軸：深さ、縦軸：岩石サイズ の空間に、
@@ -297,8 +297,6 @@ class Analyzer:
         
         # カラーバー上に現在の検出閾値（ノイズフロア）のラインを引く
         cbar.ax.axhline(config.NOISE_FLOOR_DBM, color='red', linestyle='--', linewidth=2)
-        #cbar.ax.text(1.5, config.NOISE_FLOOR_DBM, 'Detection\nThreshold', 
-        #             color='red', va='center', ha='left', fontsize=12)
 
         plt.xlabel('Depth [m]', fontsize=18)
         plt.ylabel('Diameter [m]', fontsize=18)
@@ -364,7 +362,6 @@ class Analyzer:
         plt.ylabel('Apparent Slope r', fontsize=18)
         plt.xticks(np.arange(2, 14, 2), ['0-2', '2-4', '4-6', '6-8', '8-10', '10-12'], fontsize=16)
         plt.tick_params(axis='both', which='major', labelsize=16)
-        #plt.ylim(0, r_true + 1)
         plt.legend(fontsize=16)
         plt.grid(True, ls='--', alpha=0.7)
         
@@ -750,8 +747,8 @@ def main():
             f.write(f"  r_apparent = {r_det_mean:.4f} +/- {r_det_std:.4f}\n")
             f.write(f"  k_apparent = {k_det_mean:.4e} +/- {k_det_std:.4e}\n")
 
-        # --- [新規追加] JSONファイルへの記録・追記・更新 ---
-        # 既存のJSONを読み込む（存在しないか、壊れている場合は空の辞書を作成）
+        # --- JSONファイルへの記録・追記・更新 ---
+        # 既存のJSONを読み込む
         if os.path.exists(json_path):
             try:
                 with open(json_path, 'r', encoding='utf-8') as f:
@@ -764,12 +761,15 @@ def main():
         r_key = str(r_true)
         n_key = str(total_rocks)
 
-        # rのキーが存在しなければ初期化
         if r_key not in summary_data:
             summary_data[r_key] = {}
 
-        # 出力結果4種を格納（既存のN_keyがあれば上書きされる）
+        # True fitの結果も含めて格納
         summary_data[r_key][n_key] = {
+            "r_true_mean": float(r_true_mean),
+            "r_true_std": float(r_true_std),
+            "k_true_mean": float(k_true_mean),
+            "k_true_std": float(k_true_std),
             "r_apparent_mean": float(r_det_mean),
             "r_apparent_std": float(r_det_std),
             "k_apparent_mean": float(k_det_mean),
