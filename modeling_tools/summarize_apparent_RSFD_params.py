@@ -98,6 +98,8 @@ for count in rock_counts:
         color=line_colors[rock_counts.index(count) % len(line_colors)]
     )
 
+plt.axhline(1, color='k', linestyle='--', label='Apparent / True = 1')  # y=1の水平線を追加
+
 # グラフの装飾
 plt.xlabel('Input r', fontsize=16)
 plt.ylabel('Apparent r / r true', fontsize=16)
@@ -140,9 +142,14 @@ for count in rock_counts:
         color=line_colors[rock_counts.index(count) % len(line_colors)]
     )
 
+plt.axhline(1, color='k', linestyle='--', label='Apparent / True = 1')  # y=1の水平線を追加
+
 # グラフの装飾
 plt.xlabel('Input r', fontsize=16)
 plt.ylabel('Apparent k / k true', fontsize=16)
+# plt.ylim(0, 15)
+# plt.xscale('log')
+plt.yscale('log')
 plt.tick_params(axis='both', which='major', labelsize=14)
 plt.legend(fontsize=14)
 plt.grid(True, linestyle='--', alpha=0.7)
@@ -151,4 +158,49 @@ plt.grid(True, linestyle='--', alpha=0.7)
 plt.tight_layout()
 plt.savefig(os.path.join(output_dir, 'k_apparent_ratio_plot.png'))
 plt.savefig(os.path.join(output_dir, 'k_apparent_ratio_plot.pdf'))
+plt.show()
+
+# =========================================================
+# 4. 追加プロット: k true vs k apparent
+# =========================================================
+plt.figure(figsize=(8, 6))
+
+for count in rock_counts:
+    x_vals = []
+    y_means = []
+    y_stds = []
+    
+    for r in r_keys:
+        if count in data[r]:
+            x_vals.append(data[r][count]["k_true_mean"])
+            y_means.append(data[r][count]["k_apparent_mean"])
+            y_stds.append(data[r][count]["k_apparent_std"])
+            
+    plt.errorbar(
+        x_vals, 
+        y_means, 
+        yerr=y_stds, 
+        label=f'N = {count}', 
+        marker=line_markers[rock_counts.index(count) % len(line_markers)],
+        capsize=5,
+        linestyle=line_styles[rock_counts.index(count) % len(line_styles)],
+        color=line_colors[rock_counts.index(count) % len(line_colors)]
+    )
+
+# input = apparent の線を追加
+#plt.plot([0, 4.5], [0, 4.5], 'k--', label='Input = Apparent')  # 黒の破線でプロット
+
+# グラフの装飾
+plt.xlabel('Input k', fontsize=16)
+plt.ylabel('Apparent k', fontsize=16)
+plt.tick_params(axis='both', which='major', labelsize=14)
+plt.xscale('log')
+plt.yscale('log')
+plt.legend(fontsize=14)
+plt.grid(True, linestyle='--', alpha=0.7)
+
+# グラフの表示と保存
+plt.tight_layout()
+plt.savefig(os.path.join(output_dir, 'k_apparent_plot.png'))
+plt.savefig(os.path.join(output_dir, 'k_apparent_plot.pdf'))
 plt.show()
