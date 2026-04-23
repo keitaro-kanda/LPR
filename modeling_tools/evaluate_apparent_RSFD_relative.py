@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
+import json
 
 # --- 1. 設定クラス ---
 class RadarConfig:
@@ -605,6 +606,8 @@ class Analyzer:
 # --- 4. メイン処理 ---
 def main():
     print("--- 岩石見逃しモデル 統計シミュレーション (相対値モデル) ---")
+    
+    # --- rとNの対話的入力 ---
     try:
         r_input_str = input("真のべき指数(r)を入力してください (例: 1.0): ")
         r_true = float(r_input_str)
@@ -612,17 +615,20 @@ def main():
         print("数値ではない入力です。デフォルト値 1.0 を使用します。")
         r_true = 1.0
     
-    # 全岩石数の計算をするか、特定の岩石数のみ計算するか
     try:
-        rock_counts = input("計算する岩石数をカンマ区切りで入力してください (例: 100,500,1000,5000) を入力: ")
-        rock_counts = [int(x.strip()) for x in rock_counts.split(',')]
+        rock_counts_str = input("計算する岩石数をカンマ区切りで入力してください (例: 100,500,1000,5000) を入力: ")
+        rock_counts = [int(x.strip()) for x in rock_counts_str.split(',')]
     except ValueError:
         print("数値の入力ではありません。デフォルト値を使用します。")
         rock_counts = [100, 500, 1000, 5000]
 
-    # パス設定（新規ディレクトリに変更）
+    # パス設定
     base_dir = '/Volumes/SSD_Kanda_SAMSUNG/modeling_tools_output/evaluate_apparent_RSFD_relative' 
+    os.makedirs(base_dir, exist_ok=True)
     
+    # JSONファイルのパス設定
+    json_path = os.path.join(base_dir, 'rsfd_summary.json')
+
     # 計算パラメータ
     NUM_ITERATIONS = 100  # 反復回数
     
@@ -663,20 +669,31 @@ def main():
             detected_df = model.apply_radar_equation(all_rocks_df, config, quiet=True)
             detected_df.to_csv(f"{iter_dir}/simulated_detection.csv", index=False)
             
-            # --- [新規追加] 信号強度のScatterプロット出力 ---
+            # --- 信号強度のScatterプロット出力 ---
             analyzer.plot_power_scatter(detected_df, f"{iter_dir}/power_scatter", config)
             
-            # RSFD統計プロット情報
+            # --- 各イテレーションの r と k を個別に計算して保存 ---
+            d_min = config.ROCK_SIZE_MIN
+            
             slope_true, intercept_true, _, _ = analyzer.calculate_slope(all_rocks_df['diameter'].values, overall_area)
+            r_true_iter = -slope_true if not np.isnan(slope_true) else np.nan
+            k_true_iter = (10**intercept_true) * (d_min**slope_true) if not np.isnan(slope_true) else np.nan
+            
             diameters_det = detected_df[detected_df['is_detected'] == True]['diameter'].values
             slope_det, intercept_det, _, _ = analyzer.calculate_slope(diameters_det, overall_area)
+            r_det_iter = -slope_det if not np.isnan(slope_det) else np.nan
+            k_det_iter = (10**intercept_det) * (d_min**slope_det) if not np.isnan(slope_det) else np.nan
             
             overall_csfd_stats.append({
                 'iteration': i,
                 'slope_true': slope_true,
                 'intercept_true': intercept_true,
+                'r_true': r_true_iter,
+                'k_true': k_true_iter,
                 'slope_det': slope_det,
-                'intercept_det': intercept_det
+                'intercept_det': intercept_det,
+                'r_det': r_det_iter,
+                'k_det': k_det_iter
             })
 
             analyzer.plot_csfd(detected_df, all_rocks_df, f"{iter_dir}/csfd_comparison", r_true, config)
@@ -711,6 +728,59 @@ def main():
         csfd_stats_df = pd.DataFrame(overall_csfd_stats)
         csfd_stats_df.to_csv(f"{output_dir}/csfd_fits_stats.csv", index=False)
         analyzer.plot_csfd_stats(csfd_stats_df, f"{output_dir}/RSFD_comparison_stats", r_true, config)
+
+        # 全体RSFDの r, k の平均と標準偏差を算出
+        r_true_mean = csfd_stats_df['r_true'].mean()
+        r_true_std  = csfd_stats_df['r_true'].std()
+        k_true_mean = csfd_stats_df['k_true'].mean()
+        k_true_std  = csfd_stats_df['k_true'].std()
+
+        r_det_mean = csfd_stats_df['r_det'].mean()
+        r_det_std  = csfd_stats_df['r_det'].std()
+        k_det_mean = csfd_stats_df['k_det'].mean()
+        k_det_std  = csfd_stats_df['k_det'].std()
+
+        # txtファイルへの出力
+        with open(f"{output_dir}/overall_rsfd_stats.txt", "w") as f:
+            f.write(f"=== Overall RSFD (0-{config.MAX_DEPTH}m) {NUM_ITERATIONS} Iterations Statistics ===\n\n")
+            f.write(f"[True Rocks (Generated)]\n")
+            f.write(f"  r = {r_true_mean:.4f} +/- {r_true_std:.4f}\n")
+            f.write(f"  k = {k_true_mean:.4e} +/- {k_true_std:.4e}\n\n")
+            f.write(f"[Detected Rocks (Apparent)]\n")
+            f.write(f"  r_apparent = {r_det_mean:.4f} +/- {r_det_std:.4f}\n")
+            f.write(f"  k_apparent = {k_det_mean:.4e} +/- {k_det_std:.4e}\n")
+
+        # --- [新規追加] JSONファイルへの記録・追記・更新 ---
+        # 既存のJSONを読み込む（存在しないか、壊れている場合は空の辞書を作成）
+        if os.path.exists(json_path):
+            try:
+                with open(json_path, 'r', encoding='utf-8') as f:
+                    summary_data = json.load(f)
+            except json.JSONDecodeError:
+                summary_data = {}
+        else:
+            summary_data = {}
+
+        r_key = str(r_true)
+        n_key = str(total_rocks)
+
+        # rのキーが存在しなければ初期化
+        if r_key not in summary_data:
+            summary_data[r_key] = {}
+
+        # 出力結果4種を格納（既存のN_keyがあれば上書きされる）
+        summary_data[r_key][n_key] = {
+            "r_apparent_mean": float(r_det_mean),
+            "r_apparent_std": float(r_det_std),
+            "k_apparent_mean": float(k_det_mean),
+            "k_apparent_std": float(k_det_std)
+        }
+
+        # JSONファイルへ書き出し
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(summary_data, f, indent=4)
+        print(f"  -> {json_path} を更新しました。")
+        # --------------------------------------------------
 
         # 2. 既存の深さ範囲解析の統計
         combined_range = pd.concat(all_range_results)
@@ -750,7 +820,6 @@ def main():
         analyzer.plot_depth_analysis_stats(stats_moving, f"{output_dir}/powerlaw_exp_moving_stats", r_true, x_col='depth_center', xlabel='Depth Center [m]')
         analyzer.plot_k_analysis_stats(stats_moving, f"{output_dir}/powerlaw_k_moving_stats", true_rock_density, x_col='depth_center', xlabel='Depth Center [m]')
         analyzer.plot_rock_density_stats(stats_moving, f"{output_dir}/rock_density_moving_stats", true_rock_density, x_col='depth_center', xlabel='Depth Center [m]')
-
 
         print(f"=== 岩石数: {total_rocks} の処理完了 ===\n")
 
