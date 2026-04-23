@@ -19,8 +19,14 @@ r_keys = sorted(data.keys(), key=float)
 # (最初の r のデータから岩石数のキーを取得)
 rock_counts = sorted(data[r_keys[0]].keys(), key=int)
 
+
+# プロット線用のリスト
+line_colors = ['r', 'g', 'b', 'magenta']
+line_markers = ['o', 's', 'D', '^']
+line_styles = ['-', '--', '-.', ':']
+
 # グラフの描画設定
-plt.figure(figsize=(10, 6))
+plt.figure(figsize=(8, 6))
 
 # 岩石数ごとにデータをまとめてプロット
 for count in rock_counts:
@@ -42,18 +48,22 @@ for count in rock_counts:
         y_means, 
         yerr=y_stds, 
         label=f'N = {count}', 
-        marker='o', 
+        marker=line_markers[rock_counts.index(count) % len(line_markers)],
         capsize=5,
-        linestyle='-'
+        linestyle=line_styles[rock_counts.index(count) % len(line_styles)],
+        color=line_colors[rock_counts.index(count) % len(line_colors)]
     )
+
+# input = apparent の線を追加
+plt.plot([0, 4.5], [0, 4.5], 'k--', label='Input = Apparent')  # 黒の破線でプロット
 
 # グラフの装飾
 plt.xlabel('Input r', fontsize=16)
 plt.ylabel('Apparent r', fontsize=16)
 plt.tick_params(axis='both', which='major', labelsize=14)
-plt.xlim(0, 4.5)
-plt.ylim(0, 4.5)
-plt.legend(title='Rock Count', fontsize=14)
+# plt.xlim(0.2, 4.2)
+# plt.ylim(0.2, 4.2)
+plt.legend(fontsize=14)
 plt.grid(True, linestyle='--', alpha=0.7)
 
 # グラフの表示と保存
