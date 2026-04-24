@@ -277,7 +277,7 @@ def plot_range_parameter_summary(range_labels, num_rocks_array, num_fitting_poin
     # ===================================================
     # 1. 岩石数プロット（個別）
     # ===================================================
-    fig, ax = plt.subplots(figsize=(fig_width, 6))
+    fig, ax = plt.subplots(figsize=(fig_width, fig_width * 0.75))
     ax.plot(x, num_rocks_array, 'k-', linewidth=2, marker='o', markersize=10,
             label='Total rocks')
     ax.plot(x, num_fitting_points_array, 'k--', linewidth=2, marker='D', markersize=10,
@@ -297,7 +297,7 @@ def plot_range_parameter_summary(range_labels, num_rocks_array, num_fitting_poin
     # ===================================================
     # 2. r値プロット（個別）
     # ===================================================
-    fig, ax = plt.subplots(figsize=(fig_width, 6))
+    fig, ax = plt.subplots(figsize=(fig_width, fig_width * 0.75))
     ax.plot(x, r_values_plot, 'b-', linewidth=2, marker='o', markersize=10,
             label='r (power-law exponent)')
     ax.set_xticks(x)
@@ -321,7 +321,7 @@ def plot_range_parameter_summary(range_labels, num_rocks_array, num_fitting_poin
     # ===================================================
     # 3. k値プロット（個別）
     # ===================================================
-    fig, ax = plt.subplots(figsize=(fig_width, 6))
+    fig, ax = plt.subplots(figsize=(fig_width, fig_width * 0.75))
     ax.plot(x, k_values_plot, 'r-', linewidth=2, marker='s', markersize=10,
             label='k (scaling factor)')
     ax.set_xticks(x)
@@ -357,7 +357,7 @@ def plot_range_parameter_summary(range_labels, num_rocks_array, num_fitting_poin
     k_norm = k_values / k_max_norm
     k_norm_plot = np.where(np.isnan(k_norm), nan_placeholder, k_norm)
 
-    fig, ax = plt.subplots(figsize=(fig_width, 6))
+    fig, ax = plt.subplots(figsize=(fig_width, fig_width * 0.75))
     ax.plot(x, num_norm, 'k-', linewidth=2, label='Num (total)')
     ax.plot(x, fit_norm, 'k--', linewidth=2, label='Num (fitting)')
     ax.plot(x, r_norm_plot, 'b-', linewidth=2, marker='o', markersize=8, label='r')
