@@ -53,7 +53,7 @@ max_depth = np.arange(1, 13)
 
 # LPR観測値 (Group 1-3)
 r_obs_list = [-0.2, 1.04, 1.41, 1.16, 1.23, 1.15, 1.10, 1.12, 1.15, 1.07, 1.08, 1.08]
-k_obs_list = [-0.2, 4.48, 7.05, 9.25, 10.29, 9.48, 8.33, 7.77, 7.58, 6.60, 6.39, 6.85] # e-3で規格化
+k_obs_list = [-5, 4.48, 7.05, 9.25, 10.29, 9.48, 8.33, 7.77, 7.58, 6.60, 6.39, 6.85] # e-3で規格化
 r_obs_4fit = r_obs_list[2:]
 k_obs_4fit = k_obs_list[4:]
 
@@ -64,6 +64,24 @@ k_obs_fit, k_obs_intercept = least_square_fit(max_depth[4:], k_obs_4fit)
 
 r_model_fit, r_model_intercept = least_square_fit(max_depth, r_model_mean)
 k_model_fit, k_model_intercept = least_square_fit(max_depth, k_model_mean)
+
+
+# 目盛りカスタマイズ用の関数を追加 (-0.2をNaNにし、正の目盛りは維持)
+def apply_custom_yticks_r():
+    ax = plt.gca()
+    yticks = ax.get_yticks()
+    new_ticks = [-0.2] + [t for t in yticks if t >= 0]
+    new_labels = ['NaN'] + [f"{t:g}" for t in new_ticks[1:]]
+    ax.set_yticks(new_ticks)
+    ax.set_yticklabels(new_labels, fontsize=14)
+
+def apply_custom_yticks_k():
+    ax = plt.gca()
+    yticks = ax.get_yticks()
+    new_ticks = [-5] + [t for t in yticks if t >= 0]
+    new_labels = ['NaN'] + [f"{t:g}" for t in new_ticks[1:]]
+    ax.set_yticks(new_ticks)
+    ax.set_yticklabels(new_labels, fontsize=14)
 
 
 # プロット
@@ -86,7 +104,7 @@ plt.plot(max_depth, r_model_fit * max_depth + r_model_intercept, color='gray', l
 plt.xlabel('Depth range [m]', fontsize=16)
 plt.ylabel('r', fontsize=16)
 plt.xticks(max_depth, depth_range_label, rotation=45, fontsize=14)
-plt.yticks(fontsize=14)
+apply_custom_yticks_r()
 plt.legend(fontsize=14, loc = 'lower right')
 plt.grid(True, linestyle='--', alpha=0.7)
 plt.tight_layout()
@@ -112,16 +130,13 @@ plt.plot(max_depth, k_model_fit * max_depth + k_model_intercept, color='gray', l
 plt.xlabel('Depth range [m]', fontsize=16)
 plt.ylabel(r'k [$\times 10^{-3}$]', fontsize=16)
 plt.xticks(max_depth, depth_range_label, rotation=45, fontsize=14)
-plt.yticks(fontsize=14)
+apply_custom_yticks_k()
 plt.legend(fontsize=14, loc = 'upper right')
 plt.grid(True, linestyle='--', alpha=0.7)
 plt.tight_layout()
 plt.savefig(f'{output_dir}/k_fit.png', dpi=300)
 plt.savefig(f'{output_dir}/k_fit.pdf', dpi=300)
 plt.close()
-
-
-
 
 
 # ===========================================================
@@ -137,7 +152,7 @@ plt.errorbar(max_depth, r_model_mean, yerr=r_model_std, fmt='s--', label='Model 
 plt.xlabel('Depth range [m]', fontsize=16)
 plt.ylabel(r'r', fontsize=16)
 plt.xticks(max_depth, depth_range_label, rotation=45, fontsize=14)
-plt.yticks(fontsize=14)
+apply_custom_yticks_r()
 plt.legend(fontsize=14, loc = 'upper right')
 plt.grid(True, linestyle='--', alpha=0.7)
 plt.tight_layout()
@@ -159,7 +174,7 @@ plt.errorbar(max_depth, k_model_mean, yerr=k_model_std, fmt='s--', label='Model 
 plt.xlabel('Depth range [m]', fontsize=16)
 plt.ylabel(r'k [$\times 10^{-3}$]', fontsize=16)
 plt.xticks(max_depth, depth_range_label, rotation=45, fontsize=14)
-plt.yticks(fontsize=14)
+apply_custom_yticks_k()
 plt.legend(fontsize=14, loc = 'upper right')
 plt.grid(True, linestyle='--', alpha=0.7)
 plt.tight_layout()
