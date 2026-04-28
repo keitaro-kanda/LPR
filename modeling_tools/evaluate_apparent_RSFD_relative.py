@@ -35,8 +35,8 @@ class RadarConfig:
         # --- D. シミュレーション空間設定 ---
         self.MAX_DEPTH = 12.0
         self.AREA_SIZE_M2 = 18300 # 深さ12 m x 奥行き1525 mのエリア
-        self.ROCK_SIZE_MIN = 0.01
-        self.ROCK_SIZE_MAX = 1.0
+        self.ROCK_SIZE_MIN = 0.06
+        self.ROCK_SIZE_MAX = 0.60
         self.TOTAL_ROCKS = total_rocks
 
     @property
@@ -458,6 +458,7 @@ class Analyzer:
         plt.yscale('log')
         plt.xlabel('Diameter [m]', fontsize=18)
         plt.ylabel('Cumulative Rock Density N(>D) [1/m²]', fontsize=18)
+        plt.xticks([0.06, 0.1, 0.2, 0.4, 0.6], ['0.06', '0.1', '0.2', '0.4', '0.6'], fontsize=16)
         plt.tick_params(axis='both', which='major', labelsize=16)
         plt.legend(fontsize=14)
         plt.grid(True, which="both", ls="-", alpha=0.7)
@@ -603,6 +604,7 @@ class Analyzer:
         plt.xscale('log')
         plt.yscale('log')
         plt.xlabel('Diameter [m]', fontsize=18)
+        plt.xticks([0.06, 0.1, 0.2, 0.4, 0.6], ['0.06', '0.1', '0.2', '0.4', '0.6'], fontsize=16)
         plt.ylabel('Cumulative Rock Count N(>D)', fontsize=18)
         plt.tick_params(axis='both', which='major', labelsize=16)
         plt.legend(fontsize=14)
