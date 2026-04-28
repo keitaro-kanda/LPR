@@ -9,6 +9,7 @@
 #   "label_file": "/path/to/rock_labels.json",
 #   "group1_size": 1.0,
 #   "output_dir": "/path/to/output",
+#   "run_name": "comparison_01",
 #   "ranges": [
 #     {
 #       "label": "Range 1: near crater",
@@ -396,14 +397,14 @@ with open(config_json_path, 'r', encoding='utf-8') as f:
     config = json.load(f)
 
 # 必須フィールドの確認
-required_keys = ['label_file', 'group1_size', 'output_dir', 'ranges']
+required_keys = ['label_file', 'group1_size', 'output_dir', 'run_name', 'ranges']
 for key in required_keys:
     if key not in config:
         raise ValueError(f'設定JSONに必須フィールドがありません: {key}')
 
 data_path = config['label_file']
 group1_size = float(config['group1_size'])
-output_dir = config['output_dir']
+output_dir = os.path.join(config['output_dir'], config['run_name'])
 ranges_list = config['ranges']
 
 if not (os.path.exists(data_path) and data_path.lower().endswith('.json')):
