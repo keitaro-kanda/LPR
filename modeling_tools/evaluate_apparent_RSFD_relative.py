@@ -34,7 +34,7 @@ class RadarConfig:
 
         # --- D. シミュレーション空間設定 ---
         self.MAX_DEPTH = 12.0
-        self.AREA_SIZE_M2 = 4500.0 # 幅3 m x 奥行き1500 mのエリア
+        self.AREA_SIZE_M2 = 18300 # 深さ12 m x 奥行き1525 mのエリア
         self.ROCK_SIZE_MIN = 0.01
         self.ROCK_SIZE_MAX = 1.0
         self.TOTAL_ROCKS = total_rocks
