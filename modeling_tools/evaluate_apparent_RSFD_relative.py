@@ -344,6 +344,7 @@ class Analyzer:
         plt.xscale('log')
         plt.yscale('log')
         plt.xlabel('Diameter [m]', fontsize=18)
+        plt.xticks([0.06, 0.1, 0.2, 0.4, 0.6], ['0.06', '0.1', '0.2', '0.4', '0.6'], fontsize=16)
         plt.ylabel('Cumulative Rock Density N(>D) [1/m²]', fontsize=18)
         plt.tick_params(axis='both', which='major', labelsize=16)
         plt.legend(fontsize=14)
