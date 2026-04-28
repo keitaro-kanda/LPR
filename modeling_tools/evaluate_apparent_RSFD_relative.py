@@ -407,24 +407,6 @@ class Analyzer:
         plt.savefig(f"{output_prefix}.pdf")
         plt.close()
 
-    def plot_rock_density(self, analysis_df, output_prefix, true_rock_density, x_col='depth_range', xlabel='Depth Range [m]'):
-        plt.figure(figsize=(10, 8))
-        plt.plot(analysis_df[x_col], analysis_df['rock_density'], marker='s', linestyle='-', color='r', label='Detected Rock Density')
-        plt.axhline(y=true_rock_density, color='k', linestyle='--', label=f'True Rock Density: {true_rock_density:.2e}')
-        
-        plt.xlabel(xlabel, fontsize=18)
-        plt.ylabel('Detected Rock Density [1/m²]', fontsize=18)
-        plt.xticks(np.arange(2, 14, 2), ['0-2', '2-4', '4-6', '6-8', '8-10', '10-12'], fontsize=16)
-        plt.tick_params(axis='both', which='major', labelsize=16)
-        
-        plt.legend(fontsize=16)
-        plt.grid(True, ls='--', alpha=0.7)
-        
-        plt.tight_layout()
-        plt.savefig(f"{output_prefix}.png")
-        plt.savefig(f"{output_prefix}.pdf")
-        plt.close()
-
     # === 統計出力用プロットメソッド (平均とエラー範囲) ===
     def plot_csfd_stats(self, csfd_stats_df, output_prefix, r_true, config):
         plt.figure(figsize=(10, 8))
@@ -572,35 +554,6 @@ class Analyzer:
         plt.savefig(f"{output_prefix}.pdf")
         plt.close()
 
-    def plot_rock_density_stats(self, stats_df, output_prefix, true_rock_density, x_col='depth_range', xlabel='Depth Range [m]'):
-        plt.figure(figsize=(10, 8))
-
-        x = stats_df[x_col]
-        y_mean = stats_df['rock_density_mean']
-        y_std = stats_df['rock_density_std']
-
-        plt.plot(x, y_mean, marker='s', linestyle='-', color='r', label='Mean Detected Density')
-        plt.fill_between(x, y_mean - y_std, y_mean + y_std, color='r', alpha=0.3, label='±1 Std Dev')
-        plt.axhline(y=true_rock_density, color='k', linestyle='--', label=f'True Rock Density: {true_rock_density:.2e}')
-        
-        plt.xlabel(xlabel, fontsize=18)
-        plt.ylabel('Detected Rock Density [1/m²]', fontsize=18)
-        if x_col == 'depth_range':
-            tick_vals = np.arange(2, 13, 2)
-            plt.xticks(tick_vals, [f"0-{int(v)}" for v in tick_vals], fontsize=16)
-        else:
-            plt.tick_params(axis='x', which='major', labelsize=16)
-            
-        plt.tick_params(axis='y', which='major', labelsize=16)
-        
-        plt.legend(fontsize=16)
-        plt.grid(True, ls='--', alpha=0.7)
-        
-        plt.tight_layout()
-        plt.savefig(f"{output_prefix}.png")
-        plt.savefig(f"{output_prefix}.pdf")
-        plt.close()
-
     def plot_csfd_count_stats(self, csfd_stats_df, output_prefix, r_true, config):
         plt.figure(figsize=(10, 8))
 
@@ -670,7 +623,7 @@ def process_iteration(args):
     model = RockModel()
     analyzer = Analyzer()
     
-    iter_dir = f"{output_dir}/iter_{i:02d}"
+    iter_dir = f"{output_dir}/each_iteration/iter_{i:02d}"
     os.makedirs(iter_dir, exist_ok=True)
 
     # 既存の計算ロジックをそのまま実行
@@ -721,15 +674,13 @@ def process_iteration(args):
     analyzer.plot_depth_analysis(analysis_range, f"{iter_dir}/powerlaw_exp_range", r_true, x_col='depth_range', xlabel='Depth Range [m]')
     analyzer.plot_k_analysis(analysis_range, f"{iter_dir}/powerlaw_k_range", true_rock_density, x_col='depth_range', xlabel='Depth Range [m]')
     analyzer.plot_detection_rate(analysis_range, f"{iter_dir}/detection_rate_range", x_col='depth_range', xlabel='Depth Range [m]')
-    analyzer.plot_rock_density(analysis_range, f"{iter_dir}/rock_density_range", true_rock_density, x_col='depth_range', xlabel='Depth Range [m]')
-    
+
     analysis_moving = analyzer.run_moving_window_analysis(detected_df, config, window_size=2.0, step_ratio=0.2, quiet=True)
     analysis_moving['iteration'] = i 
     analysis_moving.to_csv(f"{iter_dir}/depth_analysis_moving.csv", index=False)
     
     analyzer.plot_depth_analysis(analysis_moving, f"{iter_dir}/powerlaw_exp_moving", r_true, x_col='depth_center', xlabel='Depth Center [m]')
     analyzer.plot_k_analysis(analysis_moving, f"{iter_dir}/powerlaw_k_moving", true_rock_density, x_col='depth_center', xlabel='Depth Center [m]')
-    analyzer.plot_rock_density(analysis_moving, f"{iter_dir}/rock_density_moving", true_rock_density, x_col='depth_center', xlabel='Depth Center [m]')
 
     return csfd_stats, analysis_range, analysis_moving
 
@@ -903,7 +854,6 @@ def main():
         analyzer.plot_depth_analysis_stats(stats_range, f"{output_dir}/powerlaw_exp_range_stats", r_true, x_col='depth_range', xlabel='Depth Range [m]')
         analyzer.plot_k_analysis_stats(stats_range, f"{output_dir}/powerlaw_k_range_stats", true_rock_density, x_col='depth_range', xlabel='Depth Range [m]')
         analyzer.plot_detection_rate_stats(stats_range, f"{output_dir}/detection_rate_range_stats", x_col='depth_range', xlabel='Depth Range [m]')
-        analyzer.plot_rock_density_stats(stats_range, f"{output_dir}/rock_density_range_stats", true_rock_density, x_col='depth_range', xlabel='Depth Range [m]')
 
         # 3. 新規の移動窓解析の統計
         combined_moving = pd.concat(all_moving_results)
@@ -922,7 +872,6 @@ def main():
 
         analyzer.plot_depth_analysis_stats(stats_moving, f"{output_dir}/powerlaw_exp_moving_stats", r_true, x_col='depth_center', xlabel='Depth Center [m]')
         analyzer.plot_k_analysis_stats(stats_moving, f"{output_dir}/powerlaw_k_moving_stats", true_rock_density, x_col='depth_center', xlabel='Depth Center [m]')
-        analyzer.plot_rock_density_stats(stats_moving, f"{output_dir}/rock_density_moving_stats", true_rock_density, x_col='depth_center', xlabel='Depth Center [m]')
 
         print(f"=== 岩石数: {total_rocks} の処理完了 ===\n")
 
