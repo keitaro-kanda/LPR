@@ -601,6 +601,28 @@ class Analyzer:
         plt.savefig(f"{output_prefix}.pdf")
         plt.close()
 
+    def plot_size_histogram_stats(self, hist_mean, hist_std, output_prefix):
+        bin_labels = ['1-10', '11-20', '21-30', '31-40', '41-50',
+                      '51-60', '61-70', '71-80', '81-90', '91-100']
+        x = np.arange(len(bin_labels))
+
+        plt.figure(figsize=(10, 8))
+        plt.errorbar(x, hist_mean, yerr=hist_std, marker='o', linestyle='-',
+                     color='blue', capsize=5, label='Mean ± Std Dev')
+
+        plt.xlabel('Rock Size [cm]', fontsize=18)
+        plt.ylabel('Number of Rocks', fontsize=18)
+        plt.yscale('log')
+        plt.xticks(x, bin_labels, fontsize=14, rotation=45)
+        plt.tick_params(axis='y', which='major', labelsize=16)
+        plt.legend(fontsize=16)
+        plt.grid(True, ls='--', alpha=0.7)
+
+        plt.tight_layout()
+        plt.savefig(f"{output_prefix}.png")
+        plt.savefig(f"{output_prefix}.pdf")
+        plt.close()
+
 # --- 新規: 並列処理用のワーカー関数 ---
 # マルチプロセスで実行できるようにトップレベルに配置します
 def process_iteration(args):
@@ -617,6 +639,10 @@ def process_iteration(args):
     # 既存の計算ロジックをそのまま実行
     all_rocks_df = model.generate_rocks(r_true, config, quiet=True)
     all_rocks_df.to_csv(f"{iter_dir}/truth_rocks.csv", index=False)
+
+    # サイズヒストグラムの計算（10 cmビン）
+    _bin_edges = np.array([0.01, 0.11, 0.21, 0.31, 0.41, 0.51, 0.61, 0.71, 0.81, 0.91, 1.01])
+    size_histogram, _ = np.histogram(all_rocks_df['diameter'].values, bins=_bin_edges)
 
     detected_df = model.apply_radar_equation(all_rocks_df, config, quiet=True)
     detected_df.to_csv(f"{iter_dir}/simulated_detection.csv", index=False)
@@ -665,7 +691,7 @@ def process_iteration(args):
     analyzer.plot_k_analysis(analysis_moving, f"{iter_dir}/powerlaw_k_moving", true_rock_density, x_col='depth_center', xlabel='Depth Center [m]')
     analyzer.plot_rock_density(analysis_moving, f"{iter_dir}/rock_density_moving", true_rock_density, x_col='depth_center', xlabel='Depth Center [m]')
 
-    return csfd_stats, analysis_range, analysis_moving
+    return csfd_stats, analysis_range, analysis_moving, size_histogram
 
 # --- 4. メイン処理 ---
 def main():
@@ -714,7 +740,8 @@ def main():
 
         all_range_results = []
         all_moving_results = []
-        overall_csfd_stats = [] 
+        overall_csfd_stats = []
+        all_size_histograms = []
 
         # --- 反復計算の実行 (並列化・進捗表示対応) ---
         print("  -> 並列処理でイテレーションを実行中...")
@@ -744,10 +771,11 @@ def main():
         # ワーカーから戻ってきた結果を元のリストに集約
         for res in results:
             if res is not None:
-                csfd_stats, analysis_range, analysis_moving = res
+                csfd_stats, analysis_range, analysis_moving, size_histogram = res
                 overall_csfd_stats.append(csfd_stats)
                 all_range_results.append(analysis_range)
                 all_moving_results.append(analysis_moving)
+                all_size_histograms.append(size_histogram)
 
         # --- 統計処理とプロットの実行 ---
         print("  -> 統計データの集計とプロットを生成中...")
@@ -856,6 +884,12 @@ def main():
         analyzer.plot_depth_analysis_stats(stats_moving, f"{output_dir}/powerlaw_exp_moving_stats", r_true, x_col='depth_center', xlabel='Depth Center [m]')
         analyzer.plot_k_analysis_stats(stats_moving, f"{output_dir}/powerlaw_k_moving_stats", true_rock_density, x_col='depth_center', xlabel='Depth Center [m]')
         analyzer.plot_rock_density_stats(stats_moving, f"{output_dir}/rock_density_moving_stats", true_rock_density, x_col='depth_center', xlabel='Depth Center [m]')
+
+        # 4. サイズヒストグラムの統計プロット
+        all_size_histograms_arr = np.array(all_size_histograms)
+        hist_mean = np.mean(all_size_histograms_arr, axis=0)
+        hist_std = np.std(all_size_histograms_arr, axis=0)
+        analyzer.plot_size_histogram_stats(hist_mean, hist_std, f"{output_dir}/rock_size_histogram_stats")
 
         print(f"=== 岩石数: {total_rocks} の処理完了 ===\n")
 
