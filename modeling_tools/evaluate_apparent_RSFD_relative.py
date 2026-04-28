@@ -19,11 +19,6 @@ class RadarConfig:
         self.FREQ = 500e6  # 500 MHz
         self.C_0 = 3e8
         
-        # 相対値計算では使用しませんが、互換性のために残しています
-        self.TX_POWER_DBM = 62.0
-        self.ANTENNA_GAIN_DBI = -7.5
-        self.SYSTEM_LOSS_DB = 0
-        
         # 閾値（背景除去後の平均強度プロファイルで、表面反射に対する最低強度を参考に決定）
         self.NOISE_FLOOR_DBM = -90.0 
         self.H_ANTENNA = 0.3 # アンテナ地上高 [m]
@@ -68,21 +63,22 @@ class RadarConfig:
         # レゴリスと岩石の反射係数
         n1 = np.sqrt(self.EPSILON_R_REG)
         n2 = np.sqrt(self.EPSILON_R_ROCK)
-        return ((n1 - n2) / (n1 + n2))**2
+        return ((n1 - n2) / (n1 + n2))
 
     @property
     def surface_reflection_coeff(self):
         # 空気(真空)とレゴリスの表面反射係数
         n_air = np.sqrt(self.EPSILON_R_AIR)
         n_reg = np.sqrt(self.EPSILON_R_REG)
-        return ((n_air - n_reg) / (n_air + n_reg))**2
+        return ((n_air - n_reg) / (n_air + n_reg))
     
     @property
     def surface_rcs(self):
         # 表面のレーダー断面積 (RCS) の計算
-        # フットプリント面積 A = 3pi / 100
-        A = (3 * np.pi) / 100.0
-        sigma_surf = self.surface_reflection_coeff * (4 * np.pi * A**2) / (self.lambda_0**2)
+        # フットプリント面積 A = pi * (r_fresnel)^2
+        # レーダー断面積 sigma_surf = (reflection_coeff)^2 * (4 * pi * A^2) / (lambda_0^2)
+        # 結局、sigma_surf = surface_reflection_coeff^2 * pi^3 * H_ANTENNA^2 となる
+        sigma_surf = self.surface_reflection_coeff**2 * np.pi**3 * self.H_ANTENNA**2
         return sigma_surf
 
 # --- 2. 物理モデルクラス ---
@@ -115,9 +111,9 @@ class RockModel:
         lambda_g = config.lambda_g
         boundary_size = lambda_g / 2.0
         
-        sigma_optical = config.reflection_coeff * np.pi * (diameter_array / 2.0)**2
+        sigma_optical = config.reflection_coeff**2 * np.pi * (diameter_array / 2.0)**2
         
-        sigma_opt_at_bound = config.reflection_coeff * np.pi * (boundary_size / 2.0)**2
+        sigma_opt_at_bound = config.reflection_coeff**2 * np.pi * (boundary_size / 2.0)**2
         k_rayleigh = sigma_opt_at_bound / (boundary_size ** 6)
         sigma_rayleigh = k_rayleigh * (diameter_array ** 6)
         
