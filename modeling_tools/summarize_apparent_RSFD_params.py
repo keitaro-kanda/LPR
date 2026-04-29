@@ -30,8 +30,9 @@ rock_counts = sorted(data[r_keys[0]].keys(), key=int)
 calculation_stops = []
 for r in r_keys:
     for count in rock_counts:
-        if count in data[r] and "calculation_stop" in data[r][count] and data[r][count]["calculation_stop"]:
+        if count in data[r] and data[r][count] == "Calculation stop":
             calculation_stops.append((r, count))
+print(f"Calculation stops found for: {calculation_stops}")
 
 # プロット線用のリスト
 line_colors = ['r', 'g', 'b', 'magenta']
@@ -161,7 +162,7 @@ plt.xlabel('Input r', fontsize=16)
 plt.ylabel('Apparent k / k true', fontsize=16)
 # plt.ylim(0, 15)
 # plt.xscale('log')
-plt.yscale('log')
+# plt.yscale('log')
 plt.tick_params(axis='both', which='major', labelsize=14)
 plt.legend(fontsize=14)
 plt.grid(True, linestyle='--', alpha=0.7)
