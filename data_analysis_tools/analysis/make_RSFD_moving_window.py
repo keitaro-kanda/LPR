@@ -144,7 +144,7 @@ def load_rock_data(label_path):
         'time_bottom': time_bottom_all
     }
 
-def calculate_rock_sizes(rock_data, epsilon_rock=9.0, c=299792458, group1_size=1.0):
+def calculate_rock_sizes(rock_data, epsilon_rock=9.0, c=299792458, group1_size=1.0, use_group1=True):
     """
     各岩石のサイズを計算
 
@@ -169,8 +169,9 @@ def calculate_rock_sizes(rock_data, epsilon_rock=9.0, c=299792458, group1_size=1
 
     sizes = np.full(len(lab), np.nan)
 
-    # Group1: Group 1サイズ固定
-    sizes[lab == 1] = group1_size
+    # Group1: Group 1サイズ固定（use_group1=Falseのときは除外）
+    if use_group1:
+        sizes[lab == 1] = group1_size
 
     # Group2, Group3: time_top/time_bottomから計算
     for group in [2, 3]:
@@ -363,7 +364,8 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
                                           dist_min_data, dist_max_data,
                                           sample_interval, trace_interval,
                                           epsilon_r, c, output_path,
-                                          dpi_png=300, dpi_pdf=600):
+                                          dpi_png=300, dpi_pdf=600,
+                                          use_group1=True):
     """
     水平方向移動ウィンドウのRSFDプロットを作成
 
@@ -510,33 +512,45 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     num_label2_array = np.array(num_rocks_label2_list)
     num_label3_array = np.array(num_rocks_label3_list)
 
-    # 棒グラフの幅（ステップサイズの80%）
-    bar_width = step_size * 0.8
+    # フィッティング数の計算
+    num_fitting_points = num_label2_array + num_label3_array + (1 if use_group1 else 0)
+
+    # r/k の目盛り計算（データから上限を自動決定）
+    r_nan_value = -0.2
+    r_valid = r_values[~np.isnan(r_values)]
+    r_upper = (np.ceil(np.max(r_valid) / 0.2) * 0.2 + 0.2) if len(r_valid) > 0 else 1.4
+    r_ticks = [r_nan_value] + list(np.arange(0.0, r_upper + 0.01, 0.2))
+    r_tick_labels = ['nan'] + [f'{t:.1f}' for t in np.arange(0.0, r_upper + 0.01, 0.2)]
+
+    k_nan_value = -1e-3
+    k_valid = k_values[~np.isnan(k_values)]
+    k_upper = (np.ceil(np.max(k_valid) / 1e-3) * 1e-3 + 1e-3) if len(k_valid) > 0 else 7e-3
+    k_ticks = [k_nan_value] + list(np.arange(0.0, k_upper + 5e-4, 1e-3))
+    k_tick_labels = ['nan'] + [f'{t*1e3:.0f}' for t in np.arange(0.0, k_upper + 5e-4, 1e-3)]
 
     # Figure作成（4つのサブプロット：上から岩石数、r、k、p値）
     fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(18, 20), sharex=True)
 
-    # === 1段目: 岩石数のプロット（ラベル別積み上げ棒グラフ） ===
+    # === 1段目: 岩石数のプロット（折れ線グラフ） ===
     # B-scan背景
     ax1.imshow(bscan_data, aspect='auto', cmap='seismic',
                extent=[0, bscan_data.shape[1] * trace_interval,
                       time_array[-1], time_array[0]],
                vmin=vmin, vmax=vmax, alpha=0.5)
 
-    # 岩石数を第2軸に積み上げ棒グラフでプロット（縦向き）
+    # 岩石数を第2軸に折れ線グラフでプロット
     ax1_twin = ax1.twinx()
-    # ラベル1（赤）を一番下に
-    ax1_twin.bar(window_centers, num_label1_array, width=bar_width,
-                 color='red', alpha=0.7, label='Group 1')
-    # ラベル2（緑）をラベル1の上に積み上げ
-    ax1_twin.bar(window_centers, num_label2_array, width=bar_width,
-                 bottom=num_label1_array, color='green', alpha=0.7, label='Group 2')
-    # ラベル3（青）をラベル1+2の上に積み上げ
-    ax1_twin.bar(window_centers, num_label3_array, width=bar_width,
-                 bottom=num_label1_array + num_label2_array, color='blue', alpha=0.7, label='Group 3')
-    ax1_twin.set_ylabel('Number of detected rocks', fontsize=font_medium, color='black')
+    if use_group1:
+        ax1_twin.plot(window_centers, num_rocks_array,
+                      'k-', linewidth=2, marker='o', markersize=8, label='Total rocks')
+        ax1_twin.plot(window_centers, num_fitting_points,
+                      'k--', linewidth=2, marker='D', markersize=8, label='Fitting points')
+    else:
+        ax1_twin.plot(window_centers, num_fitting_points,
+                      'k-', linewidth=2, marker='D', markersize=8, label='Fitting points (Group 2+3)')
+    ax1_twin.set_ylabel('Number of rocks', fontsize=font_medium, color='black')
     ax1_twin.tick_params(axis='y', labelcolor='black', labelsize=font_small)
-    ax1_twin.legend(loc='lower right', fontsize=font_small - 2)
+    ax1_twin.legend(loc='upper right', fontsize=font_small - 2)
 
     ax1.set_ylabel('Time [ns]', fontsize=font_medium)
     ax1.set_ylim(time_max_data, time_min_data)
@@ -552,18 +566,14 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
 
     # rの値を第2軸にプロット（NaN値は-0.2としてプロット）
     ax2_twin = ax2.twinx()
-    r_nan_value = -0.2  # NaN値の代替値
     r_values_plot = np.where(np.isnan(r_values), r_nan_value, r_values)
     ax2_twin.plot(window_centers, r_values_plot,
                   'b-', linewidth=2, marker='o', markersize=10, label='r (power-law exponent)')
     ax2_twin.set_ylabel('r (power-law exponent)', fontsize=font_medium, color='blue')
     ax2_twin.tick_params(axis='y', labelcolor='blue', labelsize=font_small)
 
-    # y軸範囲設定（r値）: -0.2〜1.4に拡張（-0.2はNaN用）
-    ax2_twin.set_ylim(-0.2, 1.4)
-    # カスタム目盛り設定（-0.2を「nan」と表示）
-    r_ticks = [-0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4]
-    r_tick_labels = ['nan', '0.4', '0.6', '0.8', '1.0', '1.2', '1.4']
+    # y軸範囲設定（r値）: 下限-0.2固定（NaN用）、上限自動
+    ax2_twin.set_ylim(-0.2, None)
     ax2_twin.set_yticks(r_ticks)
     ax2_twin.set_yticklabels(r_tick_labels)
 
@@ -581,16 +591,12 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
 
     # kの値を第2軸にプロット（リニアスケール、NaN値は-1e-3としてプロット）
     ax3_twin = ax3.twinx()
-    k_nan_value = -1e-3  # NaN値の代替値
     k_values_plot = np.where(np.isnan(k_values), k_nan_value, k_values)
     ax3_twin.plot(window_centers, k_values_plot,
                   'r-', linewidth=2, marker='s', markersize=10, label='k (scaling factor)')
     ax3_twin.tick_params(axis='y', labelcolor='red', labelsize=font_small)
-    # y軸範囲設定（k値）: -1e-3〜7e-3に拡張（-1e-3はNaN用）
-    ax3_twin.set_ylim(-1e-3, 7e-3)
-    # カスタム目盛り設定（-1e-3を「nan」と表示）
-    k_ticks = [-1e-3, 1e-3, 2e-3, 3e-3, 4e-3, 5e-3, 6e-3, 7e-3]
-    k_tick_labels = ['nan', '1', '2', '3', '4', '5', '6', '7']
+    # y軸範囲設定（k値）: 下限-1e-3固定（NaN用）、上限自動
+    ax3_twin.set_ylim(-1e-3, None)
     ax3_twin.set_yticks(k_ticks)
     ax3_twin.set_yticklabels(k_tick_labels)
     ax3_twin.set_ylabel('k [×10⁻³ /m²]', fontsize=font_medium, color='red')
@@ -645,23 +651,24 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
     individual_plots_dir = os.path.join(os.path.dirname(output_path), 'individual_plots')
     os.makedirs(individual_plots_dir, exist_ok=True)
 
-    # --- 岩石数の個別プロット（ラベル別積み上げ棒グラフ） ---
+    # --- 岩石数の個別プロット（折れ線グラフ） ---
     fig_num, ax_num = plt.subplots(figsize=(18, 6))
     ax_num.imshow(bscan_data, aspect='auto', cmap='seismic',
                   extent=[0, bscan_data.shape[1] * trace_interval,
                          time_array[-1], time_array[0]],
                   vmin=vmin, vmax=vmax, alpha=0.5)
     ax_num_twin = ax_num.twinx()
-    # ラベル別積み上げ棒グラフ（縦向き）
-    ax_num_twin.bar(window_centers, num_label1_array, width=bar_width,
-                    color='red', alpha=0.7, label='Group 1')
-    ax_num_twin.bar(window_centers, num_label2_array, width=bar_width,
-                    bottom=num_label1_array, color='green', alpha=0.7, label='Group 2')
-    ax_num_twin.bar(window_centers, num_label3_array, width=bar_width,
-                    bottom=num_label1_array + num_label2_array, color='blue', alpha=0.7, label='Group 3')
-    ax_num_twin.set_ylabel('Number of detected rocks', fontsize=font_medium, color='black')
+    if use_group1:
+        ax_num_twin.plot(window_centers, num_rocks_array,
+                         'k-', linewidth=2, marker='o', markersize=8, label='Total rocks')
+        ax_num_twin.plot(window_centers, num_fitting_points,
+                         'k--', linewidth=2, marker='D', markersize=8, label='Fitting points')
+    else:
+        ax_num_twin.plot(window_centers, num_fitting_points,
+                         'k-', linewidth=2, marker='D', markersize=8, label='Fitting points (Group 2+3)')
+    ax_num_twin.set_ylabel('Number of rocks', fontsize=font_medium, color='black')
     ax_num_twin.tick_params(axis='y', labelcolor='black', labelsize=font_small)
-    ax_num_twin.legend(loc='lower right', fontsize=font_small - 2)
+    ax_num_twin.legend(loc='upper right', fontsize=font_small - 2)
     ax_num.set_xlabel('Moving distance [m]', fontsize=font_medium)
     ax_num.set_ylabel('Time [ns]', fontsize=font_medium)
     ax_num.set_ylim(time_max_data, time_min_data)
@@ -769,6 +776,8 @@ def create_horizontal_moving_window_plot(bscan_data, rock_data, sizes, time_posi
         f.write(f'Window width: {window_width:.2f} m\n')
         f.write(f'Step size: {step_size:.2f} m\n')
         f.write(f'Number of windows: {len(window_centers)}\n')
+        groups_used = 'Group 1 + Group 2 + Group 3' if use_group1 else 'Group 2 + Group 3 only'
+        f.write(f'Groups used: {groups_used}\n')
         f.write(f'Note: k values are area-normalized [/m²]\n\n')
         f.write('# P-value Statistics\n')
         f.write(f'Windows with p ≤ 0.05: {significant_count} / {valid_p_count} ({significant_ratio:.2f}%)\n')
@@ -863,7 +872,8 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
                                         dist_min_data, dist_max_data,
                                         sample_interval, trace_interval,
                                         epsilon_r, c, output_path,
-                                        dpi_png=300, dpi_pdf=600):
+                                        dpi_png=300, dpi_pdf=600,
+                                        use_group1=True):
     """
     深さ方向移動ウィンドウのRSFDプロットを作成
 
@@ -1015,7 +1025,8 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
                   left=num_label1_array + num_label2_array, color='blue', alpha=0.7, label='Group 3')
 
     # フィッティングデータ数を第2横軸に折れ線グラフでプロット（横向き）
-    num_fitting_points = num_label2_array + num_label3_array + 1 # グループ１は１つのデータ点にまとめて取り扱う
+    # グループ１は１つのデータ点にまとめて取り扱う（use_group1=Falseのときは加算しない）
+    num_fitting_points = num_label2_array + num_label3_array + (1 if use_group1 else 0)
     ax1_twin.plot(num_fitting_points, window_centers,
                 'k-', linewidth=2, marker='D', markersize=10, label='Number of fitting points')
 
@@ -1152,7 +1163,7 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     ax_num_twin.set_xlabel('Number of rocks', fontsize=font_medium, color='black')
     ax_num_twin.tick_params(axis='x', labelcolor='black', labelsize=font_small)
     # フィッティングデータ数を第2横軸に折れ線グラフでプロット（横向き）
-    num_fitting_points = num_label2_array + num_label3_array + 1 # グループ１は１つのデータ点にまとめて取り扱う
+    num_fitting_points = num_label2_array + num_label3_array + (1 if use_group1 else 0)
     ax_num_twin.plot(num_fitting_points, window_centers,
                 'k-', linewidth=2, marker='D', markersize=10, label='Number of fitting points')
     ax_num_twin.set_xlabel('Number of fitting points', fontsize=font_medium, color='black')
@@ -1241,7 +1252,7 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     plt.close()
 
     # --- 深さ vs Num/r/k サマリープロット ---
-    num_fitting_points_arr = num_label2_array + num_label3_array + 1
+    num_fitting_points_arr = num_label2_array + num_label3_array + (1 if use_group1 else 0)
     plot_depth_rsfd_summary(
         window_centers, num_rocks_array, num_fitting_points_arr,
         r_values, k_values, epsilon_r, c,
@@ -1273,6 +1284,8 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
         f.write(f'Window width: {window_width:.2f} ns\n')
         f.write(f'Step size: {step_size:.2f} ns\n')
         f.write(f'Number of windows: {len(window_centers)}\n')
+        groups_used = 'Group 1 + Group 2 + Group 3' if use_group1 else 'Group 2 + Group 3 only'
+        f.write(f'Groups used: {groups_used}\n')
         f.write(f'Note: k values are area-normalized [/m²]\n\n')
         f.write('# P-value Statistics\n')
         f.write(f'Windows with p ≤ 0.05: {significant_count} / {valid_p_count} ({significant_ratio:.2f}%)\n')
@@ -1335,15 +1348,30 @@ else:
 step_size = window_width * 0.2
 print(f'ステップサイズ: {step_size:.2f} {"m" if analysis_direction == "horizontal" else "ns"} (ウィンドウ幅の20%)')
 
-# Group 1のサイズ選択
-print('\n=== Group 1 サイズ設定 ===')
-print('1: 1 cm')
-print('2: 2 cm')
-group1_size_choice = input('Group 1のサイズを選択してください (1/2): ').strip()
-if group1_size_choice not in ['1', '2']:
-    raise ValueError('Group 1のサイズは1または2を選択してください。')
-group1_size = 1.0 if group1_size_choice == '1' else 2.0
-group1_size_str = 'group1_1cm' if group1_size_choice == '1' else 'group1_2cm'
+# 解析グループ選択
+print('\n=== 解析グループ設定 ===')
+print('解析に使用するグループを選択してください:')
+print('1: グループ1 + グループ2 + グループ3')
+print('2: グループ2 + グループ3 のみ')
+group_mode_choice = input('選択 (1 or 2): ').strip()
+if group_mode_choice not in ['1', '2']:
+    raise ValueError('1 または 2 を入力してください。')
+use_group1 = (group_mode_choice == '1')
+
+if use_group1:
+    # Group 1のサイズ選択
+    print('\n=== Group 1 サイズ設定 ===')
+    print('1: 1 cm')
+    print('2: 2 cm')
+    group1_size_choice = input('Group 1のサイズを選択してください (1/2): ').strip()
+    if group1_size_choice not in ['1', '2']:
+        raise ValueError('Group 1のサイズは1または2を選択してください。')
+    group1_size = 1.0 if group1_size_choice == '1' else 2.0
+    group1_size_str = 'group1_1cm' if group1_size_choice == '1' else 'group1_2cm'
+else:
+    group1_size = 1.0  # 使用しないが初期化
+    group1_size_str = 'group23only'
+    print('グループ2 + グループ3 のみで解析を行います。')
 
 # ------------------------------------------------------------------
 # 4. データ読み込み
@@ -1361,7 +1389,7 @@ rock_data = load_rock_data(label_path)
 print(f'岩石数: {len(rock_data["label"])}')
 
 # 岩石サイズと時間位置の計算
-sizes = calculate_rock_sizes(rock_data, group1_size=group1_size)
+sizes = calculate_rock_sizes(rock_data, group1_size=group1_size, use_group1=use_group1)
 time_positions = get_time_position(rock_data)
 
 # ------------------------------------------------------------------
@@ -1442,7 +1470,8 @@ if analysis_direction == 'horizontal':
         time_min_data, time_max_data,
         dist_min_data, dist_max_data,
         sample_interval, trace_interval,
-        epsilon_r, c, output_path
+        epsilon_r, c, output_path,
+        use_group1=use_group1
     )
 else:
     output_path = os.path.join(sub_dir, 'vertical_moving_window_rsfd')
@@ -1452,7 +1481,8 @@ else:
         time_min_data, time_max_data,
         dist_min_data, dist_max_data,
         sample_interval, trace_interval,
-        epsilon_r, c, output_path
+        epsilon_r, c, output_path,
+        use_group1=use_group1
     )
 
 print('\n=== 処理完了 ===')
