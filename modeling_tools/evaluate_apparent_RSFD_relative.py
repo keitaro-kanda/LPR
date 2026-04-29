@@ -94,10 +94,12 @@ class RockModel:
             print(f"  -> 自然な最大岩石サイズ (D_max_auto): {D_max_auto:.2f} m")
         
         # 0から1の範囲を TOTAL_ROCKS 個で等間隔に分割した配列を作成（分位数）
-        u = (np.arange(config.TOTAL_ROCKS) + 0.5) / config.TOTAL_ROCKS
-
+        # u = (np.arange(config.TOTAL_ROCKS) + 0.5) / config.TOTAL_ROCKS
         # サイズが常に大きい順（または小さい順）に並んでしまうのを防ぐため、配列をシャッフルする
-        np.random.shuffle(u)
+        # np.random.shuffle(u)
+
+        # 均等割りではなく、一様分布からランダムにサンプリングする
+        u = np.random.uniform(0.0, 1.0, size=config.TOTAL_ROCKS)
         
         # 算出した自然な最大サイズを上限として適用
         term1 = D_max_auto ** (-r_true)
