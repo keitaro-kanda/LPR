@@ -184,8 +184,13 @@ class Analyzer:
         x_log = np.log10(sorted_d)
         y_log = np.log10(y_cumulative)
         
-        slope, intercept = np.polyfit(x_log, y_log, 1)
-        
+        n = len(x_log)
+        sx = x_log.sum(); sy = y_log.sum()
+        sxx = np.dot(x_log, x_log); sxy = np.dot(x_log, y_log)
+        denom = n * sxx - sx * sx
+        slope = (n * sxy - sx * sy) / denom
+        intercept = (sy - slope * sx) / n
+
         return slope, intercept, x_log, y_log
 
     def run_depth_analysis(self, detected_df, config, step=1.0, quiet=False):
@@ -200,33 +205,42 @@ class Analyzer:
         # 面積の共通化：エリアの幅(Length)を算出
         length = config.AREA_SIZE_M2 / config.MAX_DEPTH
         d_min_cm = config.ROCK_SIZE_MIN * 100.0
-        
+
+        # ループ前に1回だけnumpy配列へ変換・ソート
+        is_det = detected_df['is_detected'].values
+        depths = detected_df['depth'].values
+        diameters = detected_df['diameter'].values
+
+        det_depths = depths[is_det]
+        det_diameters = diameters[is_det]
+        det_order = np.argsort(det_depths)
+        det_depths_sorted = det_depths[det_order]
+        det_diameters_by_depth = det_diameters[det_order]
+        all_depths_sorted = np.sort(depths)
+
         for d in depth_ranges:
-            subset_detected = detected_df[
-                (detected_df['is_detected'] == True) & 
-                (detected_df['depth'] <= d)
-            ]
-            subset_all = detected_df[detected_df['depth'] <= d]
-            
-            count_detected = len(subset_detected)
-            count_all = len(subset_all)
-            
+            n_det = int(np.searchsorted(det_depths_sorted, d, side='right'))
+            n_all = int(np.searchsorted(all_depths_sorted, d, side='right'))
+
+            count_detected = n_det
+            count_all = n_all
+
             # 深さごとの面積を算出
             area = d * length
-            
+
             if count_detected > 5:
                 # cm単位に変換して傾きを計算
-                diameters_cm = subset_detected['diameter'].values * 100.0
+                diameters_cm = det_diameters_by_depth[:n_det] * 100.0
                 slope, intercept, _, _ = self.calculate_slope(diameters_cm, area)
                 r_apparent = -slope
                 k_apparent = (10**intercept) * (d_min_cm**slope)
             else:
                 r_apparent = np.nan
                 k_apparent = np.nan
-            
+
             detection_rate = count_detected / count_all if count_all > 0 else 0.0
             rock_density = count_detected / area if area > 0 else 0.0
-            
+
             results.append({
                 'depth_range': d,
                 'r_apparent': r_apparent,
@@ -236,7 +250,7 @@ class Analyzer:
                 'detection_rate': detection_rate,
                 'rock_density': rock_density
             })
-            
+
         return pd.DataFrame(results)
 
     def run_moving_window_analysis(self, detected_df, config, window_size=2.0, step_ratio=0.2, quiet=False):
@@ -252,39 +266,47 @@ class Analyzer:
         
         # 面積の共通化
         length = config.AREA_SIZE_M2 / config.MAX_DEPTH
-        area = window_size * length 
+        area = window_size * length
         d_min_cm = config.ROCK_SIZE_MIN * 100.0
-        
+
+        # ループ前に1回だけnumpy配列へ変換・ソート
+        is_det = detected_df['is_detected'].values
+        depths = detected_df['depth'].values
+        diameters = detected_df['diameter'].values
+
+        det_depths = depths[is_det]
+        det_diameters = diameters[is_det]
+        det_order = np.argsort(det_depths)
+        det_depths_sorted = det_depths[det_order]
+        det_diameters_by_depth = det_diameters[det_order]
+        all_depths_sorted = np.sort(depths)
+
         for d_start in d_starts:
             d_end = d_start + window_size
             d_center = d_start + window_size / 2.0
-            
-            subset_detected = detected_df[
-                (detected_df['is_detected'] == True) & 
-                (detected_df['depth'] > d_start) & 
-                (detected_df['depth'] <= d_end)
-            ]
-            subset_all = detected_df[
-                (detected_df['depth'] > d_start) & 
-                (detected_df['depth'] <= d_end)
-            ]
-            
-            count_detected = len(subset_detected)
-            count_all = len(subset_all)
-            
+
+            # searchsorted で O(log N) のウィンドウ検索
+            det_s = int(np.searchsorted(det_depths_sorted, d_start, side='right'))
+            det_e = int(np.searchsorted(det_depths_sorted, d_end, side='right'))
+            all_s = int(np.searchsorted(all_depths_sorted, d_start, side='right'))
+            all_e = int(np.searchsorted(all_depths_sorted, d_end, side='right'))
+
+            count_detected = det_e - det_s
+            count_all = all_e - all_s
+
             if count_detected > 5:
                 # cm単位に変換して傾きを計算
-                diameters_cm = subset_detected['diameter'].values * 100.0
+                diameters_cm = det_diameters_by_depth[det_s:det_e] * 100.0
                 slope, intercept, _, _ = self.calculate_slope(diameters_cm, area)
                 r_apparent = -slope
                 k_apparent = (10**intercept) * (d_min_cm**slope)
             else:
                 r_apparent = np.nan
                 k_apparent = np.nan
-                
+
             detection_rate = count_detected / count_all if count_all > 0 else 0.0
             rock_density = count_detected / area if area > 0 else 0.0
-            
+
             results.append({
                 'depth_center': d_center,
                 'r_apparent': r_apparent,
@@ -321,7 +343,7 @@ class Analyzer:
         
         plt.tight_layout()
         plt.savefig(f"{output_prefix}.png")
-        plt.savefig(f"{output_prefix}.pdf")
+        # plt.savefig(f"{output_prefix}.pdf")
         plt.close()
 
     # === 個別出力用プロットメソッド (True Fitもpolyfitで描画 / cm単位) ===
@@ -346,7 +368,7 @@ class Analyzer:
                          label=f'True Fit (r={-slope_true:.2f}, k={k_true:.2e})')
 
         # --- Apparent Fit ---
-        diameters_det_cm = detected_df[detected_df['is_detected'] == True]['diameter'].values * 100.0
+        diameters_det_cm = detected_df['diameter'].values[detected_df['is_detected'].values] * 100.0
         if len(diameters_det_cm) > 0:
             slope_det, intercept_det, x_log_det, y_log_det = self.calculate_slope(diameters_det_cm, overall_area)
             if len(x_log_det) > 0:
@@ -370,7 +392,7 @@ class Analyzer:
         
         plt.tight_layout()
         plt.savefig(f"{output_prefix}.png")
-        plt.savefig(f"{output_prefix}.pdf")
+        # plt.savefig(f"{output_prefix}.pdf")
         plt.close()
 
     def plot_depth_analysis(self, analysis_df, output_prefix, r_true, x_col='depth_range', xlabel='Depth Range [m]'):
@@ -387,7 +409,7 @@ class Analyzer:
         
         plt.tight_layout()
         plt.savefig(f"{output_prefix}.png")
-        plt.savefig(f"{output_prefix}.pdf")
+        # plt.savefig(f"{output_prefix}.pdf")
         plt.close()
 
     def plot_k_analysis(self, analysis_df, output_prefix, true_k, x_col='depth_range', xlabel='Depth Range [m]'):
@@ -404,7 +426,7 @@ class Analyzer:
         
         plt.tight_layout()
         plt.savefig(f"{output_prefix}.png")
-        plt.savefig(f"{output_prefix}.pdf")
+        # plt.savefig(f"{output_prefix}.pdf")
         plt.close()
 
     def plot_detection_rate(self, analysis_df, output_prefix, x_col='depth_range', xlabel='Depth Range [m]'):
@@ -423,7 +445,7 @@ class Analyzer:
         
         plt.tight_layout()
         plt.savefig(f"{output_prefix}.png")
-        plt.savefig(f"{output_prefix}.pdf")
+        # plt.savefig(f"{output_prefix}.pdf")
         plt.close()
 
     # === 統計出力用プロットメソッド (エラー範囲、±ラベルの追加) ===
@@ -688,7 +710,7 @@ def process_iteration(args):
     k_true_iter = (10**intercept_true) * (d_min_cm**slope_true) if not np.isnan(slope_true) else np.nan
 
     # Apparent Fit (cm)
-    diameters_det_cm = detected_df[detected_df['is_detected'] == True]['diameter'].values * 100.0
+    diameters_det_cm = detected_df['diameter'].values[detected_df['is_detected'].values] * 100.0
     slope_det, intercept_det, _, _ = analyzer.calculate_slope(diameters_det_cm, overall_area)
     r_det_iter = -slope_det if not np.isnan(slope_det) else np.nan
     k_det_iter = (10**intercept_det) * (d_min_cm**slope_det) if not np.isnan(slope_det) else np.nan
