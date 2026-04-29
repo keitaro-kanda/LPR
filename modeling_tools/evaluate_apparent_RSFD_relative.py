@@ -760,10 +760,10 @@ def main():
         
         config = RadarConfig(total_rocks=total_rocks)
         
-        # --- 最大岩石サイズの事前チェック (3.0 m 制限) ---
+        # --- 最大岩石サイズの事前チェック (6.0 m 制限) ---
         D_max_auto = config.ROCK_SIZE_MIN * (total_rocks ** (1.0 / r_true))
-        if D_max_auto > 3.0:
-            print(f"  -> [警告] 計算上の最大岩石サイズ ({D_max_auto:.2f} m) が 3.0 m を超えるため、計算を中止します。")
+        if D_max_auto > 6.0:
+            print(f"  -> [警告] 計算上の最大岩石サイズ ({D_max_auto:.2f} m) が 6.0 m を超えるため、計算を中止します。")
             
             # JSONへの「Calculation stop」の記録
             if os.path.exists(json_path):
