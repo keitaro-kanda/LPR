@@ -1012,6 +1012,7 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
                       time_array[-1], time_array[0]],
                vmin=vmin, vmax=vmax, alpha=0.5)
 
+    """ ヒストグラム表示を削除
     # 岩石数を第2横軸に積み上げ棒グラフでプロット（横向き）
     ax1_twin = ax1.twiny()
     # ラベル1（赤）を一番左に
@@ -1023,9 +1024,11 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     # ラベル3（青）をラベル1+2の右に積み上げ
     ax1_twin.barh(window_centers, num_label3_array, height=bar_height,
                   left=num_label1_array + num_label2_array, color='blue', alpha=0.7, label='Group 3')
+                  """
 
     # フィッティングデータ数を第2横軸に折れ線グラフでプロット（横向き）
     # グループ１は１つのデータ点にまとめて取り扱う（use_group1=Falseのときは加算しない）
+    ax1_twin = ax1.twiny()
     num_fitting_points = num_label2_array + num_label3_array + (1 if use_group1 else 0)
     ax1_twin.plot(num_fitting_points, window_centers,
                 'k-', linewidth=2, marker='D', markersize=10, label='Number of fitting points')
@@ -1058,11 +1061,11 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     ax2_twin.set_xlabel('r (power-law exponent)', fontsize=font_medium, color='blue')
     ax2_twin.tick_params(axis='x', labelcolor='blue', labelsize=font_small)
 
-    # x軸範囲設定（r値）: -0.2〜1.4に拡張（-0.2はNaN用）
-    ax2_twin.set_xlim(-0.2, 1.4)
+    # x軸範囲設定（r値）: -0.2〜2.0に拡張（-0.2はNaN用）
+    ax2_twin.set_xlim(-0.2, 2.0)
     # カスタム目盛り設定（-0.2を「nan」と表示）
-    r_ticks = [-0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4]
-    r_tick_labels = ['nan', '0.4', '0.6', '0.8', '1.0', '1.2', '1.4']
+    r_ticks = [-0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0]
+    r_tick_labels = ['nan', '0.4', '0.6', '0.8', '1.0', '1.2', '1.4', '1.6', '1.8', '2.0']
     ax2_twin.set_xticks(r_ticks)
     ax2_twin.set_xticklabels(r_tick_labels)
 
@@ -1086,11 +1089,11 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     ax3_twin.plot(k_values_plot, window_centers,
                   'r-', linewidth=2, marker='s', markersize=10, label='k (scaling factor)')
     ax3_twin.tick_params(axis='x', labelcolor='red', labelsize=font_small)
-    # x軸範囲設定（k値）: -2e-3〜20e-3に拡張（-2e-3はNaN用）
-    ax3_twin.set_xlim(-2e-3, 20e-3)
+    # x軸範囲設定（k値）: -2e-3〜40e-3に拡張（-2e-3はNaN用）
+    ax3_twin.set_xlim(-2e-3, 40e-3)
     # カスタム目盛り設定（-2e-3を「nan」と表示）
-    k_ticks = [-2e-3, 0, 5e-3, 10e-3, 15e-3, 20e-3]
-    k_tick_labels = ['nan', '0', '5', '10', '15', '20']
+    k_ticks = [-2e-3, 0, 5e-3, 10e-3, 15e-3, 20e-3, 25e-3, 30e-3, 35e-3, 40e-3]
+    k_tick_labels = ['nan', '0', '5', '10', '15', '20', '25', '30', '35', '40']
     ax3_twin.set_xticks(k_ticks)
     ax3_twin.set_xticklabels(k_tick_labels)
     ax3_twin.set_xlabel('k [×10⁻³ /m²]', fontsize=font_medium, color='red')
@@ -1153,6 +1156,7 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
                          time_array[-1], time_array[0]],
                   vmin=vmin, vmax=vmax, alpha=0.5)
     ax_num_twin = ax_num.twiny()
+    """
     # ラベル別積み上げ棒グラフ（横向き）
     ax_num_twin.barh(window_centers, num_label1_array, height=bar_height,
                      color='red', alpha=0.7, label='Group 1')
@@ -1161,7 +1165,7 @@ def create_vertical_moving_window_plot(bscan_data, rock_data, sizes, time_positi
     ax_num_twin.barh(window_centers, num_label3_array, height=bar_height,
                      left=num_label1_array + num_label2_array, color='blue', alpha=0.7, label='Group 3')
     ax_num_twin.set_xlabel('Number of rocks', fontsize=font_medium, color='black')
-    ax_num_twin.tick_params(axis='x', labelcolor='black', labelsize=font_small)
+    ax_num_twin.tick_params(axis='x', labelcolor='black', labelsize=font_small)"""
     # フィッティングデータ数を第2横軸に折れ線グラフでプロット（横向き）
     num_fitting_points = num_label2_array + num_label3_array + (1 if use_group1 else 0)
     ax_num_twin.plot(num_fitting_points, window_centers,
