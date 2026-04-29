@@ -215,9 +215,7 @@ _EPS = 3.0
 _v   = _C0 / np.sqrt(_EPS)  # 媒質中の光速 [m/s]
 
 obs_moving_path = (
-    '/Volumes/SSD_Kanda_SAMSUNG/CE4_LPR/LPR_2B/Processed_Data/'
-    'order_0_1_3_4_5/4_Gain_function/RSFD_moving_window_comparison/'
-    'vertical_window23.1ns_group1_1cm/vertical_moving_window_rsfd_statistics.txt'
+    '/Volumes/SSD_Kanda_SAMSUNG/CE4_LPR/LPR_2B/Processed_Data/order_0_1_3_4_5/4_Gain_function/RSFD_moving_window_comparison/vertical_window23.1ns_group23only/vertical_moving_window_rsfd_statistics.txt'
 )
 obs_range_path = (
     '/Volumes/SSD_Kanda_SAMSUNG/CE4_LPR/LPR_2B/Processed_Data/'
@@ -255,7 +253,7 @@ if os.path.exists(obs_range_path):
     rows = []
     current_depth = None
     k_val = r_val = None
-    in_group13 = False
+    in_group23 = False
 
     with open(obs_range_path, 'r', encoding='utf-8') as f:
         for line in f:
@@ -264,20 +262,20 @@ if os.path.exists(obs_range_path):
             if m:
                 current_depth = float(m.group(1))
                 k_val = r_val = None
-                in_group13 = False
+                in_group23 = False
             elif '# [Group1-3 Fitting' in line:
-                in_group13 = True
+                in_group23 = False
             elif '# [Group2-3 Fitting' in line:
-                in_group13 = False
-            elif in_group13 and line.startswith('# k:'):
+                in_group23 = True
+            elif in_group23 and line.startswith('# k:'):
                 val = line.split(':', 1)[1].strip()
                 k_val = np.nan if val == 'nan' else float(val)
-            elif in_group13 and line.startswith('# r:'):
+            elif in_group23 and line.startswith('# r:'):
                 val = line.split(':', 1)[1].strip()
                 r_val = np.nan if val == 'nan' else float(val)
                 if current_depth is not None:
                     rows.append({'depth_range': current_depth, 'k': k_val, 'r': r_val})
-                    in_group13 = False
+                    in_group23 = False
 
     obs_range_df = pd.DataFrame(rows).dropna()
     print(f"Range 観測データ読み込み完了: {len(obs_range_df)} 行")
