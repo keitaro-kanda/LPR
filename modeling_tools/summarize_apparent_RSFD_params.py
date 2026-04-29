@@ -264,8 +264,8 @@ for i in range(num_obs):
 
     plt.xlabel('Apparent r', fontsize=16)
     plt.ylabel('Apparent k', fontsize=16)
-    plt.xlim(0.2, 3.5)
-    plt.ylim(3e-4, 0.3)
+    plt.xlim(0.2, 4.0)
+    plt.ylim(3e-4, 0.5)
     plt.tick_params(axis='both', which='major', labelsize=14)
     plt.yscale('log')
     plt.legend(fontsize=14)
