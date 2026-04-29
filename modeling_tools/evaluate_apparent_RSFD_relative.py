@@ -34,9 +34,9 @@ class RadarConfig:
 
         # --- D. シミュレーション空間設定 ---
         self.MAX_DEPTH = 12.0
-        self.AREA_SIZE_M2 = 18300 # 深さ12 m x 奥行き1525 mのエリア
+        # すべての面積計算のベースとなる統一パラメータ
+        self.AREA_SIZE_M2 = 18300.0 # 深さ12 m x 奥行き1525 mのエリア
         self.ROCK_SIZE_MIN = 0.06
-        self.ROCK_SIZE_MAX = 0.60
         self.TOTAL_ROCKS = total_rocks
 
     @property
@@ -75,9 +75,6 @@ class RadarConfig:
     @property
     def surface_rcs(self):
         # 表面のレーダー断面積 (RCS) の計算
-        # フットプリント面積 A = pi * (r_fresnel)^2
-        # レーダー断面積 sigma_surf = (reflection_coeff)^2 * (4 * pi * A^2) / (lambda_0^2)
-        # 結局、sigma_surf = surface_reflection_coeff^2 * pi^3 * H_ANTENNA^2 となる
         sigma_surf = self.surface_reflection_coeff**2 * np.pi**3 * self.H_ANTENNA**2
         return sigma_surf
 
@@ -87,15 +84,23 @@ class RockModel:
     岩石の生成とレーダー方程式の適用を行うクラス
     """
     def generate_rocks(self, r_true, config, quiet=False):
+        D_min = config.ROCK_SIZE_MIN
+        
+        # Nとrから導かれる自然な最大岩石サイズ (D_max_auto) を算出
+        D_max_auto = D_min * (config.TOTAL_ROCKS ** (1.0 / r_true))
+
         if not quiet:
             print(f"岩石を生成中... (True Slope = -{r_true}, N={config.TOTAL_ROCKS})")
+            print(f"  -> 自然な最大岩石サイズ (D_max_auto): {D_max_auto:.2f} m")
         
-        u = np.random.rand(config.TOTAL_ROCKS)
+        # 0から1の範囲を TOTAL_ROCKS 個で等間隔に分割した配列を作成（分位数）
+        u = (np.arange(config.TOTAL_ROCKS) + 0.5) / config.TOTAL_ROCKS
+
+        # サイズが常に大きい順（または小さい順）に並んでしまうのを防ぐため、配列をシャッフルする
+        np.random.shuffle(u)
         
-        D_min = config.ROCK_SIZE_MIN
-        D_max = config.ROCK_SIZE_MAX
-        
-        term1 = D_max ** (-r_true)
+        # 算出した自然な最大サイズを上限として適用
+        term1 = D_max_auto ** (-r_true)
         term2 = D_min ** (-r_true)
         
         diameters = ( (term1 - term2) * u + term2 ) ** (-1.0 / r_true)
@@ -118,7 +123,7 @@ class RockModel:
         sigma_rayleigh = k_rayleigh * (diameter_array ** 6)
         
         sigma = np.where(diameter_array >= boundary_size, sigma_optical, sigma_rayleigh)
-        return 10 * np.log10(sigma)
+        return 10 * np.log10(np.maximum(sigma, 1e-15))
 
     def apply_radar_equation(self, rocks_df, config, quiet=False):
         if not quiet:
@@ -169,7 +174,6 @@ class Analyzer:
         個数を面積(area)で規格化し、密度としてフィッティングを行う
         """
         if len(diameters) < 2:
-            # 検出岩石が1個以下の場合はエラーを回避するため空配列を返す
             return np.nan, np.nan, np.array([]), np.array([])
             
         sorted_d = np.sort(diameters)
@@ -191,6 +195,10 @@ class Analyzer:
         results = []
         depth_ranges = np.arange(1.0, config.MAX_DEPTH + 0.1, step)
         
+        # 面積の共通化：エリアの幅(Length)を算出
+        length = config.AREA_SIZE_M2 / config.MAX_DEPTH
+        d_min_cm = config.ROCK_SIZE_MIN * 100.0
+        
         for d in depth_ranges:
             subset_detected = detected_df[
                 (detected_df['is_detected'] == True) & 
@@ -201,12 +209,15 @@ class Analyzer:
             count_detected = len(subset_detected)
             count_all = len(subset_all)
             
-            area = d * 1500.0
+            # 深さごとの面積を算出
+            area = d * length
             
             if count_detected > 5:
-                slope, intercept, _, _ = self.calculate_slope(subset_detected['diameter'].values, area)
+                # cm単位に変換して傾きを計算
+                diameters_cm = subset_detected['diameter'].values * 100.0
+                slope, intercept, _, _ = self.calculate_slope(diameters_cm, area)
                 r_apparent = -slope
-                k_apparent = (10**intercept) * (config.ROCK_SIZE_MIN**slope)
+                k_apparent = (10**intercept) * (d_min_cm**slope)
             else:
                 r_apparent = np.nan
                 k_apparent = np.nan
@@ -236,7 +247,11 @@ class Analyzer:
         step_size = window_size * step_ratio
         
         d_starts = np.arange(0.0, config.MAX_DEPTH - window_size + 1e-5, step_size)
-        area = window_size * 1500.0 # 窓内の面積は常に一定
+        
+        # 面積の共通化
+        length = config.AREA_SIZE_M2 / config.MAX_DEPTH
+        area = window_size * length 
+        d_min_cm = config.ROCK_SIZE_MIN * 100.0
         
         for d_start in d_starts:
             d_end = d_start + window_size
@@ -256,9 +271,11 @@ class Analyzer:
             count_all = len(subset_all)
             
             if count_detected > 5:
-                slope, intercept, _, _ = self.calculate_slope(subset_detected['diameter'].values, area)
+                # cm単位に変換して傾きを計算
+                diameters_cm = subset_detected['diameter'].values * 100.0
+                slope, intercept, _, _ = self.calculate_slope(diameters_cm, area)
                 r_apparent = -slope
-                k_apparent = (10**intercept) * (config.ROCK_SIZE_MIN**slope)
+                k_apparent = (10**intercept) * (d_min_cm**slope)
             else:
                 r_apparent = np.nan
                 k_apparent = np.nan
@@ -286,17 +303,13 @@ class Analyzer:
         """
         plt.figure(figsize=(10, 8))
         
-        # 岩石をプロット (色を received_power に設定)
         sc = plt.scatter(df['depth'], df['diameter'], 
                          c=df['received_power'], cmap='jet', 
                          alpha=0.8, s=20, edgecolors='none', vmax=0, vmin=-120)
         
-        # カラーバーの追加と設定
         cbar = plt.colorbar(sc)
         cbar.set_label('Received Power $S_{norm}$ [dB]', fontsize=16)
         cbar.ax.tick_params(labelsize=14)
-        
-        # カラーバー上に現在の検出閾値（ノイズフロア）のラインを引く
         cbar.ax.axhline(config.NOISE_FLOOR_DBM, color='red', linestyle='--', linewidth=2)
 
         plt.xlabel('Depth [m]', fontsize=18)
@@ -309,42 +322,45 @@ class Analyzer:
         plt.savefig(f"{output_prefix}.pdf")
         plt.close()
 
-    # === 個別出力用プロットメソッド ===
+    # === 個別出力用プロットメソッド (True Fitもpolyfitで描画 / cm単位) ===
     def plot_csfd(self, detected_df, all_rocks_df, output_prefix, r_true, config):
         plt.figure(figsize=(10, 8))
         
-        # 全岩石が分布する面積で規格化
-        overall_area = config.MAX_DEPTH * 1500.0
+        # 全計算で一貫して同じAREA_SIZE_M2を使用
+        overall_area = config.AREA_SIZE_M2
+        d_min_cm = config.ROCK_SIZE_MIN * 100.0
 
-        diameters_true = all_rocks_df['diameter'].values
-        if len(diameters_true) > 0:
-            slope_true, intercept_true, x_log_true, y_log_true = self.calculate_slope(diameters_true, overall_area)
+        # --- True Fit ---
+        diameters_true_cm = all_rocks_df['diameter'].values * 100.0
+        if len(diameters_true_cm) > 0:
+            slope_true, intercept_true, x_log_true, y_log_true = self.calculate_slope(diameters_true_cm, overall_area)
             if len(x_log_true) > 0:
                 plt.scatter(10**x_log_true, 10**y_log_true, s=20, color='gray', label='Generated Rocks', marker='D', alpha=0.7)
             if not np.isnan(slope_true):
-                x_fit_true = np.linspace(min(x_log_true), max(x_log_true), 100)
-                y_fit_true = slope_true * x_fit_true + intercept_true
-                d_min = config.ROCK_SIZE_MIN
-                k_true = (10**intercept_true) * (d_min**slope_true)
-                plt.plot(10**x_fit_true, 10**y_fit_true, 'k--', linewidth=2.0, 
+                x_fit_true = np.logspace(min(x_log_true), max(x_log_true), 100)
+                y_fit_true = slope_true * np.log10(x_fit_true) + intercept_true
+                k_true = (10**intercept_true) * (d_min_cm**slope_true)
+                plt.plot(x_fit_true, 10**y_fit_true, 'k--', linewidth=2.0, 
                          label=f'True Fit (r={-slope_true:.2f}, k={k_true:.2e})')
 
-        diameters_det = detected_df[detected_df['is_detected'] == True]['diameter'].values
-        if len(diameters_det) > 0:
-            slope_det, intercept_det, x_log_det, y_log_det = self.calculate_slope(diameters_det, overall_area)
+        # --- Apparent Fit ---
+        diameters_det_cm = detected_df[detected_df['is_detected'] == True]['diameter'].values * 100.0
+        if len(diameters_det_cm) > 0:
+            slope_det, intercept_det, x_log_det, y_log_det = self.calculate_slope(diameters_det_cm, overall_area)
             if len(x_log_det) > 0:
                 plt.scatter(10**x_log_det, 10**y_log_det, s=20, color='blue', label='Detected Rocks', marker='o')
             if not np.isnan(slope_det):
-                x_fit_det = np.linspace(min(x_log_det), max(x_log_det), 100)
-                y_fit_det = slope_det * x_fit_det + intercept_det
-                k_det = (10**intercept_det) * (d_min**slope_det)
-                plt.plot(10**x_fit_det, 10**y_fit_det, 'r-', linewidth=2.5, 
+                x_fit_det = np.logspace(min(x_log_det), max(x_log_det), 100)
+                y_fit_det = slope_det * np.log10(x_fit_det) + intercept_det
+                k_det = (10**intercept_det) * (d_min_cm**slope_det)
+                plt.plot(x_fit_det, 10**y_fit_det, 'r-', linewidth=2.5, 
                          label=f'Apparent Fit (r={-slope_det:.2f}, k={k_det:.2e})')
 
         plt.xscale('log')
         plt.yscale('log')
-        plt.xlabel('Diameter [m]', fontsize=18)
-        plt.xticks([0.06, 0.1, 0.2, 0.4, 0.6], ['0.06', '0.1', '0.2', '0.4', '0.6'], fontsize=16)
+        plt.xlabel('Diameter [cm]', fontsize=18)
+        plt.xticks([6, 10, 20, 50, 100, 200, 500], [6, 10, 20, 50, 100, 200, 500], fontsize=16)
+        plt.xlim(d_min_cm * 0.8, max(diameters_true_cm.max(), diameters_det_cm.max()) * 1.2)
         plt.ylabel('Cumulative Rock Density N(>D) [1/m²]', fontsize=18)
         plt.tick_params(axis='both', which='major', labelsize=16)
         plt.legend(fontsize=14)
@@ -408,35 +424,43 @@ class Analyzer:
         plt.savefig(f"{output_prefix}.pdf")
         plt.close()
 
-    # === 統計出力用プロットメソッド (平均とエラー範囲) ===
+    # === 統計出力用プロットメソッド (エラー範囲、±ラベルの追加) ===
     def plot_csfd_stats(self, csfd_stats_df, output_prefix, r_true, config):
         plt.figure(figsize=(10, 8))
 
-        x_min_log = np.log10(config.ROCK_SIZE_MIN)
-        x_max_log = np.log10(config.ROCK_SIZE_MAX)
+        d_min_cm = config.ROCK_SIZE_MIN * 100.0
+        N_total = config.TOTAL_ROCKS
+        D_max_auto_cm = d_min_cm * (N_total ** (1.0 / r_true))
+
+        x_min_log = np.log10(d_min_cm)
+        x_max_log = np.log10(D_max_auto_cm)
         x_log_common = np.linspace(x_min_log, x_max_log, 100)
         x_common = 10**x_log_common
 
+        # --- True Fit ---
         y_true_all = []
         for _, row in csfd_stats_df.iterrows():
             if not np.isnan(row['slope_true']):
                 y_true_all.append(row['slope_true'] * x_log_common + row['intercept_true'])
         
-        d_min = config.ROCK_SIZE_MIN
-
         if y_true_all:
             y_true_all = np.array(y_true_all)
             y_true_mean = np.mean(y_true_all, axis=0)
             y_true_std = np.std(y_true_all, axis=0)
             
-            mean_slope_true = np.mean(csfd_stats_df['slope_true'])
-            mean_intercept_true = np.mean(csfd_stats_df['intercept_true'])
-            mean_k_true = (10**mean_intercept_true) * (d_min**mean_slope_true)
+            r_true_all = -csfd_stats_df['slope_true'].dropna()
+            mean_r_true = np.mean(r_true_all)
+            std_r_true = np.std(r_true_all)
+            
+            k_true_all = (10**csfd_stats_df['intercept_true'].dropna()) * (d_min_cm**csfd_stats_df['slope_true'].dropna())
+            mean_k_true = np.mean(k_true_all)
+            std_k_true = np.std(k_true_all)
             
             plt.plot(x_common, 10**y_true_mean, 'k--', linewidth=2.0, 
-                     label=f'Mean True Fit (r={-mean_slope_true:.2f}, k={mean_k_true:.2e})')
+                     label=f'True fit: r={mean_r_true:.2f} $\\pm$ {std_r_true:.2f}, k={mean_k_true:.2e} $\\pm$ {std_k_true:.2e}')
             plt.fill_between(x_common, 10**(y_true_mean - y_true_std), 10**(y_true_mean + y_true_std), color='gray', alpha=0.3)
 
+        # --- Apparent Fit ---
         y_det_all = []
         for _, row in csfd_stats_df.iterrows():
             if not np.isnan(row['slope_det']):
@@ -447,19 +471,24 @@ class Analyzer:
             y_det_mean = np.mean(y_det_all, axis=0)
             y_det_std = np.std(y_det_all, axis=0)
             
-            mean_slope_det = np.mean(csfd_stats_df['slope_det'])
-            mean_intercept_det = np.mean(csfd_stats_df['intercept_det'])
-            mean_k_det = (10**mean_intercept_det) * (d_min**mean_slope_det)
+            r_det_all = -csfd_stats_df['slope_det'].dropna()
+            mean_r_det = np.mean(r_det_all)
+            std_r_det = np.std(r_det_all)
+            
+            k_det_all = (10**csfd_stats_df['intercept_det'].dropna()) * (d_min_cm**csfd_stats_df['slope_det'].dropna())
+            mean_k_det = np.mean(k_det_all)
+            std_k_det = np.std(k_det_all)
             
             plt.plot(x_common, 10**y_det_mean, 'r-', linewidth=2.5, 
-                     label=f'Mean Apparent Fit (r={-mean_slope_det:.2f}, k={mean_k_det:.2e})')
-            plt.fill_between(x_common, 10**(y_det_mean - y_det_std), 10**(y_det_mean + y_det_std), color='red', alpha=0.3, label='Apparent Fit ±1 Std Dev')
+                     label=f'Apparent fit: r={mean_r_det:.2f} $\\pm$ {std_r_det:.2f}, k={mean_k_det:.2e} $\\pm$ {std_k_det:.2e}')
+            plt.fill_between(x_common, 10**(y_det_mean - y_det_std), 10**(y_det_mean + y_det_std), color='red', alpha=0.3)
 
         plt.xscale('log')
         plt.yscale('log')
-        plt.xlabel('Diameter [m]', fontsize=18)
+        plt.xlabel('Diameter [cm]', fontsize=18)
+        plt.xticks([6, 10, 20, 50, 100, 200, 500], [6, 10, 20, 50, 100, 200, 500], fontsize=16)
+        plt.xlim(d_min_cm * 0.8, D_max_auto_cm * 1.2)
         plt.ylabel('Cumulative Rock Density N(>D) [1/m²]', fontsize=18)
-        plt.xticks([0.06, 0.1, 0.2, 0.4, 0.6], ['0.06', '0.1', '0.2', '0.4', '0.6'], fontsize=16)
         plt.tick_params(axis='both', which='major', labelsize=16)
         plt.legend(fontsize=14)
         plt.grid(True, which="both", ls="-", alpha=0.7)
@@ -559,13 +588,16 @@ class Analyzer:
     def plot_csfd_count_stats(self, csfd_stats_df, output_prefix, r_true, config):
         plt.figure(figsize=(10, 8))
 
-        x_min_log = np.log10(config.ROCK_SIZE_MIN)
-        x_max_log = np.log10(config.ROCK_SIZE_MAX)
+        d_min_cm = config.ROCK_SIZE_MIN * 100.0
+        N_total = config.TOTAL_ROCKS
+        D_max_auto_cm = d_min_cm * (N_total ** (1.0 / r_true))
+
+        x_min_log = np.log10(d_min_cm)
+        x_max_log = np.log10(D_max_auto_cm)
         x_log_common = np.linspace(x_min_log, x_max_log, 100)
         x_common = 10**x_log_common
 
-        d_min = config.ROCK_SIZE_MIN
-
+        # --- True Fit (Count) ---
         y_true_all = []
         for _, row in csfd_stats_df.iterrows():
             if not np.isnan(row['slope_true_cnt']):
@@ -576,14 +608,19 @@ class Analyzer:
             y_true_mean = np.mean(y_true_all, axis=0)
             y_true_std = np.std(y_true_all, axis=0)
 
-            mean_slope_true = np.mean(csfd_stats_df['slope_true_cnt'])
-            mean_intercept_true = np.mean(csfd_stats_df['intercept_true_cnt'])
-            mean_k_true = (10**mean_intercept_true) * (d_min**mean_slope_true)
+            r_true_cnt_all = -csfd_stats_df['slope_true_cnt'].dropna()
+            mean_r_true_cnt = np.mean(r_true_cnt_all)
+            std_r_true_cnt = np.std(r_true_cnt_all)
+
+            k_true_cnt_all = (10**csfd_stats_df['intercept_true_cnt'].dropna()) * (d_min_cm**csfd_stats_df['slope_true_cnt'].dropna())
+            mean_k_true_cnt = np.mean(k_true_cnt_all)
+            std_k_true_cnt = np.std(k_true_cnt_all)
 
             plt.plot(x_common, 10**y_true_mean, 'k--', linewidth=2.0,
-                     label=f'Mean True Fit (r={-mean_slope_true:.2f}, k={mean_k_true:.2e})')
+                     label=f'True fit: r={mean_r_true_cnt:.2f} $\\pm$ {std_r_true_cnt:.2f}, k={mean_k_true_cnt:.2e} $\\pm$ {std_k_true_cnt:.2e}')
             plt.fill_between(x_common, 10**(y_true_mean - y_true_std), 10**(y_true_mean + y_true_std), color='gray', alpha=0.3)
 
+        # --- Apparent Fit (Count) ---
         y_det_all = []
         for _, row in csfd_stats_df.iterrows():
             if not np.isnan(row['slope_det_cnt']):
@@ -594,18 +631,23 @@ class Analyzer:
             y_det_mean = np.mean(y_det_all, axis=0)
             y_det_std = np.std(y_det_all, axis=0)
 
-            mean_slope_det = np.mean(csfd_stats_df['slope_det_cnt'])
-            mean_intercept_det = np.mean(csfd_stats_df['intercept_det_cnt'])
-            mean_k_det = (10**mean_intercept_det) * (d_min**mean_slope_det)
+            r_det_cnt_all = -csfd_stats_df['slope_det_cnt'].dropna()
+            mean_r_det_cnt = np.mean(r_det_cnt_all)
+            std_r_det_cnt = np.std(r_det_cnt_all)
+
+            k_det_cnt_all = (10**csfd_stats_df['intercept_det_cnt'].dropna()) * (d_min_cm**csfd_stats_df['slope_det_cnt'].dropna())
+            mean_k_det_cnt = np.mean(k_det_cnt_all)
+            std_k_det_cnt = np.std(k_det_cnt_all)
 
             plt.plot(x_common, 10**y_det_mean, 'r-', linewidth=2.5,
-                     label=f'Mean Apparent Fit (r={-mean_slope_det:.2f}, k={mean_k_det:.2e})')
-            plt.fill_between(x_common, 10**(y_det_mean - y_det_std), 10**(y_det_mean + y_det_std), color='red', alpha=0.3, label='Apparent Fit ±1 Std Dev')
+                     label=f'Apparent fit: r={mean_r_det_cnt:.2f} $\\pm$ {std_r_det_cnt:.2f}, k={mean_k_det_cnt:.2e} $\\pm$ {std_k_det_cnt:.2e}')
+            plt.fill_between(x_common, 10**(y_det_mean - y_det_std), 10**(y_det_mean + y_det_std), color='red', alpha=0.3)
 
         plt.xscale('log')
         plt.yscale('log')
-        plt.xlabel('Diameter [m]', fontsize=18)
-        plt.xticks([0.06, 0.1, 0.2, 0.4, 0.6], ['0.06', '0.1', '0.2', '0.4', '0.6'], fontsize=16)
+        plt.xlabel('Diameter [cm]', fontsize=18)
+        plt.xticks([6, 10, 20, 50, 100, 200, 500], [6, 10, 20, 50, 100, 200, 500], fontsize=16)
+        plt.xlim(d_min_cm * 0.8, D_max_auto_cm * 1.2)
         plt.ylabel('Cumulative Rock Count N(>D)', fontsize=18)
         plt.tick_params(axis='both', which='major', labelsize=16)
         plt.legend(fontsize=14)
@@ -617,11 +659,9 @@ class Analyzer:
         plt.close()
 
 # --- 新規: 並列処理用のワーカー関数 ---
-# マルチプロセスで実行できるようにトップレベルに配置します
 def process_iteration(args):
     i, r_true, total_rocks, output_dir, overall_area, true_rock_density = args
     
-    # プロセス間でインスタンスを共有しないよう、各プロセス内で独立して生成
     config = RadarConfig(total_rocks=total_rocks)
     model = RockModel()
     analyzer = Analyzer()
@@ -629,7 +669,6 @@ def process_iteration(args):
     iter_dir = f"{output_dir}/each_iteration/iter_{i:02d}"
     os.makedirs(iter_dir, exist_ok=True)
 
-    # 既存の計算ロジックをそのまま実行
     all_rocks_df = model.generate_rocks(r_true, config, quiet=True)
     all_rocks_df.to_csv(f"{iter_dir}/truth_rocks.csv", index=False)
 
@@ -638,19 +677,23 @@ def process_iteration(args):
 
     analyzer.plot_power_scatter(detected_df, f"{iter_dir}/power_scatter", config)
 
-    d_min = config.ROCK_SIZE_MIN
+    d_min_cm = config.ROCK_SIZE_MIN * 100.0
 
-    slope_true, intercept_true, _, _ = analyzer.calculate_slope(all_rocks_df['diameter'].values, overall_area)
+    # True Fit (cm)
+    diameters_true_cm = all_rocks_df['diameter'].values * 100.0
+    slope_true, intercept_true, _, _ = analyzer.calculate_slope(diameters_true_cm, overall_area)
     r_true_iter = -slope_true if not np.isnan(slope_true) else np.nan
-    k_true_iter = (10**intercept_true) * (d_min**slope_true) if not np.isnan(slope_true) else np.nan
+    k_true_iter = (10**intercept_true) * (d_min_cm**slope_true) if not np.isnan(slope_true) else np.nan
 
-    diameters_det = detected_df[detected_df['is_detected'] == True]['diameter'].values
-    slope_det, intercept_det, _, _ = analyzer.calculate_slope(diameters_det, overall_area)
+    # Apparent Fit (cm)
+    diameters_det_cm = detected_df[detected_df['is_detected'] == True]['diameter'].values * 100.0
+    slope_det, intercept_det, _, _ = analyzer.calculate_slope(diameters_det_cm, overall_area)
     r_det_iter = -slope_det if not np.isnan(slope_det) else np.nan
-    k_det_iter = (10**intercept_det) * (d_min**slope_det) if not np.isnan(slope_det) else np.nan
+    k_det_iter = (10**intercept_det) * (d_min_cm**slope_det) if not np.isnan(slope_det) else np.nan
 
-    slope_true_cnt, intercept_true_cnt, _, _ = analyzer.calculate_slope(all_rocks_df['diameter'].values, 1.0)
-    slope_det_cnt, intercept_det_cnt, _, _ = analyzer.calculate_slope(diameters_det, 1.0)
+    # Count Fits (cm)
+    slope_true_cnt, intercept_true_cnt, _, _ = analyzer.calculate_slope(diameters_true_cm, 1.0)
+    slope_det_cnt, intercept_det_cnt, _, _ = analyzer.calculate_slope(diameters_det_cm, 1.0)
 
     csfd_stats = {
         'iteration': i,
@@ -691,7 +734,6 @@ def process_iteration(args):
 def main():
     print("--- 岩石見逃しモデル 統計シミュレーション (相対値モデル) ---")
     
-    # --- rとNの対話的入力 ---
     try:
         r_input_str = input("真のべき指数(r)を入力してください (例: 1.0): ")
         r_true = float(r_input_str)
@@ -706,24 +748,51 @@ def main():
         print("数値の入力ではありません。デフォルト値を使用します。")
         rock_counts = [100, 500, 1000, 5000]
 
-    # パス設定
     base_dir = '/Volumes/SSD_Kanda_SAMSUNG/modeling_tools_output/evaluate_apparent_RSFD_relative' 
     os.makedirs(base_dir, exist_ok=True)
     
-    # JSONファイルのパス設定
     json_path = os.path.join(base_dir, 'rsfd_summary.json')
 
-    # 計算パラメータ
-    NUM_ITERATIONS = 100  # 反復回数
+    NUM_ITERATIONS = 100 
     
     for total_rocks in rock_counts:
         print(f"\n=== 岩石数: {total_rocks} のシミュレーションを開始 ({NUM_ITERATIONS}回) ===")
+        
+        config = RadarConfig(total_rocks=total_rocks)
+        
+        # --- 最大岩石サイズの事前チェック (3.0 m 制限) ---
+        D_max_auto = config.ROCK_SIZE_MIN * (total_rocks ** (1.0 / r_true))
+        if D_max_auto > 3.0:
+            print(f"  -> [警告] 計算上の最大岩石サイズ ({D_max_auto:.2f} m) が 3.0 m を超えるため、計算を中止します。")
+            
+            # JSONへの「Calculation stop」の記録
+            if os.path.exists(json_path):
+                try:
+                    with open(json_path, 'r', encoding='utf-8') as f:
+                        summary_data = json.load(f)
+                except json.JSONDecodeError:
+                    summary_data = {}
+            else:
+                summary_data = {}
+
+            r_key = str(r_true)
+            n_key = str(total_rocks)
+            if r_key not in summary_data:
+                summary_data[r_key] = {}
+            
+            summary_data[r_key][n_key] = "Calculation stop"
+            
+            with open(json_path, 'w', encoding='utf-8') as f:
+                json.dump(summary_data, f, indent=4)
+            print(f"  -> {json_path} にストップを記録し、次の条件へスキップします。")
+            continue
+        # --------------------------------------------------------
+
         output_dir = f"{base_dir}/r_{r_true}/{total_rocks}"
         os.makedirs(output_dir, exist_ok=True)
         print(f"出力ディレクトリ: {output_dir}")
 
-        config = RadarConfig(total_rocks=total_rocks)
-        overall_area = config.MAX_DEPTH * 1500.0
+        overall_area = config.AREA_SIZE_M2
         true_rock_density = config.TOTAL_ROCKS / overall_area
 
         with open(f"{output_dir}/parameters.txt", "w") as f:
@@ -736,32 +805,21 @@ def main():
         all_moving_results = []
         overall_csfd_stats = []
 
-        # --- 反復計算の実行 (並列化・進捗表示対応) ---
         print("  -> 並列処理でイテレーションを実行中...")
         
-        # ワーカーに渡す引数リストを作成
         tasks = [(i, r_true, total_rocks, output_dir, overall_area, true_rock_density) for i in range(1, NUM_ITERATIONS + 1)]
-        
-        # 結果を格納するためのリスト（順序を維持するために初期化）
         results = [None] * NUM_ITERATIONS
 
-        # ProcessPoolExecutorを使用してマルチプロセス処理
         with concurrent.futures.ProcessPoolExecutor() as executor:
-            # 1. 全てのタスクを先にキューに登録 (submit)
-            # futureオブジェクトをキー、元のインデックスを値とした辞書を作成
             future_to_index = {executor.submit(process_iteration, task): i for i, task in enumerate(tasks)}
             
-            # 2. as_completedで完了したタスクから順次取り出し、tqdmでプログレスバーを更新
             for future in tqdm(concurrent.futures.as_completed(future_to_index), total=NUM_ITERATIONS, desc="進捗", unit="iter"):
-                # 終わったタスクの元のインデックスを取得
                 original_idx = future_to_index[future]
                 try:
-                    # 処理結果を取得し、元の正しい順序の場所に格納
                     results[original_idx] = future.result()
                 except Exception as exc:
                     print(f"\nイテレーションでエラーが発生しました: {exc}")
 
-        # ワーカーから戻ってきた結果を元のリストに集約
         for res in results:
             if res is not None:
                 csfd_stats, analysis_range, analysis_moving = res
@@ -769,21 +827,16 @@ def main():
                 all_range_results.append(analysis_range)
                 all_moving_results.append(analysis_moving)
 
-        # --- 統計処理とプロットの実行 ---
         print("  -> 統計データの集計とプロットを生成中...")
         
-        # 分析用のダミーインスタンス（描画メソッド呼び出し用）
         analyzer = Analyzer()
         
-        # 1. 全体RSFDの統計プロット
         csfd_stats_df = pd.DataFrame(overall_csfd_stats)
-        # イテレーション順にソート（並列処理で順序が前後する可能性があるため）
         csfd_stats_df = csfd_stats_df.sort_values('iteration')
         csfd_stats_df.to_csv(f"{output_dir}/csfd_fits_stats.csv", index=False)
         analyzer.plot_csfd_stats(csfd_stats_df, f"{output_dir}/RSFD_comparison_stats", r_true, config)
         analyzer.plot_csfd_count_stats(csfd_stats_df, f"{output_dir}/RSFD_count_stats", r_true, config)
 
-        # 全体RSFDの r, k の平均と標準偏差を算出
         r_true_mean = csfd_stats_df['r_true'].mean()
         r_true_std  = csfd_stats_df['r_true'].std()
         k_true_mean = csfd_stats_df['k_true'].mean()
@@ -794,7 +847,6 @@ def main():
         k_det_mean = csfd_stats_df['k_det'].mean()
         k_det_std  = csfd_stats_df['k_det'].std()
 
-        # txtファイルへの出力
         with open(f"{output_dir}/overall_rsfd_stats.txt", "w") as f:
             f.write(f"=== Overall RSFD (0-{config.MAX_DEPTH}m) {NUM_ITERATIONS} Iterations Statistics ===\n\n")
             f.write(f"[True Rocks (Generated)]\n")
@@ -804,8 +856,6 @@ def main():
             f.write(f"  r_apparent = {r_det_mean:.4f} +/- {r_det_std:.4f}\n")
             f.write(f"  k_apparent = {k_det_mean:.4e} +/- {k_det_std:.4e}\n")
 
-        # --- JSONファイルへの記録・追記・更新 ---
-        # 既存のJSONを読み込む
         if os.path.exists(json_path):
             try:
                 with open(json_path, 'r', encoding='utf-8') as f:
@@ -821,7 +871,6 @@ def main():
         if r_key not in summary_data:
             summary_data[r_key] = {}
 
-        # True fitの結果も含めて格納
         summary_data[r_key][n_key] = {
             "r_true_mean": float(r_true_mean),
             "r_true_std": float(r_true_std),
@@ -833,13 +882,10 @@ def main():
             "k_apparent_std": float(k_det_std)
         }
 
-        # JSONファイルへ書き出し
         with open(json_path, 'w', encoding='utf-8') as f:
             json.dump(summary_data, f, indent=4)
         print(f"  -> {json_path} を更新しました。")
-        # --------------------------------------------------
 
-        # 2. 既存の深さ範囲解析の統計
         combined_range = pd.concat(all_range_results)
         stats_range = combined_range.groupby('depth_range').agg(
             r_apparent_mean=('r_apparent', 'mean'),
@@ -858,7 +904,6 @@ def main():
         analyzer.plot_k_analysis_stats(stats_range, f"{output_dir}/powerlaw_k_range_stats", true_rock_density, x_col='depth_range', xlabel='Depth Range [m]')
         analyzer.plot_detection_rate_stats(stats_range, f"{output_dir}/detection_rate_range_stats", x_col='depth_range', xlabel='Depth Range [m]')
 
-        # 3. 新規の移動窓解析の統計
         combined_moving = pd.concat(all_moving_results)
         stats_moving = combined_moving.groupby('depth_center').agg(
             r_apparent_mean=('r_apparent', 'mean'),
