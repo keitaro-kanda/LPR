@@ -25,6 +25,14 @@ r_keys = sorted(data.keys(), key=float)
 # (最初の r のデータから岩石数のキーを取得)
 rock_counts = sorted(data[r_keys[0]].keys(), key=int)
 
+# Calculation stop の有無を確認
+# Calculation stopがTrueの場合、プロットには含めないようにするためのフラグを設定
+calculation_stops = []
+for r in r_keys:
+    for count in rock_counts:
+        if count in data[r] and "calculation_stop" in data[r][count] and data[r][count]["calculation_stop"]:
+            calculation_stops.append((r, count))
+
 # プロット線用のリスト
 line_colors = ['r', 'g', 'b', 'magenta']
 line_markers = ['o', 's', 'D', '^']
@@ -41,7 +49,7 @@ for count in rock_counts:
     y_stds = []
     
     for r in r_keys:
-        if count in data[r]:
+        if count in data[r] and (r, count) not in calculation_stops:
             x_vals.append(float(r))
             y_means.append(data[r][count]["r_apparent_mean"])
             y_stds.append(data[r][count]["r_apparent_std"])
@@ -84,7 +92,7 @@ for count in rock_counts:
     y_stds = []
     
     for r in r_keys:
-        if count in data[r]:
+        if count in data[r] and (r, count) not in calculation_stops:
             x_vals.append(float(r))
             # 値と誤差を r_true_mean で割る
             r_true = data[r][count]["r_true_mean"]
@@ -128,7 +136,7 @@ for count in rock_counts:
     y_stds = []
     
     for r in r_keys:
-        if count in data[r]:
+        if count in data[r] and (r, count) not in calculation_stops:
             x_vals.append(float(r))
             # 値と誤差を k_true_mean で割る
             k_true = data[r][count]["k_true_mean"]
@@ -175,7 +183,7 @@ for count in rock_counts:
     y_stds = []
     
     for r in r_keys:
-        if count in data[r]:
+        if count in data[r] and (r, count) not in calculation_stops:
             x_vals.append(data[r][count]["k_true_mean"])
             y_means.append(data[r][count]["k_apparent_mean"])
             y_stds.append(data[r][count]["k_apparent_std"])
@@ -222,7 +230,7 @@ for count in rock_counts:
     y_stds = []
     
     for r in r_keys:
-        if count in data[r]:
+        if count in data[r] and (r, count) not in calculation_stops:
             x_means.append(data[r][count]["r_apparent_mean"])
             x_stds.append(data[r][count]["r_apparent_std"])
             y_means.append(data[r][count]["k_apparent_mean"])
