@@ -14,7 +14,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
 from datetime import datetime
-from matplotlib.ticker import MultipleLocator
+from matplotlib.ticker import MultipleLocator, FixedLocator, FixedFormatter
 
 # NaNデータ点をプロットする際のy位置（ylim下限より小さい値、軸の下に描画）
 NAN_Y_MARKER = 1e-5
@@ -99,13 +99,17 @@ def create_rsfd_plot(x_data, y_data, xlabel, ylabel, output_path,
             k_str = format_k_value(fit_params['k'])
             r_val = fit_params['r']
             R2_val = fit_params['R2']
-            p_str = fit_params['p_str']
-            fit_label = f'Fit: N = {k_str} D^({-r_val:.2f}), R²={R2_val:.3f}, {p_str}'
+            fit_label = f'Fit: r={r_val:.2f}, k={k_str}, R²={R2_val:.3f}'
             plt.plot(fit_x, fit_y, linestyle='--', linewidth=1.5, color=fit_color, label=fit_label)
 
     # 軸スケール設定（両対数のみ）
     plt.xscale('log')
     plt.yscale('log')
+
+    # カスタムx軸ティック設定
+    ax = plt.gca()
+    ax.xaxis.set_major_locator(FixedLocator([1, 5, 10, 50]))
+    ax.xaxis.set_major_formatter(FixedFormatter(['1 cm', '5 cm', '10 cm', '50 cm']))
 
     # x軸範囲の設定
     plt.xlim(0.7, 70)
@@ -747,17 +751,22 @@ else:  # startup_mode == '2'
             k_str_est = format_k_value(k_pow_area_est)
             plt.plot(D_fit_area_est, N_pow_fit_area_est,
                 linestyle='--', linewidth=1.5, color='blue',
-                label=f'Group1-3 Fit: N = {k_str_est} D⁻{r_pow_area_est:.2f}, R²={R2_pow_area_est:.3f}, {p_str_pow_area_est}')
+                label=f'Contain size-unmeasurable Fit: r={r_pow_area_est:.2f}, k={k_str_est}, R²={R2_pow_area_est:.3f}')
 
             # Group 2-3のフィット線
             k_str_2_3 = format_k_value(k_pow_area_2_3)
             plt.plot(D_fit_area_2_3, N_pow_fit_area_2_3,
                 linestyle='--', linewidth=1.5, color='red',
-                label=f'Group2-3 Fit: N = {k_str_2_3} D⁻{r_pow_area_2_3:.2f}, R²={R2_pow_area_2_3:.3f}, {p_str_pow_area_2_3}')
+                label=f'Only size-measurable Fit: r={r_pow_area_2_3:.2f}, k={k_str_2_3}, R²={R2_pow_area_2_3:.3f}')
 
             # 軸スケール設定（両対数のみ）
             plt.xscale('log')
             plt.yscale('log')
+
+            # カスタムx軸ティック設定
+            ax_comp = plt.gca()
+            ax_comp.xaxis.set_major_locator(FixedLocator([1, 5, 10, 50]))
+            ax_comp.xaxis.set_major_formatter(FixedFormatter(['1 cm', '5 cm', '10 cm', '50 cm']))
 
             # x軸範囲
             plt.xlim(0.5, 50)
@@ -769,7 +778,7 @@ else:  # startup_mode == '2'
             plt.grid(True, linestyle='--', alpha=0.5)
 
             # 凡例を右上に配置
-            plt.legend(loc='upper right', fontsize=10, frameon=True, fancybox=True)
+            plt.legend(loc='upper right', fontsize=16, frameon=True, fancybox=True)
 
             plt.tight_layout()
 
@@ -1164,17 +1173,22 @@ plt.plot(unique_sizes_estimate_group2, cum_counts_area_est,
 k_str_est = format_k_value(k_pow_area_est)
 plt.plot(D_fit_area_est, N_pow_fit_area_est,
         linestyle='--', linewidth=1.5, color='blue',
-        label=f'Group1-3 Fit: N = {k_str_est} D⁻{r_pow_area_est:.2f}, R²={R2_pow_area_est:.3f}, {p_str_pow_area_est}')
+        label=f'Contain size-measurable: r={r_pow_area_est:.2f}, k={k_str_est}, R²={R2_pow_area_est:.3f}')
 
 # Group 2-3のフィット線
 k_str_2_3 = format_k_value(k_pow_area_2_3)
 plt.plot(D_fit_area_2_3, N_pow_fit_area_2_3,
         linestyle='--', linewidth=1.5, color='red',
-        label=f'Group2-3 Fit: N = {k_str_2_3} D⁻{r_pow_area_2_3:.2f}, R²={R2_pow_area_2_3:.3f}, {p_str_pow_area_2_3}')
+        label=f'Only size-measurable: r={r_pow_area_2_3:.2f}, k={k_str_2_3}, R²={R2_pow_area_2_3:.3f}')
 
 # 軸スケール設定（両対数のみ）
 plt.xscale('log')
 plt.yscale('log')
+
+# カスタムx軸ティック設定
+ax_comp = plt.gca()
+ax_comp.xaxis.set_major_locator(FixedLocator([1, 5, 10, 50]))
+ax_comp.xaxis.set_major_formatter(FixedFormatter(['1 cm', '5 cm', '10 cm', '50 cm']))
 
 # x軸範囲
 plt.xlim(0.5, 50)
@@ -1186,7 +1200,7 @@ plt.tick_params(labelsize=16)
 plt.grid(True, linestyle='--', alpha=0.5)
 
 # 凡例を右上に配置
-plt.legend(loc='upper right', fontsize=10, frameon=True, fancybox=True)
+plt.legend(frameon=True, fancybox=True, fontsize=16)
 
 plt.tight_layout()
 
