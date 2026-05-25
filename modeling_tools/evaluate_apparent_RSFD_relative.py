@@ -143,6 +143,7 @@ class RockModel:
         
         # 2. 媒質による減衰項 (往復): -2 * attenuation_db_m * depth
         attenuation_term = -2 * config.attenuation_db_m * rocks_df['depth'].values
+        print("Attenuation rate [dB/m]:", config.attenuation_db_m)
         
         # 3. 反射強度の比率項: 10 * log10(sigma(r) / sigma_surf)
         # 対数の引き算として rcs_db - 10*log10(sigma_surf) で計算
@@ -382,7 +383,7 @@ class Analyzer:
 
         plt.xscale('log')
         plt.yscale('log')
-        plt.xlabel('Diameter [cm]', fontsize=18)
+        plt.xlabel('Diameter [m]', fontsize=18)
         plt.xticks([6, 10, 20, 50, 100, 200, 500], [6, 10, 20, 50, 100, 200, 500], fontsize=16)
         plt.xlim(d_min_cm * 0.8, max(diameters_true_cm.max(), diameters_det_cm.max()) * 1.2)
         plt.ylabel('Cumulative Rock Density N(>D) [1/m²]', fontsize=18)
