@@ -2,6 +2,7 @@ import json
 import glob
 import os
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 
 BASE_DIR = '/Volumes/SSD_Kanda_SAMSUNG/modeling_tools_output/evaluate_apparent_RSFD_relative'
 
@@ -72,8 +73,8 @@ for r in r_keys:
 print(f"Calculation stops found for: {calculation_stops}")
 
 # プロット線用のリスト
-line_colors  = ['r', 'g', 'b', 'magenta']
-line_markers = ['o', 's', 'D', '^']
+line_colors  = ['red', 'green', 'blue', 'cyan', 'magenta', 'yellow', 'orange'] # r = 1.0-4.0 に対応（0.5刻み）
+line_markers = ['o', 's', 'D', '^'] # N = 100, 500, 1000, 5000 に対応
 line_styles  = ['-', '--', '-.', ':']
 
 # =========================================================
@@ -228,49 +229,67 @@ plt.show()
 
 # =========================================================
 # 5. apparent r vs apparent k（LPR観測値ごとにプロット）
+#    色: input_r ごと、マーカー: N ごと、線スタイル: 共通
 # =========================================================
+# 色・マーカーのマッピング
+r_colors  = {r: line_colors[idx % len(line_colors)]   for idx, r     in enumerate(r_keys)}
+n_markers = {c: line_markers[idx % len(line_markers)] for idx, c     in enumerate(rock_counts)}
+
 num_obs = len(LPR_obs)
 
 for i in range(num_obs):
     r_obs = LPR_obs[i]['r']
     k_obs = LPR_obs[i]['k']
 
-    plt.figure(figsize=(8, 6))
+    fig, ax = plt.subplots(figsize=(8, 6))
 
-    for count in rock_counts:
-        x_means = []
-        x_stds  = []
-        y_means = []
-        y_stds  = []
+    for r in r_keys:
+        color = r_colors[r]
 
-        for r in r_keys:
+        # 同じ input_r の点を共通線スタイルで接続
+        x_line = [data[r][c]["r_apparent_mean"] for c in rock_counts
+                  if c in data[r] and (r, c) not in calculation_stops]
+        y_line = [data[r][c]["k_apparent_mean"] for c in rock_counts
+                  if c in data[r] and (r, c) not in calculation_stops]
+        if x_line:
+            ax.plot(x_line, y_line, color=color, linestyle='-', linewidth=1.5, zorder=1)
+
+        # 各点をマーカー＋エラーバーでプロット
+        for count in rock_counts:
             if count in data[r] and (r, count) not in calculation_stops:
-                x_means.append(data[r][count]["r_apparent_mean"])
-                x_stds.append(data[r][count]["r_apparent_std"])
-                y_means.append(data[r][count]["k_apparent_mean"])
-                y_stds.append(data[r][count]["k_apparent_std"])
+                ax.errorbar(
+                    data[r][count]["r_apparent_mean"],
+                    data[r][count]["k_apparent_mean"],
+                    xerr=data[r][count]["r_apparent_std"],
+                    yerr=data[r][count]["k_apparent_std"],
+                    marker=n_markers[count],
+                    markersize=8,
+                    color=color,
+                    capsize=5,
+                    linestyle='none',
+                    zorder=2
+                )
 
-        plt.errorbar(
-            x_means, y_means, xerr=x_stds, yerr=y_stds,
-            label=f'N = {count}',
-            marker=line_markers[rock_counts.index(count) % len(line_markers)],
-            capsize=5,
-            linestyle=line_styles[rock_counts.index(count) % len(line_styles)],
-            color=line_colors[rock_counts.index(count) % len(line_colors)]
-        )
+    ax.axhline(k_obs, color='k', linestyle='--', linewidth=2.5)
+    ax.axvline(r_obs, color='k', linestyle='--', linewidth=2.5)
 
-    plt.axhline(k_obs, color='k', linestyle='--', linewidth=2.5, label='Observed')
-    plt.axvline(r_obs, color='k', linestyle='--', linewidth=2.5)
+    # カスタム凡例: 色→input_r、マーカー→N
+    legend_r   = [Line2D([0], [0], color=r_colors[r], linestyle='-', linewidth=1.5,
+                          label=f'Input r = {float(r):.1f}') for r in r_keys]
+    legend_n   = [Line2D([0], [0], color='gray', marker=n_markers[c], linestyle='none',
+                          markersize=8, label=f'N = {c}') for c in rock_counts]
+    legend_obs = [Line2D([0], [0], color='k', linestyle='--', linewidth=2.5, label='Observed')]
+    ax.legend(handles=legend_r + legend_n + legend_obs, fontsize=14,
+              bbox_to_anchor=(1.01, 1), loc='upper left', borderaxespad=0)
 
-    plt.xlabel('Apparent r', fontsize=16)
-    plt.ylabel('Apparent k', fontsize=16)
-    plt.xlim(0.2, 4.0)
-    plt.ylim(3e-4, 0.5)
-    plt.tick_params(axis='both', which='major', labelsize=14)
-    plt.yscale('log')
-    plt.legend(fontsize=14)
-    plt.grid(True, linestyle='--', alpha=0.7)
+    ax.set_xlabel('Apparent r', fontsize=16)
+    ax.set_ylabel('Apparent k', fontsize=16)
+    ax.set_xlim(0.2, 4.0)
+    ax.set_ylim(3e-4, 0.5)
+    ax.tick_params(axis='both', which='major', labelsize=14)
+    ax.set_yscale('log')
+    ax.grid(True, linestyle='--', alpha=0.7)
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, f'apparent_r_vs_k_{i}.png'))
-    plt.savefig(os.path.join(output_dir, f'apparent_r_vs_k_{i}.pdf'))
+    plt.savefig(os.path.join(output_dir, f'apparent_r_vs_k_{i}.png'), bbox_inches='tight')
+    plt.savefig(os.path.join(output_dir, f'apparent_r_vs_k_{i}.pdf'), bbox_inches='tight')
     plt.show()
