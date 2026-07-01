@@ -842,13 +842,12 @@ def plot_depth_rsfd_summary(window_centers, num_rocks_array, num_fitting_points_
 
     fig, ax = plt.subplots(figsize=(10, 8))
 
-    ax.plot(depths, num_norm, 'k-', linewidth=2, label='Num (total)')
-    ax.plot(depths, fit_norm, 'k--', linewidth=2, label='Num (fitting)')
+    ax.plot(depths, num_norm, 'k-', linewidth=2, label='Number of rocks')
     ax.plot(depths, r_norm_plot, 'b-', linewidth=2, marker='o', markersize=8, label='r')
     ax.plot(depths, k_norm_plot, 'r-', linewidth=2, marker='s', markersize=8, label='k')
 
     ax.set_xlabel('Depth [m]', fontsize=font_medium)
-    ax.set_ylabel('RSFD parameter', fontsize=font_medium)
+    ax.set_ylabel('NormalizedRSFD parameters', fontsize=font_medium)
     ax.set_ylim(-0.2, 1.2)
     yticks = [nan_placeholder, 0, 0.2, 0.4, 0.6, 0.8, 1.0]
     ytick_labels = ['Nan', '0', '0.2', '0.4', '0.6', '0.8', '1.0']
