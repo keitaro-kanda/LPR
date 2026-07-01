@@ -842,7 +842,7 @@ def plot_depth_rsfd_summary(window_centers, num_rocks_array, num_fitting_points_
 
     fig, ax = plt.subplots(figsize=(10, 8))
 
-    ax.plot(depths, num_norm, 'k-', linewidth=2, label='Number of rocks')
+    ax.plot(depths, num_norm, 'k-', linewidth=2, marker='D', label='Number of rocks')
     ax.plot(depths, r_norm_plot, 'b-', linewidth=2, marker='o', markersize=8, label='r')
     ax.plot(depths, k_norm_plot, 'r-', linewidth=2, marker='s', markersize=8, label='k')
 
