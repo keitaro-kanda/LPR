@@ -9,6 +9,28 @@ import json
 import concurrent.futures # 並列化のために追加
 from tqdm import tqdm # 進捗バーのために追加
 
+# ============================================================
+# --- 0. 実行モード設定（ハードコーディング） ---
+# ============================================================
+# 'N' : 岩石数 N_true を入力とする既存の系（出力先 = BASE_DIR_N）
+# 'K' : 累積岩石密度 k_true を入力とする系（出力先 = BASE_DIR_K）
+#
+# k_true と N_true は k_true = N_true / AREA_SIZE_M2 で厳密に対応するため、
+# K系でも N_true = round(k_true * AREA_SIZE_M2) として一意に復元される。
+# したがって N を必要とする出力（累積個数プロット、D_max 算出等）も
+# 両モードで同一に生成される。
+INPUT_MODE = 'K'   # <<< ここを 'N' / 'K' で切り替える
+
+# 出力の親ディレクトリ
+BASE_DIR_N = '/Volumes/SSD_Kanda_SAMSUNG/modeling_tools_output/evaluate_apparent_RSFD_relative'
+BASE_DIR_K = '/Volumes/SSD_Kanda_SAMSUNG/modeling_tools_output/evaluate_apparent_RSFD_relative_kinput'
+
+# K系で計算する k_true [1/m^2] のリスト（D >= ROCK_SIZE_MIN の累積岩石密度）
+K_TRUE_LIST = [5e-3, 10e-3, 50e-3, 100e-3]
+
+# 最大岩石サイズの上限 [m]（これを超える条件は計算しない）
+MAX_ROCK_SIZE_LIMIT = 10.0
+
 # --- 1. 設定クラス ---
 class RadarConfig:
     """
@@ -20,8 +42,13 @@ class RadarConfig:
         self.C_0 = 3e8
         
         # 閾値（背景除去後の平均強度プロファイルで、表面反射に対する最低強度を参考に決定）
-        self.NOISE_FLOOR_DBM = -90.0 
+        # 表面反射で規格化した相対強度なので単位は [dB]（dBm ではない）
+        self.NOISE_FLOOR_DB = -90.0
         self.H_ANTENNA = 0.3 # アンテナ地上高 [m]
+        
+        # --- 物理定数 ---
+        self.EPSILON_0 = 8.854e-12
+        self.MU_0 = 4 * np.pi * 1e-7
         
         # --- B. 環境・媒質パラメータ ---
         self.EPSILON_R_AIR = 1.0   # 真空(空気)の比誘電率
@@ -44,19 +71,45 @@ class RadarConfig:
         return self.C_0 / self.FREQ
 
     @property
-    def lambda_g(self):
+    def lambda_reg(self):
+        """レゴリス中の波長 [m]。岩石RCSの散乱領域分けに使用する。"""
         return self.lambda_0 / np.sqrt(self.EPSILON_R_REG)
 
     @property
-    def attenuation_db_m(self):
+    def lambda_g(self):
+        """後方互換用エイリアス（= lambda_reg）"""
+        return self.lambda_reg
+
+    @property
+    def attenuation_np_m(self):
+        """
+        電界の減衰定数 alpha [Np/m]   (Jol 2009, Eq. 2.14)
+
+            alpha = 2*pi*f * sqrt( (mu*eps/2) * ( sqrt(1+tan^2 delta) - 1 ) )
+
+        平方根は「(mu*eps/2) と (sqrt(1+tan^2 delta)-1) の積」全体にかかる。
+        8.686 [dB/Np] はここでは掛けない（非dB形式で統一するため）。
+        """
         omega = 2 * np.pi * self.FREQ
-        epsilon_0 = 8.854e-12
-        mu_0 = 4 * np.pi * 1e-7
-        epsilon = self.EPSILON_R_REG * epsilon_0
-        mu = mu_0
-        term1 = omega * (np.sqrt(mu * epsilon))
-        term2 = np.sqrt(0.5 * (np.sqrt(1 + self.LOSS_TANGENT**2) - 1))
-        return (term1 * term2) * 8.686
+        epsilon = self.EPSILON_R_REG * self.EPSILON_0
+        mu = self.MU_0  # mu_r = 1
+        inner = 0.5 * mu * epsilon * (np.sqrt(1 + self.LOSS_TANGENT**2) - 1)
+        return omega * np.sqrt(inner)
+
+    @property
+    def attenuation_db_m(self):
+        """参考値: 片道パワー減衰率 [dB/m]。表示専用で計算本体では使用しない。"""
+        return (20.0 / np.log(10.0)) * self.attenuation_np_m
+
+    @property
+    def noise_floor_linear(self):
+        """検出しきい値を線形比に変換 (-90 dB -> 1e-9)"""
+        return 10.0 ** (self.NOISE_FLOOR_DB / 10.0)
+
+    @property
+    def true_rock_density(self):
+        """true RSFD の累積岩石密度 k_true [1/m^2]（D >= ROCK_SIZE_MIN）"""
+        return self.TOTAL_ROCKS / self.AREA_SIZE_M2
 
     @property
     def reflection_coeff(self):
@@ -73,10 +126,25 @@ class RadarConfig:
         return ((n_air - n_reg) / (n_air + n_reg))
     
     @property
+    def fresnel_radius(self):
+        """
+        地表面での第1フレネル半径 [m]。
+        アンテナ-地表面間の伝搬は真空(空気)中で起こるため lambda_0 を用いる。
+        """
+        return np.sqrt(self.lambda_0 * self.H_ANTENNA / 2.0)
+
+    @property
     def surface_rcs(self):
-        # 表面のレーダー断面積 (RCS) の計算
-        sigma_surf = self.surface_reflection_coeff**2 * np.pi**3 * self.H_ANTENNA**2
-        return sigma_surf
+        """
+        地表面のレーダー断面積 [m^2]（線形）。
+
+            sigma_surf = Gamma_surf^2 * 4*pi*A^2 / lambda_0^2,  A = pi * r_fres^2
+
+        入射波・散乱波ともに空気中の場なので lambda は lambda_0。
+        代入すると lambda_0 は約分され sigma_surf = Gamma^2 * pi^3 * h_ante^2 となる。
+        """
+        A = np.pi * self.fresnel_radius**2
+        return self.surface_reflection_coeff**2 * 4.0 * np.pi * A**2 / self.lambda_0**2
 
 # --- 2. 物理モデルクラス ---
 class RockModel:
@@ -114,56 +182,72 @@ class RockModel:
         })
         return df
 
-    def calculate_rcs_db(self, diameter_array, config):
-        lambda_g = config.lambda_g
-        boundary_size = lambda_g / 2.0
-        
-        sigma_optical = config.reflection_coeff**2 * np.pi * (diameter_array / 2.0)**2
-        
-        sigma_opt_at_bound = config.reflection_coeff**2 * np.pi * (boundary_size / 2.0)**2
-        k_rayleigh = sigma_opt_at_bound / (boundary_size ** 6)
-        sigma_rayleigh = k_rayleigh * (diameter_array ** 6)
-        
-        sigma = np.where(diameter_array >= boundary_size, sigma_optical, sigma_rayleigh)
-        return 10 * np.log10(np.maximum(sigma, 1e-15))
+    def calculate_rcs(self, diameter_array, config):
+        """
+        岩石のレーダー断面積 [m^2]（線形）。dB には変換しない。
+
+        散乱領域の境界は、散乱体を取り囲む媒質（レゴリス）中の波長の 1/2。
+          幾何光学領域 (D >= lambda_reg/2): sigma = Gamma^2 * pi * (D/2)^2
+          レイリー領域   (D <  lambda_reg/2): sigma = sigma|_{D=lambda_reg/2} * (D/(lambda_reg/2))^6
+        """
+        boundary_size = config.lambda_reg / 2.0
+        gamma2 = config.reflection_coeff**2
+
+        sigma_optical = gamma2 * np.pi * (diameter_array / 2.0)**2
+
+        sigma_opt_at_bound = gamma2 * np.pi * (boundary_size / 2.0)**2
+        sigma_rayleigh = sigma_opt_at_bound * (diameter_array / boundary_size)**6
+
+        return np.where(diameter_array >= boundary_size, sigma_optical, sigma_rayleigh)
 
     def apply_radar_equation(self, rocks_df, config, quiet=False):
+        """
+        地表面反射で規格化した受信強度 P_norm（線形比）を計算する。
+
+            P_norm = (sigma_rock/sigma_surf) * (h_ante/R_rock)^4
+                     * exp(-4*alpha_reg*d_rock) * 10^(X/10),  X ~ N(0, sigma_dB^2)
+
+            R_rock = h_ante + d_rock  : GPR-岩石間距離
+            d_rock                    : 岩石の深さ（吸収損失を受ける片道経路長）
+        """
         if not quiet:
-            print("レーダーシミュレーション実行中 (相対値モデル)...")
-        
-        # 岩石のRCS (10 * log10(sigma(r)))
-        rcs_db = self.calculate_rcs_db(rocks_df['diameter'].values, config)
-        
-        # 距離の計算
-        R_surf = config.H_ANTENNA
-        R_sub = rocks_df['depth'].values + R_surf
-        
-        # 1. 幾何学的減衰項: 40 * log10(R_surf / R_sub)
-        spread_term = 40 * np.log10(R_surf / R_sub)
-        
-        # 2. 媒質による減衰項 (往復): -2 * attenuation_db_m * depth
-        attenuation_term = -2 * config.attenuation_db_m * rocks_df['depth'].values
-        print("Attenuation rate [dB/m]:", config.attenuation_db_m)
-        
-        # 3. 反射強度の比率項: 10 * log10(sigma(r) / sigma_surf)
-        # 対数の引き算として rcs_db - 10*log10(sigma_surf) で計算
-        sigma_surf_db = 10 * np.log10(config.surface_rcs)
-        rcs_ratio_term = rcs_db - sigma_surf_db
-        
-        # 4. Random項 (正規分布)
-        random_term = np.random.normal(0, config.SIGMA_RANDOM_DB, size=len(rocks_df))
-        
-        # 規格化強度の計算 (S_norm)
-        received_power = spread_term + attenuation_term + rcs_ratio_term + random_term
-        
-        # 閾値判定
-        is_detected = received_power > config.NOISE_FLOOR_DBM
-        
+            print("レーダーシミュレーション実行中 (相対値モデル・非dB形式)...")
+            print(f"  減衰定数 alpha = {config.attenuation_np_m:.5f} Np/m "
+                  f"({config.attenuation_db_m:.5f} dB/m 片道)")
+
+        depth = rocks_df['depth'].values          # d_rock [m]
+        h_ante = config.H_ANTENNA                 # = R_surf
+        R_rock = h_ante + depth                   # GPR-岩石間距離 [m]
+
+        # 1. RCS 比（線形）: sigma_rock / sigma_surf
+        sigma_rock = self.calculate_rcs(rocks_df['diameter'].values, config)
+        rcs_ratio = sigma_rock / config.surface_rcs
+
+        # 2. 幾何学的減衰比: (h_ante / R_rock)^4
+        spread_ratio = (h_ante / R_rock)**4
+
+        # 3. 媒質による吸収損失（往復）: exp(-4 * alpha * d_rock)
+        #    片道パワー exp(-2*alpha*d) を往復（経路長 2d）にするので指数は -4*alpha*d。
+        #    吸収はレゴリス中でのみ起こるため R_rock ではなく depth を使う。
+        attenuation = np.exp(-4.0 * config.attenuation_np_m * depth)
+
+        # 4. Random項（対数正規）: dB での N(0, sigma_dB) に対応する乗算因子
+        random_factor = 10.0 ** (
+            np.random.normal(0.0, config.SIGMA_RANDOM_DB, size=len(rocks_df)) / 10.0
+        )
+
+        # 規格化強度 P_norm（線形比）
+        p_norm = rcs_ratio * spread_ratio * attenuation * random_factor
+
+        # 閾値判定（線形量どうしで比較）
+        is_detected = p_norm > config.noise_floor_linear
+
         result_df = rocks_df.copy()
-        result_df['rcs_db'] = rcs_db
-        result_df['received_power'] = received_power
+        result_df['rcs'] = sigma_rock                      # [m^2]
+        result_df['p_norm'] = p_norm                       # 線形比
+        result_df['p_norm_db'] = 10.0 * np.log10(p_norm)   # 表示・プロット用のみ
         result_df['is_detected'] = is_detected
-        
+
         return result_df
 
 # --- 3. 解析クラス ---
@@ -324,18 +408,19 @@ class Analyzer:
     def plot_power_scatter(self, df, output_prefix, config):
         """
         横軸：深さ、縦軸：岩石サイズ の空間に、
-        色で信号強度（received_power）をマッピングする散布図
+        色で信号強度（p_norm）をマッピングする散布図。
+        計算は線形で行い、表示のみ dB に変換している。
         """
         plt.figure(figsize=(10, 8))
         
         sc = plt.scatter(df['depth'], df['diameter'], 
-                         c=df['received_power'], cmap='jet', 
+                         c=df['p_norm_db'], cmap='jet', 
                          alpha=0.8, s=20, edgecolors='none', vmax=0, vmin=-120)
         
         cbar = plt.colorbar(sc)
-        cbar.set_label('Received Power $S_{norm}$ [dB]', fontsize=16)
+        cbar.set_label('Received Power $P_{norm}$ [dB]', fontsize=16)
         cbar.ax.tick_params(labelsize=14)
-        cbar.ax.axhline(config.NOISE_FLOOR_DBM, color='red', linestyle='--', linewidth=2)
+        cbar.ax.axhline(config.NOISE_FLOOR_DB, color='red', linestyle='--', linewidth=2)
 
         plt.xlabel('Depth [m]', fontsize=18)
         plt.ylabel('Diameter [m]', fontsize=18)
@@ -756,8 +841,56 @@ def process_iteration(args):
     return csfd_stats, analysis_range, analysis_moving
 
 # --- 4. メイン処理 ---
+def build_cases():
+    """
+    INPUT_MODE に応じて計算ケースのリストを構築する。
+
+    各ケースは以下のキーを持つ:
+      total_rocks : 生成する岩石数 N_true
+      k_nominal   : 指定した k_true [1/m^2]（N系では N/AREA から算出）
+      dir_name    : 出力サブディレクトリ名
+      json_key    : rsfd_summary.json 内のキー
+      label       : 画面表示用のラベル
+    """
+    area = RadarConfig().AREA_SIZE_M2
+
+    if INPUT_MODE == 'K':
+        cases = []
+        for k_true in K_TRUE_LIST:
+            n = int(round(k_true * area))
+            if n < 2:
+                print(f"  -> [警告] k={k_true:g} は岩石数 {n} 個となりフィット不能のためスキップします。")
+                continue
+            cases.append({
+                'total_rocks': n,
+                'k_nominal': k_true,
+                'dir_name': f"k_{k_true:g}",
+                'json_key': f"{k_true:g}",
+                'label': f"k_true = {k_true:g} [1/m2] (N = {n})",
+            })
+        return cases
+
+    # --- N系（既存の挙動） ---
+    try:
+        rock_counts_str = input("計算する岩石数をカンマ区切りで入力してください (例: 100,500,1000,5000) を入力: ")
+        rock_counts = [int(x.strip()) for x in rock_counts_str.split(',')]
+    except ValueError:
+        print("数値の入力ではありません。デフォルト値を使用します。")
+        rock_counts = [100, 500, 1000, 5000]
+
+    return [{
+        'total_rocks': n,
+        'k_nominal': n / area,
+        'dir_name': f"{n}",
+        'json_key': f"{n}",
+        'label': f"岩石数 {n} (k_true = {n / area:.4e} [1/m2])",
+    } for n in rock_counts]
+
+
 def main():
-    print("--- 岩石見逃しモデル 統計シミュレーション (相対値モデル) ---")
+    print("--- 岩石見逃しモデル 統計シミュレーション (相対値モデル・非dB形式) ---")
+    print(f"--- 入力モード: {INPUT_MODE} "
+          f"({'k_true 入力系' if INPUT_MODE == 'K' else 'N_true 入力系'}) ---")
     
     try:
         r_input_str = input("真のべき指数(r)を入力してください (例: 1.0): ")
@@ -766,29 +899,26 @@ def main():
         print("数値ではない入力です。デフォルト値 1.0 を使用します。")
         r_true = 1.0
     
-    try:
-        rock_counts_str = input("計算する岩石数をカンマ区切りで入力してください (例: 100,500,1000,5000) を入力: ")
-        rock_counts = [int(x.strip()) for x in rock_counts_str.split(',')]
-    except ValueError:
-        print("数値の入力ではありません。デフォルト値を使用します。")
-        rock_counts = [100, 500, 1000, 5000]
+    cases = build_cases()
 
-    base_dir = '/Volumes/SSD_Kanda_SAMSUNG/modeling_tools_output/evaluate_apparent_RSFD_relative' 
+    base_dir = BASE_DIR_K if INPUT_MODE == 'K' else BASE_DIR_N
     os.makedirs(base_dir, exist_ok=True)
     
     json_path = os.path.join(base_dir, 'rsfd_summary.json')
 
     NUM_ITERATIONS = 100 
     
-    for total_rocks in rock_counts:
-        print(f"\n=== 岩石数: {total_rocks} のシミュレーションを開始 ({NUM_ITERATIONS}回) ===")
+    for case in cases:
+        total_rocks = case['total_rocks']
+        print(f"\n=== {case['label']} のシミュレーションを開始 ({NUM_ITERATIONS}回) ===")
         
         config = RadarConfig(total_rocks=total_rocks)
         
-        # --- 最大岩石サイズの事前チェック (10.0 m 制限) ---
+        # --- 最大岩石サイズの事前チェック ---
         D_max_auto = config.ROCK_SIZE_MIN * (total_rocks ** (1.0 / r_true))
-        if D_max_auto > 10.0:
-            print(f"  -> [警告] 計算上の最大岩石サイズ ({D_max_auto:.2f} m) が 6.0 m を超えるため、計算を中止します。")
+        if D_max_auto > MAX_ROCK_SIZE_LIMIT:
+            print(f"  -> [警告] 計算上の最大岩石サイズ ({D_max_auto:.2f} m) が "
+                  f"{MAX_ROCK_SIZE_LIMIT:.1f} m を超えるため、計算を中止します。")
             
             # JSONへの「Calculation stop」の記録
             if os.path.exists(json_path):
@@ -801,11 +931,11 @@ def main():
                 summary_data = {}
 
             r_key = str(r_true)
-            n_key = str(total_rocks)
+            case_key = case['json_key']
             if r_key not in summary_data:
                 summary_data[r_key] = {}
             
-            summary_data[r_key][n_key] = "Calculation stop"
+            summary_data[r_key][case_key] = "Calculation stop"
             
             with open(json_path, 'w', encoding='utf-8') as f:
                 json.dump(summary_data, f, indent=4)
@@ -813,17 +943,22 @@ def main():
             continue
         # --------------------------------------------------------
 
-        output_dir = f"{base_dir}/r_{r_true}/{total_rocks}"
+        output_dir = f"{base_dir}/r_{r_true}/{case['dir_name']}"
         os.makedirs(output_dir, exist_ok=True)
         print(f"出力ディレクトリ: {output_dir}")
 
         overall_area = config.AREA_SIZE_M2
-        true_rock_density = config.TOTAL_ROCKS / overall_area
+        # k_true = N_true / A （全岩石が D >= ROCK_SIZE_MIN のため厳密に成立）
+        true_rock_density = config.true_rock_density
 
         with open(f"{output_dir}/parameters.txt", "w") as f:
+            f.write(f"Input Mode: {INPUT_MODE}\n")
             f.write(f"True Slope (r): {r_true}\n")
             f.write(f"Total Rocks: {config.TOTAL_ROCKS}\n")
-            f.write(f"True Rock Density [1/m2]: {true_rock_density:.6f}\n")
+            f.write(f"Nominal k_true [1/m2]: {case['k_nominal']:.6e}\n")
+            f.write(f"Realized k_true (= N/A) [1/m2]: {true_rock_density:.6e}\n")
+            f.write(f"Observation Area [m2]: {overall_area}\n")
+            f.write(f"D_max_auto [m]: {D_max_auto:.4f}\n")
             f.write(f"Total Iterations: {NUM_ITERATIONS}\n")
 
         all_range_results = []
@@ -891,12 +1026,16 @@ def main():
             summary_data = {}
 
         r_key = str(r_true)
-        n_key = str(total_rocks)
+        case_key = case['json_key']
 
         if r_key not in summary_data:
             summary_data[r_key] = {}
 
-        summary_data[r_key][n_key] = {
+        summary_data[r_key][case_key] = {
+            "input_mode": INPUT_MODE,
+            "N_true": int(total_rocks),
+            "k_true_input": float(case['k_nominal']),
+            "k_true_realized": float(true_rock_density),
             "r_true_mean": float(r_true_mean),
             "r_true_std": float(r_true_std),
             "k_true_mean": float(k_true_mean),
@@ -946,7 +1085,7 @@ def main():
         analyzer.plot_depth_analysis_stats(stats_moving, f"{output_dir}/powerlaw_exp_moving_stats", r_true, x_col='depth_center', xlabel='Depth Center [m]')
         analyzer.plot_k_analysis_stats(stats_moving, f"{output_dir}/powerlaw_k_moving_stats", true_rock_density, x_col='depth_center', xlabel='Depth Center [m]')
 
-        print(f"=== 岩石数: {total_rocks} の処理完了 ===\n")
+        print(f"=== {case['label']} の処理完了 ===\n")
 
     print("全ての反復処理と統計出力が完了しました。")
 
