@@ -17,6 +17,7 @@ Chang'E-4 搭載 Lunar Penetrating Radar (LPR) CH2 を対象としています�
 - [出力ファイル](#出力ファイル)
 - [コード構成](#コード構成)
 - [既知の制約と注意点](#既知の制約と注意点)
+- [関連スクリプト](#関連スクリプト)
 
 ---
 
@@ -309,7 +310,59 @@ $D_{max}$ で切断された分布は $D_{max}$ 近傍で累積分布が丸ま�
 
 ---
 
-## 参考文献
+## 関連スクリプト
+
+同じ出力ディレクトリを入力として使う後段の解析スクリプトです。どちらも N系 / K系の両方に対応しており、ディレクトリ名・JSONキーの形式から入力モードを自動判定します。
+
+### `analyze_depth_range_RSFD.py`
+
+各イテレーションの `simulated_detection.csv` を読み直し、**任意の深さ範囲に限定した** RSFD を再解析します。評価モデルを再実行する必要はありません。
+
+```bash
+python analyze_depth_range_RSFD.py
+# 評価モデル出力のベースディレクトリのパス：/path/to/evaluate_apparent_RSFD_relative_kinput
+# 解析する深さ範囲の開始値 [m] を入力してください (例: 0.0): 0.0
+# 解析する深さ範囲の終了値 [m] を入力してください (例: 3.0): 3.0
+```
+
+- 面積は `(d_end - d_start) / MAX_DEPTH × AREA_SIZE_M2` で按分されます。
+- 出力は `<BASE_DIR>/analysis_<範囲>/r_<r>/<ケース名>/` と `<BASE_DIR>/rsfd_summary_<範囲>.json`。
+- `diameter` / `depth` / `is_detected` 列しか使わないため、非dB化の前後どちらのCSVでも動作します。
+- 深さ範囲内の検出岩石が6個未満のイテレーションはフィットせず `NaN` になります。全イテレーションが該当する場合は警告を表示します（$k=10^{-3}$ のような小さい $N$ で起こりやすい）。
+
+### `summarize_apparent_RSFD_params.py`
+
+`rsfd_summary*.json` を読み込み、$r_{true}$ と $r_{app}$、$k_{true}$ と $k_{app}$ の関係、および CE-4/LPR 観測値との比較図を出力します。
+
+```bash
+python summarize_apparent_RSFD_params.py
+# summary.jsonを含むベースディレクトリのパス：/path/to/evaluate_apparent_RSFD_relative_kinput
+# 使用するJSONファイルを選択してください: 0
+```
+
+出力先は `Summary_Plots_all_range/`（全範囲）または `Summary_Plots_<範囲>/`（深さ範囲）で、以下の5種類の図を生成します。
+
+| ファイル | 内容 |
+|---|---|
+| `r_apparent_plot` | Input $r$ vs Apparent $r$ |
+| `r_apparent_ratio_plot` | Input $r$ vs $r_{app}/r_{true}$ |
+| `k_apparent_ratio_plot` | Input $r$ vs $k_{app}/k_{true}$ |
+| `k_apparent_plot` | $k_{true}$ vs $k_{app}$（両対数） |
+| `apparent_r_vs_k_<i>` | Apparent $r$–$k$ 平面上での観測値との比較（LPR観測値ごとに1枚） |
+
+凡例のケース表記は入力モードに応じて `N = 1000` / `k = 0.005` と自動で切り替わります。`apparent_r_vs_k_*` の軸範囲は従来の既定値を基準に、データと観測値が収まるよう自動で拡張されます。
+
+比較対象の観測値はスクリプト冒頭の `LPR_obs` にハードコーディングされています。
+
+```python
+LPR_obs = [
+    {'r': 1.08, 'k': 7.21e-3},  # full range
+    {'r': 1.92, 'k': 19.3e-3},  # 0-3 m
+    {'r': 1.00, 'k': 5.68e-3}   # 3-12 m
+]
+```
+
+---
 
 - Skolnik, M. I. (2008), *Radar Handbook*, 3rd ed. — レーダー方程式（Eq. 1.2）、レイリー領域の $D^6$ 依存
 - Jol, H. M. (2009), *Ground Penetrating Radar: Theory and Applications* — 減衰定数（Eq. 2.14）、フレネル半径（Eq. 1.31）

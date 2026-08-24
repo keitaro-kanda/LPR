@@ -11,7 +11,79 @@ import glob
 MAX_DEPTH = 12.0
 AREA_SIZE_M2 = 18300.0
 ROCK_SIZE_MIN = 0.06
-BASE_DIR = '/Volumes/SSD_Kanda_SAMSUNG/modeling_tools_output/evaluate_apparent_RSFD_relative'
+
+# K系（k_true 入力系）の出力ディレクトリ名の接頭辞
+# 例: N系 -> "r_2.0/1000/",  K系 -> "r_2.0/k_0.005/"
+K_DIR_PREFIX = 'k_'
+
+
+def read_total_rocks(case_dir):
+    """
+    parameters.txt から実際に生成された岩石数 N_true を読む。
+    見つからない場合は None を返す（旧形式の出力にも対応するため）。
+    """
+    path = os.path.join(case_dir, 'parameters.txt')
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.startswith('Total Rocks:'):
+                    return int(line.split(':', 1)[1].strip())
+    except (ValueError, OSError):
+        return None
+    return None
+
+
+def parse_case_dir(case_dir):
+    """
+    ケースディレクトリ名から入力モードと諸元を判定する。
+
+      N系: "1000"     -> mode='N', total_rocks=1000
+      K系: "k_0.005"  -> mode='K', k_nominal=0.005, total_rocks=round(k*A)
+
+    k_true と N_true は k_true = N_true / AREA_SIZE_M2 で厳密に対応するため、
+    K系でも N_true を一意に復元でき、D_max の算出等はそのまま行える。
+    parameters.txt があればそちらの Total Rocks を優先する。
+
+    解釈できないディレクトリ名の場合は None を返す。
+    """
+    name = os.path.basename(case_dir.rstrip(os.sep))
+
+    if name.startswith(K_DIR_PREFIX):
+        try:
+            k_nominal = float(name[len(K_DIR_PREFIX):])
+        except ValueError:
+            return None
+        mode = 'K'
+        total_rocks = int(round(k_nominal * AREA_SIZE_M2))
+        json_key = f"{k_nominal:g}"
+    else:
+        try:
+            total_rocks = int(name)
+        except ValueError:
+            return None
+        mode = 'N'
+        k_nominal = total_rocks / AREA_SIZE_M2
+        json_key = str(total_rocks)
+
+    n_from_file = read_total_rocks(case_dir)
+    if n_from_file is not None:
+        total_rocks = n_from_file
+
+    if mode == 'K':
+        label = f"k={json_key} [1/m2] (N={total_rocks})"
+    else:
+        label = f"N={total_rocks} (k={k_nominal:.4e} [1/m2])"
+
+    return {
+        'mode':        mode,
+        'dir_name':    name,
+        'total_rocks': total_rocks,
+        'k_nominal':   k_nominal,
+        'json_key':    json_key,
+        'label':       label,
+    }
 
 
 def calculate_slope(diameters, area=1.0):
@@ -124,18 +196,29 @@ def analyze_one_combination(total_rocks, csv_files, d_start, d_end, area, out_di
     r_d_arr = np.array(r_apparent_list, dtype=float)
     k_d_arr = np.array(k_apparent_list, dtype=float)
 
-    r_true_mean = float(np.nanmean(r_t_arr))
-    r_true_std  = float(np.nanstd(r_t_arr))
-    k_true_mean = float(np.nanmean(k_t_arr))
-    k_true_std  = float(np.nanstd(k_t_arr))
-    r_app_mean  = float(np.nanmean(r_d_arr))
-    r_app_std   = float(np.nanstd(r_d_arr))
-    k_app_mean  = float(np.nanmean(k_d_arr))
-    k_app_std   = float(np.nanstd(k_d_arr))
+    def _nanstat(arr):
+        """全てNaN（有効なフィットが1つも無い）場合に警告を出さずNaNを返す。"""
+        valid = arr[~np.isnan(arr)]
+        if valid.size == 0:
+            return float('nan'), float('nan')
+        return float(np.mean(valid)), float(np.std(valid))
+
+    r_true_mean, r_true_std = _nanstat(r_t_arr)
+    k_true_mean, k_true_std = _nanstat(k_t_arr)
+    r_app_mean,  r_app_std  = _nanstat(r_d_arr)
+    k_app_mean,  k_app_std  = _nanstat(k_d_arr)
+
+    n_valid = int(np.sum(~np.isnan(r_d_arr)))
+    if n_valid == 0:
+        print(f"    [警告] 有効なフィットがありません "
+              f"(深さ範囲内の検出岩石が6個未満のイテレーションのみ)")
 
     with open(os.path.join(out_dir, 'stats.txt'), 'w') as f:
         f.write(f"Depth range    : {d_start} - {d_end} m\n")
         f.write(f"Area           : {area:.2f} m2\n")
+        f.write(f"N_true         : {total_rocks}\n")
+        f.write(f"k_true (= N/A) : {total_rocks / AREA_SIZE_M2:.6e} [1/m2]\n")
+        f.write(f"Iterations     : {len(csv_files)} (valid fits: {n_valid})\n")
         f.write(f"r_true         = {r_true_mean:.4f} +/- {r_true_std:.4f}\n")
         f.write(f"k_true         = {k_true_mean:.4e} +/- {k_true_std:.4e}\n")
         f.write(f"r_apparent     = {r_app_mean:.4f} +/- {r_app_std:.4f}\n")
@@ -292,6 +375,11 @@ def plot_csfd_count_stats(iter_df, out_prefix, r_true, total_rocks, d_start, d_e
 def main():
     print("--- 深さ範囲限定 RSFD 再解析ツール ---")
 
+    base_dir = input('評価モデル出力のベースディレクトリのパス：').strip()
+    if not os.path.isdir(base_dir):
+        print(f"エラー: ディレクトリが見つかりません: {base_dir}")
+        return
+
     try:
         d_start = float(input("解析する深さ範囲の開始値 [m] を入力してください (例: 0.0): "))
         d_end   = float(input("解析する深さ範囲の終了値 [m] を入力してください (例: 3.0): "))
@@ -308,20 +396,21 @@ def main():
 
     area = (d_end - d_start) / MAX_DEPTH * AREA_SIZE_M2
     range_label = f"{d_start}-{d_end}m"
-    analysis_dir = os.path.join(BASE_DIR, f"analysis_{range_label}")
-    json_path = os.path.join(BASE_DIR, f"rsfd_summary_{range_label}.json")
+    analysis_dir = os.path.join(base_dir, f"analysis_{range_label}")
+    json_path = os.path.join(base_dir, f"rsfd_summary_{range_label}.json")
 
     print(f"\n深さ範囲 : {d_start} - {d_end} m")
     print(f"解析面積 : {area:.2f} m2")
     print(f"出力先   : {analysis_dir}")
     print(f"JSON     : {json_path}\n")
 
-    r_dirs = sorted(glob.glob(os.path.join(BASE_DIR, "r_*")))
+    r_dirs = sorted(glob.glob(os.path.join(base_dir, "r_*")))
     if not r_dirs:
-        print(f"エラー: {BASE_DIR} 内に r_* ディレクトリが見つかりません。")
+        print(f"エラー: {base_dir} 内に r_* ディレクトリが見つかりません。")
         return
 
     summary_data = {}
+    detected_modes = set()
 
     for r_dir in r_dirs:
         r_str = os.path.basename(r_dir).replace("r_", "")
@@ -333,33 +422,41 @@ def main():
         r_key = str(r_true)
         summary_data[r_key] = {}
 
-        n_dirs = sorted(glob.glob(os.path.join(r_dir, "*")))
-        for n_dir in n_dirs:
-            n_basename = os.path.basename(n_dir)
-            try:
-                total_rocks = int(n_basename)
-            except ValueError:
+        case_dirs = sorted(glob.glob(os.path.join(r_dir, "*")))
+        for case_dir in case_dirs:
+            if not os.path.isdir(case_dir):
                 continue
 
-            n_key = str(total_rocks)
+            case = parse_case_dir(case_dir)
+            if case is None:
+                continue
+
+            detected_modes.add(case['mode'])
+            total_rocks = case['total_rocks']
+            case_key = case['json_key']
 
             csv_files = sorted(
-                glob.glob(os.path.join(n_dir, "each_iteration", "iter_*", "simulated_detection.csv"))
+                glob.glob(os.path.join(case_dir, "each_iteration", "iter_*", "simulated_detection.csv"))
             )
 
             if not csv_files:
-                print(f"  [スキップ] r={r_true}, N={total_rocks}: CSVが見つかりません")
-                summary_data[r_key][n_key] = "Calculation stop"
+                print(f"  [スキップ] r={r_true}, {case['label']}: CSVが見つかりません")
+                summary_data[r_key][case_key] = "Calculation stop"
                 continue
 
-            print(f"  処理中: r={r_true}, N={total_rocks} ({len(csv_files)} イテレーション)")
+            print(f"  処理中: r={r_true}, {case['label']} ({len(csv_files)} イテレーション)")
 
-            out_dir = os.path.join(analysis_dir, f"r_{r_true}", str(total_rocks))
+            out_dir = os.path.join(analysis_dir, f"r_{r_true}", case['dir_name'])
 
             result, iter_df = analyze_one_combination(
                 total_rocks, csv_files, d_start, d_end, area, out_dir
             )
-            summary_data[r_key][n_key] = result
+
+            # 入力モードに依らず N/k の双方を記録しておく（相互変換できるように）
+            result['input_mode']   = case['mode']
+            result['N_true']       = int(total_rocks)
+            result['k_true_input'] = float(case['k_nominal'])
+            summary_data[r_key][case_key] = result
 
             plot_csfd_comparison_stats(
                 iter_df, os.path.join(out_dir, 'RSFD_comparison_stats'),
@@ -373,10 +470,20 @@ def main():
             print(f"    r_apparent = {result['r_apparent_mean']:.4f} +/- {result['r_apparent_std']:.4f}")
             print(f"    k_apparent = {result['k_apparent_mean']:.4e} +/- {result['k_apparent_std']:.4e}")
 
+    if not detected_modes:
+        print("エラー: 解析可能なケースディレクトリが見つかりませんでした。")
+        return
+    if len(detected_modes) > 1:
+        print(f"\n[警告] N系とK系のディレクトリが混在しています: {sorted(detected_modes)}")
+    else:
+        mode = detected_modes.pop()
+        print(f"\n入力モード: {mode} "
+              f"({'k_true 入力系' if mode == 'K' else 'N_true 入力系'})")
+
     with open(json_path, 'w', encoding='utf-8') as f:
         json.dump(summary_data, f, indent=4, ensure_ascii=False)
 
-    print(f"\n全処理完了。JSONを保存しました: {json_path}")
+    print(f"全処理完了。JSONを保存しました: {json_path}")
 
 
 if __name__ == "__main__":
