@@ -367,7 +367,8 @@ else:
                          markersize=8, label=case_label(c)) for c in case_keys]
     legend_obs = [Line2D([0], [0], color='k', linestyle='--', linewidth=2.5,
                          label=f"Observed ({OBS['label']})")]
-    ax.legend(handles=legend_r + legend_n + legend_obs, fontsize=14,
+    handles_list = legend_r + legend_n + legend_obs
+    ax.legend(handles=handles_list, fontsize=14,
               bbox_to_anchor=(1.01, 1), loc='upper left', borderaxespad=0)
 
     ax.set_xlabel('Apparent r', fontsize=16)
@@ -380,4 +381,56 @@ else:
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, 'apparent_r_vs_k.png'), bbox_inches='tight')
     plt.savefig(os.path.join(output_dir, 'apparent_r_vs_k.pdf'), bbox_inches='tight')
+    plt.show()
+
+    # --- 追加: ラベル（凡例）なしプロット (figsize=(8, 6)) ---
+    fig_nl, ax_nl = plt.subplots(figsize=(8, 6))
+    for r in r_keys:
+        color = r_colors[r]
+        pts = [(get_entry(r, c)["r_apparent_mean"], get_entry(r, c)["k_apparent_mean"])
+               for c in case_keys if get_entry(r, c) is not None]
+        pts = [(x, y) for x, y in pts if x == x and y == y]
+        if pts:
+            ax_nl.plot([p[0] for p in pts], [p[1] for p in pts],
+                       color=color, linestyle='-', linewidth=1.5, zorder=1)
+
+        for case_key in case_keys:
+            entry = get_entry(r, case_key)
+            if entry is None:
+                continue
+            ax_nl.errorbar(
+                entry["r_apparent_mean"],
+                entry["k_apparent_mean"],
+                xerr=entry["r_apparent_std"],
+                yerr=entry["k_apparent_std"],
+                marker=case_markers[case_key],
+                markersize=8,
+                color=color,
+                capsize=5,
+                linestyle='none',
+                zorder=2
+            )
+
+    ax_nl.axhline(k_obs, color='k', linestyle='--', linewidth=2.5)
+    ax_nl.axvline(r_obs, color='k', linestyle='--', linewidth=2.5)
+    ax_nl.set_xlabel('Apparent r', fontsize=16)
+    ax_nl.set_ylabel('Apparent k [1/m$^2$]', fontsize=16)
+    ax_nl.set_xlim(x_lo, x_hi)
+    ax_nl.set_ylim(y_lo, y_hi)
+    ax_nl.tick_params(axis='both', which='major', labelsize=14)
+    ax_nl.set_yscale('log')
+    ax_nl.grid(True, linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'apparent_r_vs_k_no_legend.png'))
+    plt.savefig(os.path.join(output_dir, 'apparent_r_vs_k_no_legend.pdf'))
+    plt.show()
+
+    # --- 追加: ラベル（凡例）のみの画像 ---
+    fig_leg = plt.figure(figsize=(4, 6))
+    ax_leg = fig_leg.add_subplot(111)
+    ax_leg.axis('off')
+    ax_leg.legend(handles=handles_list, fontsize=14, loc='center', frameon=True)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'apparent_r_vs_k_legend_only.png'), bbox_inches='tight')
+    plt.savefig(os.path.join(output_dir, 'apparent_r_vs_k_legend_only.pdf'), bbox_inches='tight')
     plt.show()
