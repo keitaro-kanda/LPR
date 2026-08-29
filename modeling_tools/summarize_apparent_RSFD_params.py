@@ -366,13 +366,13 @@ else:
     legend_n   = [Line2D([0], [0], color='gray', marker=case_markers[c], linestyle='none',
                          markersize=8, label=case_label(c)) for c in case_keys]
     legend_obs = [Line2D([0], [0], color='k', linestyle='--', linewidth=2.5,
-                         label=f"Observed ({OBS['label']})")]
+                         label=f"Observed \n(r={r_obs}, k={k_obs:.2e})")]
     handles_list = legend_r + legend_n + legend_obs
     ax.legend(handles=handles_list, fontsize=14,
               bbox_to_anchor=(1.01, 1), loc='upper left', borderaxespad=0)
 
     ax.set_xlabel('Apparent r', fontsize=16)
-    ax.set_ylabel('Apparent k [1/m$^2$]', fontsize=16)
+    ax.set_ylabel('Apparent k [/m$^2$]', fontsize=16)
     ax.set_xlim(x_lo, x_hi)
     ax.set_ylim(y_lo, y_hi)
     ax.tick_params(axis='both', which='major', labelsize=14)
