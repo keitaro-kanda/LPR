@@ -28,8 +28,26 @@ BASE_DIR_K = '/Volumes/SSD_Kanda_SAMSUNG/modeling_tools_output/evaluate_apparent
 # K系で計算する k_true [1/m^2] のリスト（D >= ROCK_SIZE_MIN の累積岩石密度）
 K_TRUE_LIST = [5e-3, 10e-3, 50e-3, 100e-3]
 
-# 最大岩石サイズの上限 [m]（これを超える条件は計算しない）
+# 最大岩石サイズの上限 [m]（D_MAX_MODE='auto' のときのみ有効）
 MAX_ROCK_SIZE_LIMIT = 10.0
+
+# ============================================================
+# --- 0b. 最大岩石サイズ D_max の決定方法（ハードコーディング） ---
+# ============================================================
+# 'fixed': ROCK_SIZE_MAX を最大岩石サイズとして使う（推奨）
+#          D_max が N・r に依存しないため、全ての (r, k) 組み合わせが計算可能。
+#          月地下に存在しうる最大の岩石サイズを物理的な根拠から与える、という考え方。
+# 'auto' : D_max = D_min * N^(1/r)（従来方式。N(>D_max)=1 となるサイズ）
+#          D_max が非現実的に大きくなる条件は MAX_ROCK_SIZE_LIMIT で打ち切る。
+D_MAX_MODE = 'fixed'
+
+# D_MAX_MODE='fixed' のときの最大岩石サイズ [m]
+#   1.0 : CE-4/LPR で観測された最大岩石 46.8 cm の約2倍
+#   2.0 : r_true が 1.0 付近まで届く（切断による丸まりが小さくなるため）
+# 切断の丸まりにより、フィットで得られる r_true は入力 r より大きくなる。
+#   ROCK_SIZE_MAX=1.0 -> 入力 r=0.6/1.0/2.0/4.0 で r_true=1.19/1.36/2.02/3.81
+#   ROCK_SIZE_MAX=2.0 -> 同                      r_true=1.00/1.21/1.95/3.84
+ROCK_SIZE_MAX = 2.0
 
 # --- 1. 設定クラス ---
 class RadarConfig:
@@ -63,8 +81,27 @@ class RadarConfig:
         self.MAX_DEPTH = 12.0
         # すべての面積計算のベースとなる統一パラメータ
         self.AREA_SIZE_M2 = 18300.0 # 深さ12 m x 奥行き1525 mのエリア
+        # 岩石サイズの下限 [m]。
+        # LPR CH2 のサイズ推定下限であり、RSFD のフィット下限でもある。
+        # （これより小さい岩石が存在しない、という意味ではない）
         self.ROCK_SIZE_MIN = 0.06
+        # 岩石サイズの上限 [m]（D_MAX_MODE='fixed' のときに使用）
+        self.ROCK_SIZE_MAX = ROCK_SIZE_MAX
         self.TOTAL_ROCKS = total_rocks
+
+    def d_max(self, r_true):
+        """
+        最大岩石サイズ D_max [m] を返す。
+
+          'fixed': ROCK_SIZE_MAX（N・r に依存しない固定値）
+          'auto' : D_min * N^(1/r)（N(>D_max)=1 となるサイズ。従来方式）
+
+        'auto' では D_max が (r, N) に強く依存し、r が小さく N が大きい条件で
+        非現実的な値（数十 m）になるため、多くの (r, k) 組み合わせが計算不能になる。
+        """
+        if D_MAX_MODE == 'fixed':
+            return self.ROCK_SIZE_MAX
+        return self.ROCK_SIZE_MIN * (self.TOTAL_ROCKS ** (1.0 / r_true))
 
     @property
     def lambda_0(self):
@@ -153,13 +190,18 @@ class RockModel:
     """
     def generate_rocks(self, r_true, config, quiet=False):
         D_min = config.ROCK_SIZE_MIN
-        
-        # Nとrから導かれる自然な最大岩石サイズ (D_max_auto) を算出
-        D_max_auto = D_min * (config.TOTAL_ROCKS ** (1.0 / r_true))
+        D_max = config.d_max(r_true)
+
+        if D_max <= D_min:
+            raise ValueError(
+                f"D_max ({D_max:.3f} m) が D_min ({D_min:.3f} m) 以下です。"
+                "ROCK_SIZE_MAX の設定を確認してください。"
+            )
 
         if not quiet:
+            mode_note = ("固定値" if D_MAX_MODE == 'fixed' else "N と r から自動決定")
             print(f"岩石を生成中... (True Slope = -{r_true}, N={config.TOTAL_ROCKS})")
-            print(f"  -> 自然な最大岩石サイズ (D_max_auto): {D_max_auto:.2f} m")
+            print(f"  -> 最大岩石サイズ (D_max): {D_max:.2f} m [{mode_note}]")
         
         # 0から1の範囲を TOTAL_ROCKS 個で等間隔に分割した配列を作成（分位数）
         # u = (np.arange(config.TOTAL_ROCKS) + 0.5) / config.TOTAL_ROCKS
@@ -169,8 +211,8 @@ class RockModel:
         # 均等割りではなく、一様分布からランダムにサンプリングする
         u = np.random.uniform(0.0, 1.0, size=config.TOTAL_ROCKS)
         
-        # 算出した自然な最大サイズを上限として適用
-        term1 = D_max_auto ** (-r_true)
+        # [D_min, D_max] の切断べき乗分布から逆関数法でサンプリング
+        term1 = D_max ** (-r_true)
         term2 = D_min ** (-r_true)
         
         diameters = ( (term1 - term2) * u + term2 ) ** (-1.0 / r_true)
@@ -540,7 +582,7 @@ class Analyzer:
 
         d_min_cm = config.ROCK_SIZE_MIN * 100.0
         N_total = config.TOTAL_ROCKS
-        D_max_auto_cm = d_min_cm * (N_total ** (1.0 / r_true))
+        D_max_auto_cm = config.d_max(r_true) * 100.0
 
         x_min_log = np.log10(d_min_cm)
         x_max_log = np.log10(D_max_auto_cm)
@@ -700,7 +742,7 @@ class Analyzer:
 
         d_min_cm = config.ROCK_SIZE_MIN * 100.0
         N_total = config.TOTAL_ROCKS
-        D_max_auto_cm = d_min_cm * (N_total ** (1.0 / r_true))
+        D_max_auto_cm = config.d_max(r_true) * 100.0
 
         x_min_log = np.log10(d_min_cm)
         x_max_log = np.log10(D_max_auto_cm)
@@ -915,9 +957,10 @@ def main():
         config = RadarConfig(total_rocks=total_rocks)
         
         # --- 最大岩石サイズの事前チェック ---
-        D_max_auto = config.ROCK_SIZE_MIN * (total_rocks ** (1.0 / r_true))
-        if D_max_auto > MAX_ROCK_SIZE_LIMIT:
-            print(f"  -> [警告] 計算上の最大岩石サイズ ({D_max_auto:.2f} m) が "
+        # D_MAX_MODE='fixed' では D_max が N・r に依存しないため、この打ち切りは不要。
+        D_max_used = config.d_max(r_true)
+        if D_MAX_MODE == 'auto' and D_max_used > MAX_ROCK_SIZE_LIMIT:
+            print(f"  -> [警告] 計算上の最大岩石サイズ ({D_max_used:.2f} m) が "
                   f"{MAX_ROCK_SIZE_LIMIT:.1f} m を超えるため、計算を中止します。")
             
             # JSONへの「Calculation stop」の記録
@@ -958,7 +1001,9 @@ def main():
             f.write(f"Nominal k_true [1/m2]: {case['k_nominal']:.6e}\n")
             f.write(f"Realized k_true (= N/A) [1/m2]: {true_rock_density:.6e}\n")
             f.write(f"Observation Area [m2]: {overall_area}\n")
-            f.write(f"D_max_auto [m]: {D_max_auto:.4f}\n")
+            f.write(f"D_max Mode: {D_MAX_MODE}\n")
+            f.write(f"D_max [m]: {D_max_used:.4f}\n")
+            f.write(f"D_min [m]: {config.ROCK_SIZE_MIN:.4f}\n")
             f.write(f"Total Iterations: {NUM_ITERATIONS}\n")
 
         all_range_results = []

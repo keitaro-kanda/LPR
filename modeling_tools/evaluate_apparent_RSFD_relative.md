@@ -84,9 +84,16 @@ $$P_{norm} > 10^{\mathrm{NOISE\_FLOOR\_DB}/10} = 10^{-9}\quad(-90\ \mathrm{dB})$
 
 $$D=\left[u\left(D_{max}^{-r}-D_{min}^{-r}\right)+D_{min}^{-r}\right]^{-1/r},\qquad u\sim U[0,1)$$
 
-$D_{max}$ は $N(>D_{max})=1$ となるサイズとして自動決定されます：
+$D_{max}$ の決め方は `D_MAX_MODE` で切り替えます。
 
-$$D_{max}=D_{min}\,N_{true}^{1/r}$$
+| モード | $D_{max}$ | 特徴 |
+|---|---|---|
+| `'fixed'`（既定） | `ROCK_SIZE_MAX`（既定 1.0 m） | $N$・$r$ に依存しないため、**全ての $(r,k)$ 組み合わせが計算可能** |
+| `'auto'` | $D_{min}N_{true}^{1/r}$ | $N(>D_{max})=1$ となるサイズ。$r$ が小さく $k$ が大きい条件で非現実的な値になり計算不能 |
+
+`'fixed'` の 1.0 m は、CE-4/LPR で観測された最大岩石 46.8 cm の約2倍という根拠で設定しています。
+
+$D_{min}$ は「これより小さい岩石が存在しない」という意味ではなく、**LPR CH2 のサイズ推定下限であり、RSFD のフィット下限**です。6 cm 未満の岩石は実際には存在すると考えられますが、サイズを推定できないため RSFD には乗りません。なお $D_{min}$ を下げても $r_{true}$ の切断バイアスは改善しません（フィット窓 $[6\,\mathrm{cm}, D_{max}]$ における累積分布の形は $D^{-r}-D_{max}^{-r}$ で、$D_{min}$ は規格化定数にしか入らないため）。
 
 深さは $0$–`MAX_DEPTH` の一様分布で与えます。
 
@@ -164,8 +171,10 @@ python evaluate_apparent_RSFD_relative.py
 |---|---|---|
 | `INPUT_MODE` | `'N'` | 入力モード切り替え |
 | `BASE_DIR_N` / `BASE_DIR_K` | — | 出力の親ディレクトリ |
-| `K_TRUE_LIST` | `[1e-3, 5e-3, 10e-3, 50e-3]` | K系で計算する $k_{true}$ [1/m²] |
-| `MAX_ROCK_SIZE_LIMIT` | `10.0` | $D_{max}$ の上限 [m]。超える条件は計算せず JSON に `"Calculation stop"` を記録 |
+| `K_TRUE_LIST` | `[5e-3, 10e-3, 50e-3, 100e-3]` | K系で計算する $k_{true}$ [1/m²] |
+| `D_MAX_MODE` | `'fixed'` | $D_{max}$ の決定方法（`'fixed'` / `'auto'`） |
+| `ROCK_SIZE_MAX` | `1.0` | `'fixed'` のときの最大岩石サイズ $D_{max}$ [m] |
+| `MAX_ROCK_SIZE_LIMIT` | `10.0` | `'auto'` のときのみ有効。$D_{max}$ がこれを超える条件は計算せず JSON に `"Calculation stop"` を記録 |
 | `NUM_ITERATIONS` | `100` | `main()` 内。イテレーション回数 |
 
 ### `RadarConfig`
@@ -182,7 +191,8 @@ python evaluate_apparent_RSFD_relative.py
 | `SIGMA_RANDOM_DB` | `3.0` | 反射強度ばらつきの標準偏差 [dB] | |
 | `MAX_DEPTH` | `12.0` | 岩石を配置する最大深さ [m] | 最上部レゴリス層の厚さ |
 | `AREA_SIZE_M2` | `18300.0` | 観測領域の断面積 [m²] | 12 m × 1525 m |
-| `ROCK_SIZE_MIN` | `0.06` | 最小岩石サイズ $D_{min}$ [m] | LPR CH2 のサイズ推定下限 |
+| `ROCK_SIZE_MIN` | `0.06` | 岩石サイズ下限 $D_{min}$ [m]（＝RSFDのフィット下限） | LPR CH2 のサイズ推定下限 |
+| `ROCK_SIZE_MAX` | `1.0` | 岩石サイズ上限 $D_{max}$ [m]（`'fixed'` 時） | 観測最大 46.8 cm の約2倍 |
 
 主な派生プロパティ：`lambda_0`, `lambda_reg`, `fresnel_radius`, `attenuation_np_m` [Np/m], `attenuation_db_m`（表示専用）, `noise_floor_linear`, `reflection_coeff`, `surface_reflection_coeff`, `surface_rcs`, `true_rock_density`
 
@@ -250,7 +260,7 @@ python evaluate_apparent_RSFD_relative.py
 }
 ```
 
-第1階層のキーが $r_{true}$、第2階層が $N_{true}$（N系）または $k_{true}$（K系）です。$D_{max}$ が上限を超えた条件は文字列 `"Calculation stop"` が入ります。
+第1階層のキーが $r_{true}$、第2階層が $N_{true}$（N系）または $k_{true}$（K系）です。`D_MAX_MODE='auto'` で $D_{max}$ が上限を超えた条件には、文字列 `"Calculation stop"` が入ります（`'fixed'` では発生しません）。
 
 ### 解析の種類
 
@@ -291,11 +301,25 @@ $k$ を「べき乗則の係数」ではなく「$D_{min}$ における累積密
 ### 統計的な制約
 
 - **`k_true = 1e-3` は $N_{true}=18$ 個**です。移動窓（幅2 m）では1窓あたり平均3個となり、6個以上というフィット条件をほぼ常に下回るため、`aggregated_stats_moving.csv` の大半が `NaN` になります。この条件で深さプロファイルが必要な場合は `window_size` を広げてください。
-- **$r=1.0$ では $k_{true}\geq 10\times10^{-3}$ が計算されません**（$D_{max}$ が 10.98 m, 54.90 m となり `MAX_ROCK_SIZE_LIMIT` を超過）。
+- `D_MAX_MODE='auto'` を使う場合、**$r=1.0$ では $k_{true}\geq 10\times10^{-3}$ が計算されません**（$D_{max}$ が 10.98 m, 54.90 m となり `MAX_ROCK_SIZE_LIMIT` を超過）。既定の `'fixed'` ではこの制約はありません。
 
 ### 入力パラメータと `r_true` / `k_true` の関係
 
-$D_{max}$ で切断された分布は $D_{max}$ 近傍で累積分布が丸まるため、**フィットで得られる $r_{true}$ は入力した $r$ より系統的に大きく出ます**（$N=100$ で最大 +5.6%、$N=1000$ で +3% 程度）。コードは入力値をそのまま使わず生成された岩石集団を毎回フィットし直しているので、比較には出力された `r_true_mean` を使ってください。
+$D_{max}$ で切断された分布は $D_{max}$ 近傍で累積分布が丸まるため、**フィットで得られる $r_{true}$ は入力した $r$ より系統的に大きく出ます**。コードは入力値をそのまま使わず生成された岩石集団を毎回フィットし直しているので、比較・作図には出力された `r_true_mean` を使ってください。
+
+`'fixed'` ではこのバイアスは $(D_{max}/D_{min})^{-r}$ で決まり、**$r$ だけの関数**になります（$N$・$k$ にはほぼ依存しません）。フィット範囲を 6 cm 以上に固定したときの対応は以下のとおりです。
+
+| 入力 $r$ | $D_{max}$=1.0 m | $D_{max}$=2.0 m |
+|---|---|---|
+| 0.6 | 1.19 | 1.00 |
+| 0.8 | 1.27 | 1.09 |
+| 1.0 | 1.36 | 1.21 |
+| 1.5 | 1.66 | 1.54 |
+| 2.0 | 2.02 | 1.95 |
+| 3.0 | 2.90 | 2.87 |
+| 4.0 | 3.81 | 3.84 |
+
+$D_{max}=1.0$ m では $r_{true}$ の下限が約 1.19 になり、$r_{true}\approx1.09$ の真の分布は作れません。観測の $r_{app}=1.09$ を再現するには $r_{app}<r_{true}$ の関係から $r_{true}>1.09$ が必要なので目的上は問題ありませんが、$r_{true}\approx1.0$ を直接示したい場合は `ROCK_SIZE_MAX = 2.0` にしてください。$r_{true}$ を 1.2〜1.6 付近で細かく刻みたい場合は、入力 $r$ のグリッドを 0.5〜0.8 まで下方に拡張します。
 
 ### 乱数シード
 
