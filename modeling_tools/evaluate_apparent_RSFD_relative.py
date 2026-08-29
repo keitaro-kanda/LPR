@@ -26,7 +26,7 @@ BASE_DIR_N = '/Volumes/SSD_Kanda_SAMSUNG/modeling_tools_output/evaluate_apparent
 BASE_DIR_K = '/Volumes/SSD_Kanda_SAMSUNG/modeling_tools_output/evaluate_apparent_RSFD_relative_kinput'
 
 # K系で計算する k_true [1/m^2] のリスト（D >= ROCK_SIZE_MIN の累積岩石密度）
-K_TRUE_LIST = [5e-3, 10e-3, 50e-3, 100e-3]
+K_TRUE_LIST = [5e-3, 10e-3, 20e-3, 50e-3, 100e-3]
 
 # 最大岩石サイズの上限 [m]（D_MAX_MODE='auto' のときのみ有効）
 MAX_ROCK_SIZE_LIMIT = 10.0
