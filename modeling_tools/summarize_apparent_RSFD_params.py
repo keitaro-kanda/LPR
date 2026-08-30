@@ -365,8 +365,12 @@ else:
                 zorder=2
             )
 
+    # 観測値の r, k を破線で表示
     ax.axhline(k_obs, color='k', linestyle='--', linewidth=2.5)
     ax.axvline(r_obs, color='k', linestyle='--', linewidth=2.5)
+    # 観測値をテキストで表示
+    # ax.text(r_obs - 0.1, 1e-3, f"r={r_obs}", color='k', fontsize=14, rotation=90)
+    # ax.text(0.2, k_obs * 1.1, f"k={k_obs:.2e}", color='k', fontsize=14)
 
     # カスタム凡例: 色→input_r、マーカー→ケース(N または k)
     legend_r   = [Line2D([0], [0], color=r_colors[r], linestyle='-', linewidth=1.5,
@@ -374,7 +378,7 @@ else:
     legend_n   = [Line2D([0], [0], color='gray', marker=case_markers[c], linestyle='none',
                          markersize=8, label=case_label(c)) for c in case_keys]
     legend_obs = [Line2D([0], [0], color='k', linestyle='--', linewidth=2.5,
-                         label=f"Observed \n(r={r_obs}, k={k_obs:.2e})")]
+                         label=f"Observed, r={r_obs}, k={k_obs:.2e}")]
     handles_list = legend_r + legend_n + legend_obs
     ax.legend(handles=handles_list, fontsize=14,
               bbox_to_anchor=(1.01, 1), loc='upper left', borderaxespad=0)
