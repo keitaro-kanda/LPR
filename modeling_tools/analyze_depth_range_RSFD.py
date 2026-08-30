@@ -72,9 +72,9 @@ def parse_case_dir(case_dir):
         total_rocks = n_from_file
 
     if mode == 'K':
-        label = f"k={json_key} [1/m2] (N={total_rocks})"
+        label = f"k={json_key} [/m2] (N={total_rocks})"
     else:
-        label = f"N={total_rocks} (k={k_nominal:.4e} [1/m2])"
+        label = f"N={total_rocks} (k={k_nominal:.4e} [/m2])"
 
     return {
         'mode':        mode,
@@ -217,7 +217,7 @@ def analyze_one_combination(total_rocks, csv_files, d_start, d_end, area, out_di
         f.write(f"Depth range    : {d_start} - {d_end} m\n")
         f.write(f"Area           : {area:.2f} m2\n")
         f.write(f"N_true         : {total_rocks}\n")
-        f.write(f"k_true (= N/A) : {total_rocks / AREA_SIZE_M2:.6e} [1/m2]\n")
+        f.write(f"k_true (= N/A) : {total_rocks / AREA_SIZE_M2:.6e} [/m2]\n")
         f.write(f"Iterations     : {len(csv_files)} (valid fits: {n_valid})\n")
         f.write(f"r_true         = {r_true_mean:.4f} +/- {r_true_std:.4f}\n")
         f.write(f"k_true         = {k_true_mean:.4e} +/- {k_true_std:.4e}\n")
@@ -311,7 +311,7 @@ def plot_csfd_comparison_stats(iter_df, out_prefix, r_true, total_rocks, d_start
     plt.xlabel('Diameter [cm]', fontsize=18)
     plt.xticks([6, 10, 20, 50, 100, 200, 500], [6, 10, 20, 50, 100, 200, 500], fontsize=16)
     plt.xlim(d_min_cm * 0.8, D_max_auto_cm * 1.2)
-    plt.ylabel('Cumulative Rock Density N(>D) [1/m²]', fontsize=18)
+    plt.ylabel('Cumulative Rock Density N(>D) [/m²]', fontsize=18)
     plt.tick_params(axis='both', which='major', labelsize=16)
     plt.legend(fontsize=14)
     plt.grid(True, which='both', ls='-', alpha=0.7)

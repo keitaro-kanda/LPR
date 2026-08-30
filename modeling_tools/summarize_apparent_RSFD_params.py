@@ -258,26 +258,34 @@ def plot_true_vs_apparent(param, ratio, out_name):
 
     # 参照線
     if ratio:
-        plt.axhline(1, color='k', linestyle='--', label='Apparent / True = 1')
+        plt.axhline(1, color='k', linestyle='--', label=f'${axis_name}_{{app}}$ / ${axis_name}_{{true}}$ = 1')
     elif all_x and all_y:
         lo = min(min(all_x), min(all_y)) * 0.8
         hi = max(max(all_x), max(all_y)) * 1.2
-        plt.plot([lo, hi], [lo, hi], 'k--', label='Apparent = True')
+        plt.plot([lo, hi], [lo, hi], 'k--', label=f'${axis_name}_{{app}}$ = ${axis_name}_{{true}}$')
 
     if log_axis:
         plt.xscale('log')
         if not ratio:
             plt.yscale('log')
 
-    unit = ' [1/m$^2$]' if axis_name == 'k' else ''
-    plt.xlabel(f'True {axis_name}{unit}', fontsize=16)
+    unit = ' [/m$^2$]' if axis_name == 'k' else ''
+    
+    # 軸ラベルの表記を LaTeX 風に変更
+    plt.xlabel(f'${axis_name}_{{true}}${unit}', fontsize=16)
     if ratio:
-        plt.ylabel(f'Apparent {axis_name} / True {axis_name}', fontsize=16)
+        plt.ylabel(f'${axis_name}_{{app}}$ / ${axis_name}_{{true}}$', fontsize=16)
     else:
-        plt.ylabel(f'Apparent {axis_name}{unit}', fontsize=16)
+        plt.ylabel(f'${axis_name}_{{app}}${unit}', fontsize=16)
 
     plt.tick_params(axis='both', which='major', labelsize=14)
-    plt.legend(fontsize=14)
+    
+    # k_apparent_ratio_plot の場合のみ凡例を2列に設定
+    if out_name == 'k_apparent_ratio_plot':
+        plt.legend(fontsize=14, ncol=3)
+    else:
+        plt.legend(fontsize=14)
+        
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, f'{out_name}.png'))
@@ -371,8 +379,8 @@ else:
     ax.legend(handles=handles_list, fontsize=14,
               bbox_to_anchor=(1.01, 1), loc='upper left', borderaxespad=0)
 
-    ax.set_xlabel('Apparent r', fontsize=16)
-    ax.set_ylabel('Apparent k [/m$^2$]', fontsize=16)
+    ax.set_xlabel(r'$r_{app}$', fontsize=16)
+    ax.set_ylabel('$k_{app}$ [/m$^2$]', fontsize=16)
     ax.set_xlim(x_lo, x_hi)
     ax.set_ylim(y_lo, y_hi)
     ax.tick_params(axis='both', which='major', labelsize=14)
@@ -413,8 +421,8 @@ else:
 
     ax_nl.axhline(k_obs, color='k', linestyle='--', linewidth=2.5)
     ax_nl.axvline(r_obs, color='k', linestyle='--', linewidth=2.5)
-    ax_nl.set_xlabel('Apparent r', fontsize=16)
-    ax_nl.set_ylabel('Apparent k [1/m$^2$]', fontsize=16)
+    ax_nl.set_xlabel(r'$r_{app}$', fontsize=16)
+    ax_nl.set_ylabel(r'$k_{app}$ [/m$^2$]', fontsize=16)
     ax_nl.set_xlim(x_lo, x_hi)
     ax_nl.set_ylim(y_lo, y_hi)
     ax_nl.tick_params(axis='both', which='major', labelsize=14)

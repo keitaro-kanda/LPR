@@ -25,7 +25,7 @@ INPUT_MODE = 'K'   # <<< ここを 'N' / 'K' で切り替える
 BASE_DIR_N = '/Volumes/SSD_Kanda_SAMSUNG/modeling_tools_output/evaluate_apparent_RSFD_relative'
 BASE_DIR_K = '/Volumes/SSD_Kanda_SAMSUNG/modeling_tools_output/evaluate_apparent_RSFD_relative_kinput'
 
-# K系で計算する k_true [1/m^2] のリスト（D >= ROCK_SIZE_MIN の累積岩石密度）
+# K系で計算する k_true [/m^2] のリスト（D >= ROCK_SIZE_MIN の累積岩石密度）
 K_TRUE_LIST = [5e-3, 10e-3, 20e-3, 50e-3, 100e-3]
 
 # 最大岩石サイズの上限 [m]（D_MAX_MODE='auto' のときのみ有効）
@@ -145,7 +145,7 @@ class RadarConfig:
 
     @property
     def true_rock_density(self):
-        """true RSFD の累積岩石密度 k_true [1/m^2]（D >= ROCK_SIZE_MIN）"""
+        """true RSFD の累積岩石密度 k_true [/m^2]（D >= ROCK_SIZE_MIN）"""
         return self.TOTAL_ROCKS / self.AREA_SIZE_M2
 
     @property
@@ -513,7 +513,7 @@ class Analyzer:
         plt.xlabel('Diameter [m]', fontsize=18)
         plt.xticks([6, 10, 20, 50, 100, 200, 500], [6, 10, 20, 50, 100, 200, 500], fontsize=16)
         plt.xlim(d_min_cm * 0.8, max(diameters_true_cm.max(), diameters_det_cm.max()) * 1.2)
-        plt.ylabel('Cumulative Rock Density N(>D) [1/m²]', fontsize=18)
+        plt.ylabel('Cumulative Rock Density N(>D) [/m²]', fontsize=18)
         plt.tick_params(axis='both', which='major', labelsize=16)
         plt.legend(fontsize=14)
         plt.grid(True, which="both", ls="-", alpha=0.7)
@@ -526,7 +526,7 @@ class Analyzer:
     def plot_depth_analysis(self, analysis_df, output_prefix, r_true, x_col='depth_range', xlabel='Depth Range [m]'):
         plt.figure(figsize=(10, 8))
         plt.plot(analysis_df[x_col], analysis_df['r_apparent'], marker='o', linestyle='-', color='blue', label='Apparent r')
-        plt.axhline(y=r_true, color='k', linestyle='--', label='True r')
+        plt.axhline(y=r_true, color='k', linestyle='--', label=r'$r_{true}$')
         
         plt.xlabel(xlabel, fontsize=18)
         plt.ylabel('Apparent Slope r', fontsize=18)
@@ -543,10 +543,10 @@ class Analyzer:
     def plot_k_analysis(self, analysis_df, output_prefix, true_k, x_col='depth_range', xlabel='Depth Range [m]'):
         plt.figure(figsize=(10, 8))
         plt.plot(analysis_df[x_col], analysis_df['k_apparent'], marker='^', linestyle='-', color='red', label='Apparent k')
-        plt.axhline(y=true_k, color='k', linestyle='--', label=f'True k: {true_k:.2e}')
+        plt.axhline(y=true_k, color='k', linestyle='--', label=r'$k_{true}$')
         
         plt.xlabel(xlabel, fontsize=18)
-        plt.ylabel('Apparent Density Coefficient k [1/m²]', fontsize=18)
+        plt.ylabel('Apparent Density Coefficient k [/m²]', fontsize=18)
         plt.xticks(np.arange(2, 14, 2), ['0-2', '2-4', '4-6', '6-8', '8-10', '10-12'], fontsize=16)
         plt.tick_params(axis='both', which='major', labelsize=16)
         plt.legend(fontsize=16)
@@ -640,7 +640,7 @@ class Analyzer:
         plt.xlabel('Diameter [cm]', fontsize=18)
         plt.xticks([6, 10, 20, 50, 100, 200, 500], [6, 10, 20, 50, 100, 200, 500], fontsize=16)
         plt.xlim(d_min_cm * 0.8, D_max_auto_cm * 1.2)
-        plt.ylabel('Cumulative Rock Density N(>D) [1/m²]', fontsize=18)
+        plt.ylabel('Cumulative Rock Density N(>D) [/m²]', fontsize=18)
         plt.tick_params(axis='both', which='major', labelsize=16)
         plt.legend(fontsize=14)
         plt.grid(True, which="both", ls="-", alpha=0.7)
@@ -659,7 +659,7 @@ class Analyzer:
 
         plt.plot(x, y_mean, marker='o', linestyle='-', color='blue', label='Mean Apparent r')
         plt.fill_between(x, y_mean - y_std, y_mean + y_std, color='blue', alpha=0.3, label='±1 Std Dev')
-        plt.axhline(y=r_true, color='k', linestyle='--', label='True r')
+        plt.axhline(y=r_true, color='k', linestyle='--', label=r'$r_{true}$')
         
         plt.xlabel(xlabel, fontsize=18)
         plt.ylabel('Apparent Slope r', fontsize=18)
@@ -688,10 +688,10 @@ class Analyzer:
 
         plt.plot(x, y_mean, marker='^', linestyle='-', color='red', label='Mean Apparent k')
         plt.fill_between(x, y_mean - y_std, y_mean + y_std, color='red', alpha=0.3, label='±1 Std Dev')
-        plt.axhline(y=true_k, color='k', linestyle='--', label=f'True k: {true_k:.2e}')
+        plt.axhline(y=true_k, color='k', linestyle='--', label=r'$k_{true}$')
         
         plt.xlabel(xlabel, fontsize=18)
-        plt.ylabel('Apparent Density Coefficient k [1/m²]', fontsize=18)
+        plt.ylabel('Apparent Density Coefficient k [/m²]', fontsize=18)
         if x_col == 'depth_range':
             tick_vals = np.arange(2, 13, 2)
             plt.xticks(tick_vals, [f"0-{int(v)}" for v in tick_vals], fontsize=16)
@@ -889,7 +889,7 @@ def build_cases():
 
     各ケースは以下のキーを持つ:
       total_rocks : 生成する岩石数 N_true
-      k_nominal   : 指定した k_true [1/m^2]（N系では N/AREA から算出）
+      k_nominal   : 指定した k_true [/m^2]（N系では N/AREA から算出）
       dir_name    : 出力サブディレクトリ名
       json_key    : rsfd_summary.json 内のキー
       label       : 画面表示用のラベル
@@ -908,7 +908,7 @@ def build_cases():
                 'k_nominal': k_true,
                 'dir_name': f"k_{k_true:g}",
                 'json_key': f"{k_true:g}",
-                'label': f"k_true = {k_true:g} [1/m2] (N = {n})",
+                'label': f"k_true = {k_true:g} [/m2] (N = {n})",
             })
         return cases
 
@@ -925,7 +925,7 @@ def build_cases():
         'k_nominal': n / area,
         'dir_name': f"{n}",
         'json_key': f"{n}",
-        'label': f"岩石数 {n} (k_true = {n / area:.4e} [1/m2])",
+        'label': f"岩石数 {n} (k_true = {n / area:.4e} [/m2])",
     } for n in rock_counts]
 
 
@@ -998,8 +998,8 @@ def main():
             f.write(f"Input Mode: {INPUT_MODE}\n")
             f.write(f"True Slope (r): {r_true}\n")
             f.write(f"Total Rocks: {config.TOTAL_ROCKS}\n")
-            f.write(f"Nominal k_true [1/m2]: {case['k_nominal']:.6e}\n")
-            f.write(f"Realized k_true (= N/A) [1/m2]: {true_rock_density:.6e}\n")
+            f.write(f"Nominal k_true [/m2]: {case['k_nominal']:.6e}\n")
+            f.write(f"Realized k_true (= N/A) [/m2]: {true_rock_density:.6e}\n")
             f.write(f"Observation Area [m2]: {overall_area}\n")
             f.write(f"D_max Mode: {D_MAX_MODE}\n")
             f.write(f"D_max [m]: {D_max_used:.4f}\n")
