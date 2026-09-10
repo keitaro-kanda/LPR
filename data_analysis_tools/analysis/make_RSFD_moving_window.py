@@ -848,6 +848,7 @@ def plot_depth_rsfd_summary(window_centers, num_rocks_array, num_fitting_points_
 
     ax.set_xlabel('Depth [m]', fontsize=font_medium)
     ax.set_ylabel('NormalizedRSFD parameters', fontsize=font_medium)
+    ax.set_xlim(0, 12)
     ax.set_ylim(-0.2, 1.2)
     yticks = [nan_placeholder, 0, 0.2, 0.4, 0.6, 0.8, 1.0]
     ytick_labels = ['Nan', '0', '0.2', '0.4', '0.6', '0.8', '1.0']
