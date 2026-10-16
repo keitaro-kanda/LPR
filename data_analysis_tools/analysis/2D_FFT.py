@@ -42,6 +42,9 @@ CE-4/LPR の B-scan（2 次元の txt。各列が 1 本の A-scan）から、い
         mean_all_L<Ls>m.png               全解析窓（全グループ）をまとめた平均（3 パネル）
         compare_lengths_<グループ>.png    区間長による違い（S_x, S_y の平均を重ねる。all もあり）
         compare_groups_L<Ls>m.png         グループの違い（同じ区間長で重ねる）
+    すべての図で、横軸（k_x, k_y）・縦軸（dB）・2 次元図の色の範囲を共通にしている。
+    線の色は名前で呼べる色（r, b, g, m, c, y と k = 黒）にしている。
+    第 2 軸（上・右）に波長 λ = 2 pi / k [m] を示す（λ_y は ε_r で換算した深さ方向の波長）。
         spectra_mean.npz           平均スペクトルの数値
         run_info.json              設定と区間の一覧
         L<Ls>m/<窓>_x<始点>-<終点>m.png   区間ごとの結果（B-scan + 3 パネル）
@@ -77,14 +80,14 @@ DELIMITER = None        # None で自動（カンマ / タブ / 空白）
 #     regolith: 最上部のレゴリス層のうち、強い反射・層境界・縦縞を避けた範囲
 #               （地表直下 0-30 ns は直接波・地表反射の残りが強いので外している）
 #     strong  : 比較用。反射が比較的強い範囲
-#     random  : 比較用。深部のランダムノイズの範囲
+#     random  : 比較用。深部の、信号がほぼなくランダムノイズだけの範囲
 WINDOWS = [
     dict(name='A', x_m=(20.0, 250.0), t0_ns=30.0, group='regolith'),    # 下の層境界 ~140-160 ns
     dict(name='B', x_m=(740.0, 990.0), t0_ns=30.0, group='regolith'),   # 下の層境界 ~190 ns。1030 m の縦縞の手前まで
     dict(name='C', x_m=(470.0, 700.0), t0_ns=200.0, group='strong'),    # 比較的反射が強い領域
     dict(name='D', x_m=(1000.0, 1250.0), t0_ns=150.0, group='strong'),  # 比較的反射が強い領域
     dict(name='E', x_m=(200.0, 400.0), t0_ns=500.0, group='random'),    # 深部のランダムノイズ
-    dict(name='F', x_m=(1200.0, 1400.0), t0_ns=500.0, group='random'),   # 深部のランダムノイズ
+    dict(name='F', x_m=(1200.0, 1400.0), t0_ns=500.0, group='random'),  # 深部のランダムノイズ
 ]
 TIME_LEN_NS = 100.0     # 解析窓の時間の長さ [ns]（ε_r = 3 で深さ 8.65 m 分）
 
@@ -103,7 +106,14 @@ ZERO_RUN_MIN = 16       # 0 がこの点数以上（16 点 = 5 ns）続く所だ
 # --- 出力
 SAVE_SEGMENT_FIGS = True  # 区間ごとの図を保存する
 KY_MAX_PLOT = None      # 図の k_y の上限 [rad/m]。None でナイキスト波数まで（80 で約 1.1 GHz）
-DB_RANGE = 50.0         # 2 次元スペクトル図の色の幅 [dB]
+DB_RANGE = 70.0         # 2 次元スペクトル図の色の幅 [dB]（全図で共通。上端は全平均図の最大値 + 5 dB）
+SX_YLIM_DB = None       # S_x の図の縦軸 (下限, 上限) [dB]。None で全図に共通の範囲を自動で決める
+SY_YLIM_DB = None       # S_y の図の縦軸 (下限, 上限) [dB]。同上
+SPEC_DB_RANGE_MAX = 100.0  # 自動で決める縦軸の幅の上限 [dB]
+# 第 2 軸（波長 λ = 2 pi / k）に目盛りを打つ波長 [m]。軸の範囲に入るものだけ表示する
+WL_TICKS_X = (0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50)          # S_x の図（k_x は対数軸）
+WL_TICKS_X_MAP = (0.075, 0.1, 0.15, 0.25, 0.5)             # 2 次元図の水平方向（±k_x に打つ）
+WL_TICKS_Y = (0.06, 0.08, 0.1, 0.15, 0.2, 0.3, 0.5, 1)     # 鉛直方向（深さの波長、ε_r で換算）
 OVERVIEW_STRIDE = 10    # 全体図で間引くトレース数
 DPI = 130
 USE_CACHE = True
@@ -285,11 +295,20 @@ def _db(a):
     return 10 * np.log10(np.maximum(a, 1e-300))
 
 
-WIN_COLORS = ['#1f77b4', '#d62728', '#2ca02c', '#9467bd', '#ff7f0e', '#8c564b', '#e377c2']
-GROUP_STYLES = ['-', '--', ':', '-.']
-
+# 線の色は名前で呼べる色にする（論文で「赤線」「青線」と言えるように）
+WIN_COLORS = ['r', 'b', 'g', 'm', 'c', 'y']                    # 解析窓（A, B, C, ... の順）
+COLOR_NAMES = {'r': 'red', 'b': 'blue', 'g': 'green', 'm': 'magenta', 'c': 'cyan',
+               'y': 'yellow', 'k': 'black', 'orange': 'orange', 'gray': 'gray'}
+LENGTH_COLORS = ['r', 'g', 'b', 'm', 'c', 'y']                 # 区間長（短い順）
+MEAN_COLOR = 'k'                                               # 平均は黒
+GROUP_STYLES = ['-', '--', ':', '-.']                          # グループは線種で区別
+DK_STYLE = dict(color='gray', ls='-.', lw=1.0)                 # 分解能 Δk
+KN_STYLE = dict(color='gray', ls=(0, (1, 1.5)), lw=1.6)        # ナイキスト波数 k_N
+BAND_FILL = dict(color='0.85', alpha=0.6)                      # LPR 帯域（薄い灰色）
+BAND_LINE = dict(color='w', ls='--', lw=0.9)                   # 2 次元図の帯域の線（白）
 
 ALL_NAME = 'all'          # 全解析窓をまとめた平均の名前
+LIM = {}                  # 全図に共通の軸の範囲（main で決める）
 
 
 def _group(w):
@@ -309,90 +328,123 @@ def _win_color(name):
     return WIN_COLORS[i % len(WIN_COLORS)]
 
 
-def ky_max(g=None):
+def _group_style(gname):
+    gl = groups()
+    return GROUP_STYLES[gl.index(gname) % len(GROUP_STYLES)] if gname in gl else '-'
+
+
+def ky_max():
     kn = np.pi / dy_m()
     return kn if KY_MAX_PLOT is None else min(KY_MAX_PLOT, kn)
 
 
-def draw_map(ax, g, S, vmax):
+def _lw(ls, lw):
+    return lw * 1.4 if ls == ':' else lw            # 点線は細く見えるので少し太く
+
+
+def _wl_axis(ax, which, wl_ticks, label, symmetric=False):
+    """波長 λ = 2 pi / k の第 2 軸（上または右）。λ は k の逆数で単調でない（±k）場合も
+    あるので、k の軸と同じ目盛り位置に λ の値を文字で付ける。軸の範囲を決めてから呼ぶ。"""
+    ident = (lambda v: v, lambda v: v)
+    sec = ax.secondary_xaxis('top', functions=ident) if which == 'x' else \
+        ax.secondary_yaxis('right', functions=ident)
+    lo, hi = sorted(ax.get_xlim() if which == 'x' else ax.get_ylim())
+    pos, lab = [], []
+    for wl in wl_ticks:
+        k = 2 * np.pi / wl
+        for kk in ((k, -k) if symmetric else (k,)):
+            if lo <= kk <= hi:
+                pos.append(kk)
+                lab.append(f'{wl:g}')
+    if which == 'x':
+        sec.set_xticks(pos, labels=lab)
+        sec.set_xlabel(label)
+    else:
+        sec.set_yticks(pos, labels=lab)
+        sec.set_ylabel(label)
+    sec.tick_params(which='minor', length=0)
+    return sec
+
+
+def draw_map(ax, g, S):
     m = g.ky <= ky_max() + 1e-9
     im = ax.imshow(_db(S[m]), origin='lower', aspect='auto', cmap='magma',
                    extent=[g.kx[0] - g.dkx / 2, g.kx[-1] + g.dkx / 2,
                            g.ky[m][0] - g.dky / 2, g.ky[m][-1] + g.dky / 2],
-                   vmin=vmax - DB_RANGE, vmax=vmax)
+                   vmin=LIM['map'][0], vmax=LIM['map'][1])
     for f in BAND_MHZ:
-        ax.axhline(mhz_to_ky(f), color='cyan', ls='--', lw=0.8)
+        ax.axhline(mhz_to_ky(f), **BAND_LINE)
+    ax.set_xlim(*LIM['kx_map'])
+    ax.set_ylim(*LIM['ky_map'])
     ax.set_xlabel('k_x [rad/m]')
     ax.set_ylabel('k_y [rad/m]')
+    _wl_axis(ax, 'x', WL_TICKS_X_MAP, 'λ_x [m]', symmetric=True)
+    _wl_axis(ax, 'y', WL_TICKS_Y, f'λ_y [m] (ε_r = {EPS_R:g})')
     ax.set_title('S(k_x, k_y)')
-    ax.legend(handles=[Line2D([], [], color='cyan', ls='--', lw=1,
-                              label=f'{BAND_MHZ[0]:g}–{BAND_MHZ[1]:g} MHz')],
-              loc='upper right', fontsize=7.5, framealpha=0.7)
+    ax.legend(handles=[Line2D([], [], label=f'{BAND_MHZ[0]:g}–{BAND_MHZ[1]:g} MHz', **BAND_LINE)],
+              loc='upper right', fontsize=7.5, facecolor='0.4', labelcolor='w', framealpha=0.7)
     return im
 
 
 def _res_lines(ax, dk, kn, axis, show_dk=True):
-    """分解能 Δk（一点鎖線）とナイキスト波数 k_N（点線）の縦線と、数値の注記"""
+    """分解能 Δk（灰色の一点鎖線）とナイキスト波数 k_N（灰色の点線）の縦線と凡例"""
     hs = []
     if show_dk:
-        ax.axvline(dk, color='tab:olive', ls='-.', lw=1.0)
-        hs.append(Line2D([], [], color='tab:olive', ls='-.', lw=1.0,
-                         label=f'Δk_{axis} = {dk:.3f} rad/m'))
-    lo, hi = ax.get_xlim()
-    ax.axvline(kn, color='tab:gray', ls=':', lw=1.4)
-    lab = f'k_N,{axis} = {kn:.1f} rad/m'
-    if kn > hi:
-        lab += ' (off scale)'
-    hs.append(Line2D([], [], color='tab:gray', ls=':', lw=1.4, label=lab))
-    ax.set_xlim(lo, hi)
+        ax.axvline(dk, **DK_STYLE)
+        hs.append(Line2D([], [], label=f'Δk_{axis} = {dk:.3f} rad/m', **DK_STYLE))
+    ax.axvline(kn, **KN_STYLE)
+    hs.append(Line2D([], [], label=f'k_N,{axis} = {kn:.1f} rad/m', **KN_STYLE))
     return hs
 
 
-def draw_sx(ax, g, curves, ylim=None):
+def _curve_handles(curves):
+    return [Line2D([], [], color=c['color'], lw=_lw(c.get('ls', '-'), c.get('lw', 1.3)),
+                   ls=c.get('ls', '-'), label=c['label']) for c in curves if c.get('label')]
+
+
+def draw_sx(ax, g, curves, dk_lines=None, plot=True):
+    """S_x の図。plot=False なら線は描かず（呼び出し側で描いた前提）、軸・凡例・縦線だけ整える"""
     k = g.kx[g.kx_pos]
-    for c in curves:
-        ax.semilogx(k, _db(c['s']), color=c['color'], lw=c.get('lw', 1.3), ls=c.get('ls', '-'),
-                    label=c.get('label'))
-    ax.set_xlim(0.8 * g.dkx, 1.25 * np.pi / DX_M)
-    hs = _res_lines(ax, g.dkx, np.pi / DX_M, 'x')
+    ax.set_xscale('log')
+    for c in curves if plot else []:
+        ls = c.get('ls', '-')
+        ax.plot(k, _db(c['s']), color=c['color'], lw=_lw(ls, c.get('lw', 1.3)), ls=ls)
+    hs = []
+    if dk_lines is None:
+        hs = _res_lines(ax, g.dkx, np.pi / DX_M, 'x')
+    else:                                           # 区間長ごとの Δk_x（色 = 区間長）
+        for dk, col in dk_lines:
+            ax.axvline(dk, color=col, ls='-.', lw=1.0)
+        hs = _res_lines(ax, None, np.pi / DX_M, 'x', show_dk=False)
+        hs.insert(0, Line2D([], [], color='k', ls='-.', lw=1.0, label='Δk_x (colour = L)'))
+    ax.set_xlim(*LIM['kx'])
+    ax.set_ylim(*LIM['sx'])
+    _wl_axis(ax, 'x', WL_TICKS_X, 'λ_x [m]')
     ax.set_xlabel('k_x [rad/m]')
     ax.set_ylabel('S_x [dB]')
     ax.set_title(f'S_x(k_x), k_y in {BAND_MHZ[0]:g}–{BAND_MHZ[1]:g} MHz')
     ax.grid(alpha=0.3, which='both')
-    if ylim:
-        ax.set_ylim(*ylim)
-    h0 = [Line2D([], [], color=c['color'], lw=c.get('lw', 1.3), ls=c.get('ls', '-'),
-                 label=c['label']) for c in curves if c.get('label')]
-    ax.legend(handles=h0 + hs, fontsize=7.5, loc='lower left')
+    ax.legend(handles=_curve_handles(curves) + hs, fontsize=7.5, loc='lower left')
 
 
-def draw_sy(ax, g, curves, ylim=None):
+def draw_sy(ax, g, curves, plot=True):
     k = g.ky[g.ky_pos]
-    km = ky_max()
-    m = k <= km + 1e-9
-    for c in curves:
-        ax.plot(k[m], _db(c['s'][m]), color=c['color'], lw=c.get('lw', 1.3), ls=c.get('ls', '-'),
-                label=c.get('label'))
-    ax.axvspan(mhz_to_ky(BAND_MHZ[0]), mhz_to_ky(BAND_MHZ[1]), color='cyan', alpha=0.12)
-    ax.set_xlim(0, km * 1.02)
+    m = k <= ky_max() + 1e-9
+    for c in curves if plot else []:
+        ls = c.get('ls', '-')
+        ax.plot(k[m], _db(c['s'][m]), color=c['color'], lw=_lw(ls, c.get('lw', 1.3)), ls=ls)
+    ax.axvspan(mhz_to_ky(BAND_MHZ[0]), mhz_to_ky(BAND_MHZ[1]), **BAND_FILL)
     hs = _res_lines(ax, g.dky, np.pi / dy_m(), 'y')
+    ax.set_xlim(*LIM['ky'])
+    ax.set_ylim(*LIM['sy'])
     ax.set_xlabel('k_y [rad/m]')
     ax.set_ylabel('S_y [dB]')
     ax.set_title('S_y(k_y)')
     ax.grid(alpha=0.3)
-    sec = ax.secondary_xaxis('top', functions=(ky_to_mhz, mhz_to_ky))
-    sec.set_xlabel('f [MHz]')
-    if ylim:
-        ax.set_ylim(*ylim)
-    h0 = [Line2D([], [], color=c['color'], lw=c.get('lw', 1.3), ls=c.get('ls', '-'),
-                 label=c['label']) for c in curves if c.get('label')]
-    h0.append(Patch(fc='cyan', alpha=0.25, label=f'{BAND_MHZ[0]:g}–{BAND_MHZ[1]:g} MHz'))
+    _wl_axis(ax, 'x', WL_TICKS_Y, f'λ_y [m] (ε_r = {EPS_R:g})')
+    h0 = _curve_handles(curves)
+    h0.append(Patch(label=f'{BAND_MHZ[0]:g}–{BAND_MHZ[1]:g} MHz', **BAND_FILL))
     ax.legend(handles=h0 + hs, fontsize=7.5, loc='lower center')
-
-
-def _ylim(arrs, rng=60.0):
-    top = max(float(_db(a).max()) for a in arrs)
-    return top - rng, top + 5
 
 
 def plot_overview(data, outdir, amp):
@@ -400,19 +452,17 @@ def plot_overview(data, outdir, amp):
     st = max(1, OVERVIEW_STRIDE)
     img = np.nan_to_num(data[:, ::st])
     fig, ax = plt.subplots(figsize=(16, 5.5), layout='constrained')
-    ax.imshow(img, aspect='auto', cmap='seismic', vmin=-amp, vmax=amp,
+    # 解析窓の枠の色（r, b, g, ...）が見分けられるよう、全体図の B-scan は灰色で描く
+    ax.imshow(img, aspect='auto', cmap='gray', vmin=-amp, vmax=amp,
               extent=[0, ntr * DX_M, T0_NS + nt * DT_NS, T0_NS])
-    gl = groups()
     for w in WINDOWS:
         col = _win_color(w['name'])
-        ls = GROUP_STYLES[gl.index(_group(w)) % len(GROUP_STYLES)]
         ax.add_patch(Rectangle((w['x_m'][0], w['t0_ns']), w['x_m'][1] - w['x_m'][0], TIME_LEN_NS,
-                               fill=False, ec=col, lw=2, ls=ls))
+                               fill=False, ec=col, lw=2, ls=_group_style(_group(w))))
         ax.text(w['x_m'][0], w['t0_ns'] - 4, w['name'], color=col, fontsize=12, va='bottom',
                 fontweight='bold')
-    ax.legend(handles=[Line2D([], [], color='k', lw=2, ls=GROUP_STYLES[i % len(GROUP_STYLES)],
-                              label=gname) for i, gname in enumerate(gl)],
-              loc='lower right', fontsize=9, framealpha=0.85)
+    ax.legend(handles=[Line2D([], [], color='k', lw=2, ls=_group_style(gn), label=gn)
+                       for gn in groups()], loc='upper right', fontsize=9, framealpha=0.85)
     ax.set_xlabel('Moving distance [m]')
     ax.set_ylabel('Time [ns]')
     sec = ax.secondary_yaxis('right', functions=(lambda t: t * 1e-9 * velocity() / 2,
@@ -427,25 +477,31 @@ def _lname(Ls):
     return f'{Ls:03.0f}' if float(Ls).is_integer() else f'{Ls:05.1f}'.replace('.', 'p')
 
 
-def plot_mean(outdir, gname, Ls, g, res, vmax):
-    fig, axs = plt.subplots(1, 3, figsize=(19, 5.6), layout='constrained',
-                            gridspec_kw={'width_ratios': [1.2, 1, 1]})
-    im = draw_map(axs[0], g, res['S'], vmax)
-    fig.colorbar(im, ax=axs[0], label='dB')
-    cx = [dict(s=res['Sx'], color='k', lw=2.2, label=f'{gname} mean ({res["n"]} segments)')]
-    cy = [dict(s=res['Sy'], color='k', lw=2.2, label=f'{gname} mean ({res["n"]} segments)')]
-    gl = groups()
+def _win_curves(res, show_group):
+    out = []
     for name, r in res['by_win'].items():
-        col = _win_color(name)
         gw = _group(next(w for w in WINDOWS if w['name'] == name))
-        ls = GROUP_STYLES[gl.index(gw) % len(GROUP_STYLES)]
-        lab = f'{name} ({r["n"]})' if gname != ALL_NAME else f'{name}, {gw} ({r["n"]})'
+        lab = f'{name}, {gw} ({r["n"]})' if show_group else f'{name} ({r["n"]})'
+        out.append((name, gw, lab, r))
+    return out
+
+
+def plot_mean(outdir, gname, Ls, g, res):
+    fig, axs = plt.subplots(1, 3, figsize=(19, 5.8), layout='constrained',
+                            gridspec_kw={'width_ratios': [1.2, 1, 1]})
+    im = draw_map(axs[0], g, res['S'])
+    fig.colorbar(im, ax=axs[0], label='dB')
+    ls0 = '-' if gname == ALL_NAME else _group_style(gname)
+    cx = [dict(s=res['Sx'], color=MEAN_COLOR, lw=2.2, ls=ls0,
+               label=f'{gname} mean ({res["n"]} segments)')]
+    cy = [dict(s=res['Sy'], color=MEAN_COLOR, lw=2.2, ls=ls0,
+               label=f'{gname} mean ({res["n"]} segments)')]
+    for name, gw, lab, r in _win_curves(res, gname == ALL_NAME):
+        col, ls = _win_color(name), _group_style(gw)
         cx.append(dict(s=r['Sx'], color=col, lw=1.0, ls=ls, label=lab))
         cy.append(dict(s=r['Sy'], color=col, lw=1.0, ls=ls, label=lab))
-    arrs_x = [res['Sx']] + [r['Sx'] for r in res['by_win'].values()]
-    arrs_y = [res['Sy']] + [r['Sy'] for r in res['by_win'].values()]
-    draw_sx(axs[1], g, cx, _ylim(arrs_x))
-    draw_sy(axs[2], g, cy, _ylim(arrs_y))
+    draw_sx(axs[1], g, cx)
+    draw_sy(axs[2], g, cy)
     names = ', '.join(res['by_win'])
     fig.suptitle(f'Mean spectrum, {gname}, L = {Ls:g} m (windows {names}, {TIME_LEN_NS:g} ns, '
                  f'window: {WINDOW_FUNC})', fontsize=13)
@@ -453,7 +509,7 @@ def plot_mean(outdir, gname, Ls, g, res, vmax):
     plt.close(fig)
 
 
-def plot_segment(path, seg, blk, g, S, Sx, Sy, vmax, ylim_x, ylim_y, amp, t0_ns):
+def plot_segment(path, seg, blk, g, S, Sx, Sy, amp, t0_ns):
     fig = plt.figure(figsize=(16, 10.5), layout='constrained')
     gs = fig.add_gridspec(2, 2)
     ax = fig.add_subplot(gs[0, 0])
@@ -466,10 +522,11 @@ def plot_segment(path, seg, blk, g, S, Sx, Sy, vmax, ylim_x, ylim_y, amp, t0_ns)
                                                  lambda d: d * 2 / velocity() * 1e9))
     sec.set_ylabel(f'Depth [m] (ε_r = {EPS_R:g})')
     ax = fig.add_subplot(gs[0, 1])
-    im = draw_map(ax, g, S, vmax)
+    im = draw_map(ax, g, S)
     fig.colorbar(im, ax=ax, label='dB')
-    draw_sx(fig.add_subplot(gs[1, 0]), g, [dict(s=Sx, color='k')], ylim_x)
-    draw_sy(fig.add_subplot(gs[1, 1]), g, [dict(s=Sy, color='k')], ylim_y)
+    col = _win_color(seg['win'])
+    draw_sx(fig.add_subplot(gs[1, 0]), g, [dict(s=Sx, color=col, label=f'{seg["win"]}')])
+    draw_sy(fig.add_subplot(gs[1, 1]), g, [dict(s=Sy, color=col, label=f'{seg["win"]}')])
     fig.suptitle(f'Window {seg["win"]} ({seg["group"]}), x = {seg["x0"]:.2f}–{seg["x1"]:.2f} m '
                  f'(L = {seg["x1"] - seg["x0"]:.2f} m), t = {t0_ns:g}–{t0_ns + TIME_LEN_NS:g} ns',
                  fontsize=13)
@@ -477,81 +534,83 @@ def plot_segment(path, seg, blk, g, S, Sx, Sy, vmax, ylim_x, ylim_y, amp, t0_ns)
     plt.close(fig)
 
 
-def _compare_axes(axs, kxmin):
-    axs[0].set_xlabel('k_x [rad/m]')
-    axs[0].set_ylabel('S_x [dB]')
-    axs[0].set_title(f'S_x(k_x), k_y in {BAND_MHZ[0]:g}–{BAND_MHZ[1]:g} MHz')
-    axs[0].set_xlim(0.8 * kxmin, 1.25 * np.pi / DX_M)
-    axs[1].axvspan(mhz_to_ky(BAND_MHZ[0]), mhz_to_ky(BAND_MHZ[1]), color='cyan', alpha=0.12)
-    axs[1].set_xlim(0, ky_max() * 1.02)
-    axs[1].set_xlabel('k_y [rad/m]')
-    axs[1].set_ylabel('S_y [dB]')
-    axs[1].set_title('S_y(k_y)')
-    sec = axs[1].secondary_xaxis('top', functions=(ky_to_mhz, mhz_to_ky))
-    sec.set_xlabel('f [MHz]')
-    for ax in axs:
-        ax.grid(alpha=0.3, which='both')
-
-
 def plot_compare_lengths(outdir, gname, res_by_L):
-    fig, axs = plt.subplots(1, 2, figsize=(15, 5.8), layout='constrained')
-    cols = plt.cm.viridis(np.linspace(0.05, 0.85, len(res_by_L)))
-    hx, hy = [], []
-    for (Ls, (g, res)), col in zip(res_by_L.items(), cols):
-        axs[0].semilogx(g.kx[g.kx_pos], _db(res['Sx']), color=col, lw=1.5)
-        axs[0].axvline(g.dkx, color=col, ls='-.', lw=0.9)
-        hx.append(Line2D([], [], color=col, lw=1.5,
-                         label=f'L = {Ls:g} m ({res["n"]} seg.), Δk_x = {g.dkx:.3f}'))
-        ky = g.ky[g.ky_pos]
-        m = ky <= ky_max() + 1e-9
-        axs[1].plot(ky[m], _db(res['Sy'][m]), color=col, lw=1.5)
-        hy.append(Line2D([], [], color=col, lw=1.5, label=f'L = {Ls:g} m'))
-    g0 = next(iter(res_by_L.values()))[0]
-    _compare_axes(axs, min(g.dkx for g, _ in res_by_L.values()))
-    hx += _res_lines(axs[0], g0.dkx, np.pi / DX_M, 'x', show_dk=False)
-    hx.append(Line2D([], [], color='k', ls='-.', lw=0.9, label='Δk_x (colour = L)'))
-    hy += _res_lines(axs[1], g0.dky, np.pi / dy_m(), 'y')
-    axs[0].legend(handles=hx, fontsize=7.5, loc='lower left')
-    axs[1].legend(handles=hy, fontsize=7.5, loc='lower center')
-    top = max(float(_db(r['Sx']).max()) for _, r in res_by_L.values())
-    axs[0].set_ylim(top - 60, top + 5)
-    top = max(float(_db(r['Sy']).max()) for _, r in res_by_L.values())
-    axs[1].set_ylim(top - 60, top + 5)
+    fig, axs = plt.subplots(1, 2, figsize=(15, 6.0), layout='constrained')
+    cx, cy, dks = [], [], []
+    for i, (Ls, (g, res)) in enumerate(res_by_L.items()):
+        col = LENGTH_COLORS[i % len(LENGTH_COLORS)]
+        cx.append((g, dict(s=res['Sx'], color=col, lw=1.5,
+                           label=f'L = {Ls:g} m ({res["n"]} seg.), Δk_x = {g.dkx:.3f}')))
+        cy.append((g, dict(s=res['Sy'], color=col, lw=1.5, label=f'L = {Ls:g} m')))
+        dks.append((g.dkx, col))
+    # 区間長ごとに k 軸が違うので 1 本ずつ描き、凡例と範囲は最後にまとめる
+    for g, c in cx:
+        axs[0].semilogx(g.kx[g.kx_pos], _db(c['s']), color=c['color'], lw=c['lw'])
+    draw_sx(axs[0], cx[0][0], [c for _, c in cx], dk_lines=dks, plot=False)
+    for g, c in cy:
+        k = g.ky[g.ky_pos]
+        m = k <= ky_max() + 1e-9
+        axs[1].plot(k[m], _db(c['s'][m]), color=c['color'], lw=c['lw'])
+    draw_sy(axs[1], cy[0][0], [c for _, c in cy], plot=False)
     fig.suptitle(f'Mean spectra for different segment lengths ({gname})', fontsize=13)
     fig.savefig(os.path.join(outdir, f'compare_lengths_{gname}.png'), dpi=DPI)
     plt.close(fig)
 
 
 def plot_compare_groups(outdir, Ls, res_by_group):
-    fig, axs = plt.subplots(1, 2, figsize=(15, 5.8), layout='constrained')
-    hx, hy = [], []
-    for i, (gname, (g, res)) in enumerate(res_by_group.items()):
-        ls = GROUP_STYLES[i % len(GROUP_STYLES)]
-        axs[0].semilogx(g.kx[g.kx_pos], _db(res['Sx']), color='k', lw=1.6, ls=ls)
-        ky = g.ky[g.ky_pos]
-        m = ky <= ky_max() + 1e-9
-        axs[1].plot(ky[m], _db(res['Sy'][m]), color='k', lw=1.6, ls=ls)
-        for name, r in res['by_win'].items():
-            col = _win_color(name)
-            axs[0].semilogx(g.kx[g.kx_pos], _db(r['Sx']), color=col, lw=0.9, ls=ls)
-            axs[1].plot(ky[m], _db(r['Sy'][m]), color=col, lw=0.9, ls=ls)
-            hx.append(Line2D([], [], color=col, lw=0.9, ls=ls, label=f'{name} ({r["n"]})'))
-        hx.insert(len(hx) - len(res['by_win']),
-                  Line2D([], [], color='k', lw=1.6, ls=ls, label=f'{gname} mean ({res["n"]})'))
-    g0 = next(iter(res_by_group.values()))[0]
-    _compare_axes(axs, g0.dkx)
-    hy = list(hx)
-    hx += _res_lines(axs[0], g0.dkx, np.pi / DX_M, 'x')
-    hy += _res_lines(axs[1], g0.dky, np.pi / dy_m(), 'y')
-    axs[0].legend(handles=hx, fontsize=7.5, loc='lower left')
-    axs[1].legend(handles=hy, fontsize=7.5, loc='lower center')
-    top = max(float(_db(r['Sx']).max()) for _, r in res_by_group.values())
-    axs[0].set_ylim(top - 60, top + 5)
-    top = max(float(_db(r['Sy']).max()) for _, r in res_by_group.values())
-    axs[1].set_ylim(top - 60, top + 5)
+    fig, axs = plt.subplots(1, 2, figsize=(15, 6.0), layout='constrained')
+    curves_x, curves_y = [], []
+    g0 = None
+    for gname, (g, res) in res_by_group.items():
+        g0 = g
+        ls = _group_style(gname)
+        curves_x.append(dict(s=res['Sx'], color=MEAN_COLOR, lw=1.8, ls=ls,
+                             label=f'{gname} mean ({res["n"]})'))
+        curves_y.append(dict(s=res['Sy'], color=MEAN_COLOR, lw=1.8, ls=ls,
+                             label=f'{gname} mean ({res["n"]})'))
+        for name, gw, lab, r in _win_curves(res, False):
+            curves_x.append(dict(s=r['Sx'], color=_win_color(name), lw=1.0, ls=ls, label=lab))
+            curves_y.append(dict(s=r['Sy'], color=_win_color(name), lw=1.0, ls=ls, label=lab))
+    draw_sx(axs[0], g0, curves_x)
+    draw_sy(axs[1], g0, curves_y)
     fig.suptitle(f'Mean spectra by group, L = {Ls:g} m', fontsize=13)
     fig.savefig(os.path.join(outdir, f'compare_groups_L{_lname(Ls)}m.png'), dpi=DPI)
     plt.close(fig)
+
+
+def set_common_limits(all_L):
+    """全図に共通の軸の範囲を決める（横軸・縦軸・2 次元図の色）"""
+    kn_x, kn_y = np.pi / DX_M, np.pi / dy_m()
+    dkx_min = min(d['g'].dkx for d in all_L.values())
+    LIM['kx'] = (0.8 * dkx_min, 1.25 * kn_x)
+    LIM['kx_map'] = (-kn_x, kn_x)
+    LIM['ky'] = (0.0, ky_max() * 1.02)
+    LIM['ky_map'] = (0.0, ky_max())
+    tops_x, tops_y, bots_x, bots_y, map_max = [], [], [], [], []
+    for d in all_L.values():
+        g = d['g']
+        mky = (g.ky[g.ky_pos] <= ky_max() + 1e-9) & (g.ky[g.ky_pos] >= 2 * g.dky)
+        for sx, sy in d['seg_marg']:                       # 区間ごとの線（上端を決める）
+            tops_x.append(_db(sx).max())
+            tops_y.append(_db(sy[mky]).max())
+        for byL in d['res'].values():                      # 平均の線（下端を決める）
+            curves = [(byL['Sx'], byL['Sy'])] + [(r['Sx'], r['Sy']) for r in byL['by_win'].values()]
+            for sx, sy in curves:
+                bots_x.append(_db(sx).min())
+                bots_y.append(_db(sy[mky]).min())
+            map_max.append(_db(byL['S'][g.ky <= ky_max() + 1e-9]).max())
+    for key, user, tops, bots in (('sx', SX_YLIM_DB, tops_x, bots_x), ('sy', SY_YLIM_DB, tops_y, bots_y)):
+        if user is not None:
+            LIM[key] = tuple(user)
+        else:
+            top = float(max(tops)) + 3.0
+            bot = max(float(min(bots)) - 3.0, top - SPEC_DB_RANGE_MAX)
+            LIM[key] = (bot, top)
+    vmax = float(max(map_max)) + 5.0
+    LIM['map'] = (vmax - DB_RANGE, vmax)
+    print('共通の軸: k_x {:.3f}-{:.1f}、k_y 0-{:.1f} rad/m、S_x {:.1f}-{:.1f} dB、S_y {:.1f}-{:.1f} dB、'
+          '2 次元図 {:.1f}-{:.1f} dB'.format(LIM['kx'][0], LIM['kx'][1], LIM['ky'][1], *LIM['sx'],
+                                          *LIM['sy'], *LIM['map']))
 
 
 # =============================================================================
@@ -604,14 +663,15 @@ def main():
     gl = groups()
     # 平均をとる単位：各グループと、グループが 2 つ以上あれば全解析窓をまとめたもの（all）
     avg_units = gl + ([ALL_NAME] if len(gl) > 1 else [])
-    results = {gname: {} for gname in avg_units}     # results[group][Ls] = (grid, res)
     info = dict(settings={k: v for k, v in globals().items()
                           if k.isupper() and isinstance(v, (int, float, str, tuple, list,
                                                             dict, type(None)))},
                 data_path=os.path.abspath(data_path), shape=[nt, ntr],
                 nyquist=dict(kx=np.pi / DX_M, ky=np.pi / dy_m()), lengths={})
+
+    # ---- 1. すべての区間長でスペクトルを計算する（軸の範囲を全図で揃えるため、描く前に全部）
+    all_L = {}
     for Ls in SEG_LENGTHS_M:
-        t = time.time()
         ny = int(round(TIME_LEN_NS / DT_NS))
         nx = int(round(Ls / DX_M))
         g = Grid(ny, nx)
@@ -620,11 +680,8 @@ def main():
             for s in segments(w, blk, ix0, Ls, bad):
                 s['group'] = _group(w)
                 segs.append(s)
-                if s['ok']:
-                    b = np.nan_to_num(blk[:, s['col']:s['col'] + nx])
-                    spectra.append(g.psd(b))
-                else:
-                    spectra.append(None)
+                spectra.append(g.psd(np.nan_to_num(blk[:, s['col']:s['col'] + nx]))
+                               if s['ok'] else None)
         good = [i for i, sp in enumerate(spectra) if sp is not None]
         print('L = {:g} m: 区間 {}（除外 {}）、Δk_x = {:.3f} rad/m、Δk_y = {:.3f} rad/m'.format(
             Ls, len(good), len(segs) - len(good), g.dkx, g.dky))
@@ -635,11 +692,10 @@ def main():
             if n_ok == 0:
                 msg += '  ** 全区間が除外されたので、この窓はどの図にも入りません **'
             print(msg)
-        vmax_g, ylim_g = {}, {}
+        res_g = {}
         for gname in avg_units:
             gi = [i for i in good if gname == ALL_NAME or segs[i]['group'] == gname]
             if not gi:
-                print('  {}: 有効な区間がありません'.format(gname))
                 continue
             Smean = np.mean([spectra[i] for i in gi], axis=0)
             Sx, Sy = g.marginals(Smean)
@@ -649,46 +705,60 @@ def main():
                 if idx:
                     sx, sy = g.marginals(np.mean([spectra[i] for i in idx], axis=0))
                     res['by_win'][w['name']] = dict(Sx=sx, Sy=sy, n=len(idx))
-            results[gname][Ls] = (g, res)
-            vmax_g[gname] = float(_db(Smean[g.ky <= ky_max() + 1e-9]).max())
-            ylx, yly = _ylim([Sx], 50.0), _ylim([Sy], 60.0)
-            ylim_g[gname] = ((ylx[0], ylx[1] + 10), (yly[0], yly[1] + 10))
-            plot_mean(outdir, gname, Ls, g, res, vmax_g[gname])
-            print('  {}: {} 区間 -> {}'.format(
-                gname, len(gi), os.path.join(outdir, f'mean_{gname}_L{_lname(Ls)}m.png')))
-        here = {gname: results[gname][Ls] for gname in gl if Ls in results[gname]}   # all は除く
-        if len(here) > 1:
-            plot_compare_groups(outdir, Ls, here)
-
-        if SAVE_SEGMENT_FIGS:
-            sub = os.path.join(outdir, f'L{_lname(Ls)}m')
-            os.makedirs(sub, exist_ok=True)
-            for i in good:
-                s = segs[i]
-                w, blk, ix0, _ = blocks[s['win']]
-                sx, sy = g.marginals(spectra[i])
-                fn = '{}_x{:07.2f}-{:07.2f}m.png'.format(s['win'], s['x0'], s['x1'])
-                plot_segment(os.path.join(sub, fn), s, np.nan_to_num(blk[:, s['col']:s['col'] + nx]),
-                             g, spectra[i], sx, sy, vmax_g[s['group']] + 10, *ylim_g[s['group']],
-                             amp, w['t0_ns'])
-            print('  -> {}/（{} 枚）'.format(sub, len(good)))
+            res_g[gname] = res
+        seg_marg = [g.marginals(spectra[i]) for i in good]
+        all_L[Ls] = dict(g=g, nx=nx, segs=segs, spectra=spectra, good=good, res=res_g,
+                         seg_marg=seg_marg)
         info['lengths'][str(Ls)] = dict(
             n_used=len(good), n_excluded=len(segs) - len(good), dkx=g.dkx, dky=g.dky, nx=nx, ny=ny,
             segments=[{k: v for k, v in s.items() if k != 'col'} for s in segs])
-        print('  ({:.0f} s)'.format(time.time() - t))
+    if not any(d['good'] for d in all_L.values()):
+        raise SystemExit('有効な区間がありません')
 
-    np.savez(os.path.join(outdir, 'spectra_mean.npz'),
-             **{f'{gname}_L{_lname(Ls)}_{key}': val
-                for gname, byL in results.items() for Ls, (g, r) in byL.items()
-                for key, val in (('kx', g.kx), ('ky', g.ky), ('S', r['S']),
-                                 ('kx_pos', g.kx[g.kx_pos]), ('Sx', r['Sx']),
-                                 ('ky_pos', g.ky[g.ky_pos]), ('Sy', r['Sy']),
-                                 ('n', np.array(r['n'])))})
-    for gname, byL in results.items():
+    # ---- 2. 全図に共通の軸の範囲
+    set_common_limits(all_L)
+
+    # ---- 3. 図
+    for Ls, d in all_L.items():
+        t = time.time()
+        g = d['g']
+        for gname, res in d['res'].items():
+            plot_mean(outdir, gname, Ls, g, res)
+            print('  L = {:g} m, {}: {} 区間 -> {}'.format(
+                Ls, gname, res['n'], os.path.join(outdir, f'mean_{gname}_L{_lname(Ls)}m.png')))
+        here = {gname: (g, d['res'][gname]) for gname in gl if gname in d['res']}   # all は除く
+        if len(here) > 1:
+            plot_compare_groups(outdir, Ls, here)
+        if SAVE_SEGMENT_FIGS:
+            sub = os.path.join(outdir, f'L{_lname(Ls)}m')
+            os.makedirs(sub, exist_ok=True)
+            for j, i in enumerate(d['good']):
+                s = d['segs'][i]
+                w, blk, ix0, _ = blocks[s['win']]
+                sx, sy = d['seg_marg'][j]
+                fn = '{}_x{:07.2f}-{:07.2f}m.png'.format(s['win'], s['x0'], s['x1'])
+                plot_segment(os.path.join(sub, fn), s,
+                             np.nan_to_num(blk[:, s['col']:s['col'] + d['nx']]),
+                             g, d['spectra'][i], sx, sy, amp, w['t0_ns'])
+            print('  -> {}/（{} 枚、{:.0f} s）'.format(sub, len(d['good']), time.time() - t))
+
+    for gname in avg_units:
+        byL = {Ls: (d['g'], d['res'][gname]) for Ls, d in all_L.items() if gname in d['res']}
         if byL:
             plot_compare_lengths(outdir, gname, byL)
+    np.savez(os.path.join(outdir, 'spectra_mean.npz'),
+             **{f'{gname}_L{_lname(Ls)}_{key}': val
+                for Ls, d in all_L.items() for gname, r in d['res'].items()
+                for key, val in (('kx', d['g'].kx), ('ky', d['g'].ky), ('S', r['S']),
+                                 ('kx_pos', d['g'].kx[d['g'].kx_pos]), ('Sx', r['Sx']),
+                                 ('ky_pos', d['g'].ky[d['g'].ky_pos]), ('Sy', r['Sy']),
+                                 ('n', np.array(r['n'])))})
+    info['common_limits'] = {k: list(v) for k, v in LIM.items()}
+    info['colors'] = {w['name']: COLOR_NAMES.get(_win_color(w['name']), _win_color(w['name']))
+                      for w in WINDOWS}
     with open(os.path.join(outdir, 'run_info.json'), 'w', encoding='utf-8') as fh:
         json.dump(info, fh, ensure_ascii=False, indent=1, default=str)
+    print('線の色: ' + ', '.join('{} = {}'.format(k, v) for k, v in info['colors'].items()))
     print('完了（{:.0f} s）。出力先: {}'.format(time.time() - t_all, outdir))
 
 
